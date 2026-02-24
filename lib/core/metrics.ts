@@ -73,29 +73,48 @@ export const METRICS = {
         return data?.current_occupancy || 0;
     },
 
+    // Returns current occupancy for each area in a venue
     getAreaSummaries: async (venueId: string) => {
         const sb = getSupabase();
-        const { data, error } = await sb.rpc('get_area_summaries', { p_venue_id: venueId });
-        if (error) throw error;
+        const { data, error } = await sb
+            .from('occupancy_snapshots')
+            .select('area_id, current_occupancy, updated_at, areas(name, capacity_max)')
+            .eq('venue_id', venueId);
+        if (error) {
+            logError('metrics:getAreaSummaries', error.message, { venueId });
+            throw error;
+        }
         return data || [];
     },
 
+    // Returns current occupancy per venue for a business
     getVenueSummaries: async (businessId: string) => {
         const sb = getSupabase();
-        const { data, error } = await sb.rpc('get_venue_summaries', { p_business_id: businessId });
-        if (error) throw error;
+        const { data, error } = await sb
+            .from('occupancy_snapshots')
+            .select('venue_id, current_occupancy, venues(name, capacity_max)')
+            .eq('business_id', businessId);
+        if (error) {
+            logError('metrics:getVenueSummaries', error.message, { businessId }, undefined, businessId);
+            throw error;
+        }
         return data || [];
     },
 
+    // Returns hourly traffic buckets (entries_in, entries_out, net_delta per hour)
     getDailyTrafficSummary: async (businessId: string, venueId: string, startDate: string, endDate: string) => {
         const sb = getSupabase();
-        const { data, error } = await sb.rpc('get_daily_traffic_summary', {
+        const { data, error } = await sb.rpc('get_hourly_traffic', {
             p_business_id: businessId,
             p_venue_id: venueId,
-            p_start_date: startDate,
-            p_end_date: endDate
+            p_area_id: null,
+            p_start_ts: startDate,
+            p_end_ts: endDate
         });
-        if (error) throw error;
+        if (error) {
+            logError('metrics:getDailyTrafficSummary', error.message, { businessId, venueId, startDate, endDate }, undefined, businessId);
+            throw error;
+        }
         return data || [];
     },
 
@@ -107,7 +126,7 @@ export const METRICS = {
             p_venue_id: venueId || null
         });
         if (error) {
-            console.error("Ban check failed", error);
+            logError('metrics:checkBanStatus', error.message, { businessId, patronId, venueId }, undefined, businessId);
             return { is_banned: false };
         }
         return data;

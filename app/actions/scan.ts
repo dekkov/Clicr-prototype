@@ -1,9 +1,9 @@
 'use server';
 
-import { createHash } from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { IDScanEvent } from '@/lib/types';
 import { ParsedID } from '@/lib/aamva';
+import { logError } from '@/lib/core/errors';
 
 export type ScanResult = {
     status: 'ACCEPTED' | 'DENIED' | 'WARNED' | 'ERROR';
@@ -12,38 +12,58 @@ export type ScanResult = {
 
 export async function submitScanAction(
     venueId: string,
-    result: ScanResult, // Just the status/message
-    rawDetails: ParsedID // The full parsed ID data
+    result: ScanResult,
+    rawDetails: ParsedID
 ): Promise<IDScanEvent | null> {
     console.log("SERVER ACTION: submitScanAction started for venue:", venueId);
 
     const issuingState = rawDetails.state || 'Unknown';
+    // NOTE (V1/V2): supabaseAdmin bypasses RLS. This route should eventually use a session
+    // client enforcing row-level security, or delegate to MUTATIONS.recordScan().
+    const businessId = await getBusinessId(venueId);
 
-    // GENERATE SECURE HASH (Standardized format: ID_NUMBER:STATE uppercase)
-    const idString = `${rawDetails.idNumber || ''}:${issuingState}`.toUpperCase();
-    const idHash = createHash('sha256').update(idString).digest('hex');
-
-    // 0. SERVER-SIDE BAN CHECK (Source of Truth)
-    let finalStatus = result.status === 'DENIED' ? 'DENIED' : 'ACCEPTED';
-
-    // Check if this hash is banned
-    const { data: banHit } = await supabaseAdmin
-        .from('bans')
-        .select('*')
-        .eq('id_hash', idHash)
-        .eq('active', true)
-        .eq('business_id', (await getBusinessId(venueId))) // Optional: Check scope? For now global hash check is safer
-        .maybeSingle();
-
-    if (banHit) {
-        console.log("SERVER ACTION: DETECTED BAN HIT", banHit.id);
-        finalStatus = 'BANNED';
+    // C3: business_id is NOT NULL in id_scans — abort early if it can't be resolved
+    if (!businessId) {
+        logError('scan:submitScanAction', 'Could not resolve business_id for venue', { venueId });
+        return null;
     }
 
-    // 1. Construct the object for scan_events (Legacy/Quick Table)
+    // 0. SERVER-SIDE BAN CHECK using patron_bans + banned_persons
+    let finalStatus = result.status === 'DENIED' ? 'DENIED' : 'ACCEPTED';
+
+    const last4 = rawDetails.idNumber ? rawDetails.idNumber.slice(-4) : null;
+    if (last4 && businessId) {
+        const { data: matchedPersons } = await supabaseAdmin
+            .from('banned_persons')
+            .select('id')
+            .eq('id_number_last4', last4)
+            .eq('issuing_state_or_country', issuingState)
+            .eq('business_id', businessId);
+
+        if (matchedPersons && matchedPersons.length > 0) {
+            for (const person of matchedPersons) {
+                const { data: banResult } = await supabaseAdmin.rpc('check_ban_status', {
+                    p_business_id: businessId,
+                    p_patron_id: person.id,
+                    p_venue_id: venueId
+                });
+                // D1: handle both RETURNS TABLE (array) and RETURNS jsonb (object) – migration conflict
+                const banRow = Array.isArray(banResult) ? banResult[0] : banResult;
+                if (banRow?.is_banned) {
+                    console.log("SERVER ACTION: DETECTED BAN HIT for person", person.id);
+                    finalStatus = 'BANNED';
+                    break;
+                }
+            }
+        }
+    }
+
+    // 1. Construct the scan record for id_scans
+    // C2: scan_result CHECK only allows 'ACCEPTED'|'DENIED'|'WARNED'|'ERROR'; BANNED maps to DENIED
     const scanEvent = {
+        business_id: businessId,
         venue_id: venueId,
-        scan_result: finalStatus, // Cast to match type
+        scan_result: finalStatus === 'BANNED' ? 'DENIED' : finalStatus,
         age: rawDetails.age || 0,
         age_band: getAgeBand(rawDetails.age || 0),
         sex: rawDetails.sex || 'U',
@@ -56,77 +76,50 @@ export async function submitScanAction(
         id_number_last4: rawDetails.idNumber ? rawDetails.idNumber.slice(-4) : null,
         issuing_state: issuingState,
         id_type: 'DRIVERS_LICENSE',
-
-        // Metadata
-        timestamp: new Date().toISOString()
     };
 
-    // 2. Persist to scan_events using Admin Client (Bypass RLS)
+    // 2. Persist to id_scans
     const { data, error } = await supabaseAdmin
-        .from('scan_events')
+        .from('id_scans')
         .insert([scanEvent])
         .select()
         .single();
 
     if (error) {
-        console.error("SERVER ACTION ERROR: Supabase Write to scan_events failed:", error);
+        logError('scan:submitScanAction', `Write to id_scans failed: ${error.message}`, { venueId, businessId }, undefined, businessId);
         throw new Error(`Failed to save scan: ${error.message}`);
     }
 
-    // 3. Optional: Attempt duplicate write to scan_logs for occupancy/analytics
+    // 3. If accepted, increment occupancy atomically
     try {
-        const businessId = await getBusinessId(venueId);
+        if (businessId && finalStatus === 'ACCEPTED') {
+            const { data: areaData } = await supabaseAdmin
+                .from('areas')
+                .select('id')
+                .eq('venue_id', venueId)
+                .limit(1)
+                .single();
 
-        if (businessId) {
-            // Write to scan_logs
-            await supabaseAdmin.from('scan_logs').insert({
-                business_id: businessId,
-                venue_id: venueId,
-                timestamp: scanEvent.timestamp,
-                age: scanEvent.age,
-                gender: scanEvent.sex,
-                zip_code: scanEvent.zip_code,
-                scan_result: finalStatus === 'DENIED' || finalStatus === 'BANNED' ? 'DENIED' : 'ACCEPTED', // Map BANNED to DENIED for analytics enum match
-                id_hash: idHash, // REAL HASH
-                created_at: scanEvent.timestamp
-            });
-
-            // If Accepted, also increment Occupancy
-            if (scanEvent.scan_result === 'ACCEPTED') {
-                // Fetch first area for venue (assume General Admission/Default)
-                const { data: areaData } = await supabaseAdmin
-                    .from('areas')
-                    .select('id')
-                    .eq('venue_id', venueId)
-                    .limit(1)
-                    .single();
-
-                if (areaData?.id) {
-                    await supabaseAdmin.rpc('process_occupancy_event', {
-                        p_business_id: businessId,
-                        p_venue_id: venueId,
-                        p_area_id: areaData.id,
-                        p_device_id: 'SCANNER',
-                        p_user_id: null,
-                        p_delta: 1,
-                        p_flow_type: 'IN',
-                        p_event_type: 'SCAN',
-                        p_session_id: null
-                    });
-                } else {
-                    console.warn(`[Scan] No area found for venue ${venueId} - skipping occupancy increment`);
-                }
+            if (areaData?.id) {
+                await supabaseAdmin.rpc('apply_occupancy_delta', {
+                    p_business_id: businessId,
+                    p_venue_id: venueId,
+                    p_area_id: areaData.id,
+                    p_delta: 1,
+                    p_source: 'scan'
+                });
+            } else {
+                console.warn(`[Scan] No area found for venue ${venueId} - skipping occupancy increment`);
             }
         }
     } catch (e) {
-        console.warn("SERVER ACTION: Could not sync to scan_logs/occupancy (non-fatal):", e);
+        console.warn("[Scan] Could not increment occupancy (non-fatal):", e);
     }
 
-    // Convert back to IDScanEvent with correct status
     return {
         ...data,
-        scan_result: finalStatus, // Return the BANNED status so UI can react
-        timestamp: new Date(data.timestamp).getTime()
+        scan_result: finalStatus,
+        timestamp: new Date(data.created_at).getTime()
     } as IDScanEvent;
 }
 
@@ -138,9 +131,9 @@ async function getBusinessId(venueId: string) {
 
 export async function getRecentScansAction(venueId?: string): Promise<IDScanEvent[]> {
     let query = supabaseAdmin
-        .from('scan_events')
+        .from('id_scans')
         .select('*')
-        .order('timestamp', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(100);
 
     if (venueId) {
@@ -150,13 +143,13 @@ export async function getRecentScansAction(venueId?: string): Promise<IDScanEven
     const { data, error } = await query;
 
     if (error) {
-        console.error("Supabase Fetch Error:", error);
+        logError('scan:getRecentScansAction', error.message, { venueId });
         return [];
     }
 
     return data.map((d) => ({
         ...d,
-        timestamp: new Date(d.timestamp).getTime()
+        timestamp: new Date(d.created_at).getTime()
     }));
 }
 

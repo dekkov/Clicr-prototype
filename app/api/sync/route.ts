@@ -36,7 +36,7 @@ async function hydrateData(data: DBData): Promise<DBData> {
                 city: 'City', // Fallback as schema might differ slightly
                 state: 'State',
                 zip: '00000',
-                capacity: v.total_capacity,
+                capacity: v.capacity_max,
                 timezone: v.timezone || 'UTC',
 
                 // Required fields by Type
@@ -52,7 +52,7 @@ async function hydrateData(data: DBData): Promise<DBData> {
                 id: a.id,
                 venue_id: a.venue_id,
                 name: a.name,
-                default_capacity: a.capacity,
+                default_capacity: a.capacity_max,
                 parent_area_id: a.parent_area_id,
 
                 // Required fields by Type
@@ -89,7 +89,14 @@ async function hydrateData(data: DBData): Promise<DBData> {
             });
         }
 
-        // 1. Fetch Occupancy Snapshots (Source of Truth for Counts)
+        // 1. Fetch Occupancy Events first (needed as fallback inside snapshot mapping below)
+        const { data: occEvents } = await supabaseAdmin
+            .from('occupancy_events')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(100);
+
+        // 2. Fetch Occupancy Snapshots (Source of Truth for Counts)
         const { data: snapshots, error: snapError } = await supabaseAdmin
             .from('occupancy_snapshots')
             .select('*');
@@ -140,24 +147,16 @@ async function hydrateData(data: DBData): Promise<DBData> {
             // BUT use snapshots for "Total Area Occupancy".
         }
 
-        // 2. Fetch Recent Logs (for activity feed)
-        const { data: occEvents, error: occError } = await supabaseAdmin
-            .from('occupancy_events')
-            .select('*')
-            .order('timestamp', { ascending: false })
-            .limit(100);
-
-        if (occError) console.error("Supabase Occupancy Fetch Error:", occError);
-
-        if (!occError && occEvents) {
+        // 3. Map Occupancy Events to app format (occEvents already fetched above)
+        if (occEvents) {
             data.events = occEvents.map((e: any) => ({
                 id: e.id,
                 venue_id: e.venue_id,
                 area_id: e.area_id || '',
-                clicr_id: e.session_id || '',
+                clicr_id: e.device_id || '',
                 user_id: 'system',
                 business_id: e.business_id,
-                timestamp: new Date(e.timestamp).getTime(),
+                timestamp: new Date(e.created_at).getTime(),
                 delta: e.delta,
                 flow_type: e.flow_type as any,
                 event_type: e.event_type as any,
@@ -171,15 +170,15 @@ async function hydrateData(data: DBData): Promise<DBData> {
 
         // 2. Fetch Scan Events
         const { data: scans, error: scanError } = await supabaseAdmin
-            .from('scan_events')
+            .from('id_scans')
             .select('*')
-            .order('timestamp', { ascending: false })
+            .order('created_at', { ascending: false })
             .limit(100);
 
         if (!scanError && scans) {
             data.scanEvents = scans.map((s: any) => ({
                 ...s,
-                timestamp: new Date(s.timestamp).getTime()
+                timestamp: new Date(s.created_at).getTime()
             })) as IDScanEvent[];
         }
 
@@ -193,7 +192,7 @@ async function hydrateData(data: DBData): Promise<DBData> {
             // Also merge new devices from DB if they don't exist locally
             devices.forEach((d: any) => {
                 const exists = data.clicrs.find(c => c.id === d.id);
-                if (!exists && d.device_type === 'COUNTER_ONLY') {
+                if (!exists && d.device_type === 'COUNTER') {
                     data.clicrs.push({
                         id: d.id,
                         area_id: d.area_id,
@@ -201,7 +200,7 @@ async function hydrateData(data: DBData): Promise<DBData> {
                         current_count: 0,
                         flow_mode: 'BIDIRECTIONAL',
                         active: true,
-                        button_config: d.config?.button_config || {
+                        button_config: d.button_config || {
                             left: { label: 'IN', delta: 1, color: 'green' },
                             right: { label: 'OUT', delta: -1, color: 'red' }
                         }
@@ -215,7 +214,7 @@ async function hydrateData(data: DBData): Promise<DBData> {
                     return {
                         ...c,
                         name: match.name, // Persisted name
-                        button_config: match.config?.button_config || c.button_config // Persisted buttons
+                        button_config: match.button_config || c.button_config // Persisted buttons
                     };
                 }
                 return c;
@@ -358,16 +357,15 @@ export async function POST(request: Request) {
 
                 // ATOMIC UPDATE via RPC
                 try {
-                    const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('process_occupancy_event', {
+                    const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('apply_occupancy_delta', {
                         p_business_id: finalEventBizId,
                         p_venue_id: event.venue_id,
                         p_area_id: event.area_id,
-                        p_device_id: event.clicr_id, // Map session_id to device_id better if possible, or use one field
-                        p_user_id: userId || '00000000-0000-0000-0000-000000000000', // Fallback UUID
                         p_delta: event.delta,
-                        p_flow_type: event.flow_type,
-                        p_event_type: event.event_type,
-                        p_session_id: event.clicr_id
+                        p_source: event.event_type === 'SCAN' ? 'scan' : event.event_type === 'AUTO_SCAN' ? 'auto_scan' : 'manual',
+                        p_device_id: null,
+                        p_gender: event.gender || null,
+                        p_idempotency_key: event.idempotency_key || null
                     });
 
                     if (rpcError) throw rpcError;
@@ -387,20 +385,25 @@ export async function POST(request: Request) {
                 const scan = payload as IDScanEvent;
                 // PERSIST: Save scan to Supabase
                 try {
-                    await supabaseAdmin.from('scan_events').insert({
-                        business_id: 'biz_001',
+                    // D3: Resolve business_id dynamically instead of hardcoded 'biz_001'
+                    let scanBizId: string | null = null;
+                    if (userId) {
+                        const { data: scanProfile } = await supabaseAdmin.from('profiles').select('business_id').eq('id', userId).single();
+                        if (scanProfile) scanBizId = scanProfile.business_id;
+                    }
+                    await supabaseAdmin.from('id_scans').insert({
+                        business_id: scanBizId || scan.business_id || 'biz_001',
                         venue_id: scan.venue_id,
-                        timestamp: new Date(scan.timestamp).toISOString(),
                         scan_result: scan.scan_result,
                         age: scan.age,
-                        gender: scan.sex, // Map sex -> gender
+                        sex: scan.sex,
                         zip_code: scan.zip_code,
 
                         // PII Fields
                         first_name: scan.first_name,
                         last_name: scan.last_name,
                         dob: scan.dob,
-                        id_number: scan.id_number,
+                        id_number_last4: scan.id_number_last4,
                         issuing_state: scan.issuing_state,
                         city: scan.city,
                         address_street: scan.address_street
@@ -411,8 +414,21 @@ export async function POST(request: Request) {
 
             case 'RESET_COUNTS':
                 if (body.venue_id) {
-                    await supabaseAdmin.from('occupancy_events').delete().eq('venue_id', body.venue_id);
-                    await supabaseAdmin.from('scan_events').delete().eq('venue_id', body.venue_id);
+                    // D2: Use reset_counts RPC to zero snapshots; events are audit records and must not be hard-deleted
+                    let resetBizId: string | null = null;
+                    if (userId) {
+                        const { data: resetProfile } = await supabaseAdmin.from('profiles').select('business_id').eq('id', userId).single();
+                        if (resetProfile) resetBizId = resetProfile.business_id;
+                    }
+                    if (resetBizId) {
+                        await supabaseAdmin.rpc('reset_counts', {
+                            p_scope: 'VENUE',
+                            p_business_id: resetBizId,
+                            p_venue_id: body.venue_id
+                        });
+                    } else {
+                        console.warn('[RESET_COUNTS] Could not resolve business_id — Supabase snapshots not zeroed. Local state reset only.');
+                    }
                 }
                 updatedData = resetAllCounts(body.venue_id);
                 break;
@@ -463,10 +479,9 @@ export async function POST(request: Request) {
                         business_id: clicrBizId,
                         area_id: newClicr.area_id,
                         name: newClicr.name,
-                        pairing_code: newClicr.command || null,
-                        device_type: 'COUNTER_ONLY',
-                        is_active: newClicr.active ?? true,
-                        config: { button_config: newClicr.button_config }
+                        device_type: 'COUNTER',
+                        status: (newClicr.active ?? true) ? 'ACTIVE' : 'INACTIVE',
+                        button_config: newClicr.button_config || { label_a: 'GUEST IN', label_b: 'GUEST OUT' }
                     });
 
                     if (error) {
@@ -486,7 +501,7 @@ export async function POST(request: Request) {
                     await supabaseAdmin.from('venues').update({
                         name: venue.name,
                         // address, etc. (map if needed)
-                        total_capacity: venue.default_capacity_total,
+                        capacity_max: venue.total_capacity ?? venue.default_capacity_total ?? null,
                         capacity_enforcement_mode: venue.capacity_enforcement_mode,
                         status: venue.status
                     }).eq('id', venue.id);
@@ -502,7 +517,7 @@ export async function POST(request: Request) {
                 try {
                     await supabaseAdmin.from('areas').update({
                         name: areaPayload.name,
-                        capacity: areaPayload.default_capacity
+                        capacity_max: areaPayload.default_capacity ?? areaPayload.capacity_max
                     }).eq('id', areaPayload.id);
                 } catch (e) {
                     console.error("Update Area Persistence Failed", e);
