@@ -1,14 +1,17 @@
 -- ============================================================================
 -- Migration 007: Fix get_report_summary RPC
 --
--- Problems fixed:
---   1. occupancy_events was missing the `source` column when the DB was
---      bootstrapped from manual_rpc_install.sql or manual_traffic_rpc.sql
---      (neither includes the `source` column). get_report_summary references
---      oe.source, causing every dashboard stats load to fail.
---   2. get_report_summary was defined as STABLE, not SECURITY DEFINER.
---      This meant RLS applied to all underlying table reads. Marking it
---      SECURITY DEFINER (like the other core RPCs) makes it reliable.
+-- Problem fixed:
+--   occupancy_events was missing the `source` column when the DB was
+--   bootstrapped from manual_rpc_install.sql or manual_traffic_rpc.sql
+--   (neither includes the `source` column). get_report_summary references
+--   oe.source, causing every dashboard stats load to fail.
+--
+-- NOTE: The function remains STABLE (not SECURITY DEFINER) so that
+--   row-level security continues to enforce multi-tenant isolation.
+--   Authenticated users can only read data for businesses they belong to,
+--   enforced by the existing events_select / scans_select / turnarounds_select
+--   RLS policies (is_member_of(business_id)).
 -- ============================================================================
 
 -- 1. Add `source` column to occupancy_events if it doesn't already exist.
@@ -22,8 +25,8 @@ BEGIN
     END IF;
 END $$;
 
--- 2. Recreate get_report_summary as SECURITY DEFINER so it bypasses RLS
---    and can reliably read occupancy_events, turnarounds, and id_scans.
+-- 2. Recreate get_report_summary preserving STABLE (RLS stays active).
+--    The only change from 003_rpcs.sql is that the source column now exists.
 CREATE OR REPLACE FUNCTION get_report_summary(
     p_business_id UUID,
     p_venue_id    UUID DEFAULT NULL,
@@ -44,8 +47,7 @@ RETURNS TABLE(
     effective_start_ts   TIMESTAMPTZ
 )
 LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
+STABLE
 AS $$
 DECLARE
     v_effective_start TIMESTAMPTZ;
