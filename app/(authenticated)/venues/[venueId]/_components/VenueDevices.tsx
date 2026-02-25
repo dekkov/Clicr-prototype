@@ -15,7 +15,7 @@ import {
 import { cn } from '@/lib/utils'; // Assuming utils exists
 
 export default function VenueDevices({ venueId }: { venueId: string }) {
-    const { devices, clicrs, areas, addDevice, updateDevice } = useApp();
+    const { devices, clicrs, areas, addDevice, updateDevice, business } = useApp();
     const venueDevices = (devices || []).filter(d => d.venue_id === venueId);
     const venueClicrs = (clicrs || []).filter(c => (areas || []).find(a => a.id === c.area_id)?.venue_id === venueId);
 
@@ -25,7 +25,7 @@ export default function VenueDevices({ venueId }: { venueId: string }) {
     const handleAddMockDevice = async () => {
         const newDevice: Device = {
             id: Math.random().toString(36).substring(7),
-            business_id: 'biz_001',
+            business_id: business?.id ?? '',
             venue_id: venueId,
             area_id: null, // Unassigned area initially
             device_type: 'SCANNER',

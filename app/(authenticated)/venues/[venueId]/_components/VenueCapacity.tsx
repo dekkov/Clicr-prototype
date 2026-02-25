@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function VenueCapacity({ venueId }: { venueId: string }) {
-    const { venues, capacityOverrides, addCapacityOverride, updateVenue } = useApp();
+    const { venues, capacityOverrides, addCapacityOverride, updateVenue, currentUser } = useApp();
     const venue = venues.find(v => v.id === venueId);
 
     // Filter overrides for this venue (and active/future only?)
@@ -45,7 +45,7 @@ export default function VenueCapacity({ venueId }: { venueId: string }) {
             end_datetime: newOverride.end_datetime,
             capacity_value: newOverride.capacity_value,
             reason: newOverride.reason || '',
-            created_by_user_id: 'usr_owner', // current user mock
+            created_by_user_id: currentUser.id,
             created_at: new Date().toISOString(),
             area_id: newOverride.area_id || null
         };

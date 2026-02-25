@@ -14,7 +14,8 @@ async function run() {
     const bizName = `Sys Test ${testSuffix}`;
 
     // Create User via Auth API (Must be done via API)
-    const { data: user } = await sbAdmin.auth.admin.createUser({ email: userEmail, password: 'password123', email_confirm: true });
+    const testPassword = Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
+    const { data: user } = await sbAdmin.auth.admin.createUser({ email: userEmail, password: testPassword, email_confirm: true });
     if (!user.user) throw new Error("User create failed");
     const userId = user.user.id;
 
@@ -61,7 +62,7 @@ async function run() {
 
     // Client Context for User
     const sbUser = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-    await sbUser.auth.signInWithPassword({ email: user.user.email, password: 'password123' });
+    await sbUser.auth.signInWithPassword({ email: user.user.email, password: testPassword });
 
     // 2. Add Traffic
     console.log("2. Adding Traffic (+10 In, -2 Out)...");

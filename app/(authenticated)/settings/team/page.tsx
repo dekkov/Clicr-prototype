@@ -17,12 +17,7 @@ const ROLE_DEFINITIONS: Record<UserRole, { label: string; description: string; c
 };
 
 export default function TeamSettingsPage() {
-    // Mock Users linked to context/store eventually
-    const [users, setUsers] = useState([
-        { id: 'u1', name: 'Harrison W.', email: 'harrison@clicr.com', role: 'OWNER' as UserRole, status: 'ACTIVE' },
-        { id: 'u2', name: 'Sarah J.', email: 'sarah@clicr.com', role: 'MANAGER' as UserRole, status: 'ACTIVE' },
-        { id: 'u3', name: 'Mike T.', email: 'mike@clicr.com', role: 'STAFF' as UserRole, status: 'INVITED' },
-    ]);
+    const { users, addUser, removeUser } = useApp();
 
     const [showInviteModal, setShowInviteModal] = useState(false);
     const [inviteEmail, setInviteEmail] = useState('');
@@ -30,22 +25,23 @@ export default function TeamSettingsPage() {
 
     const handleInvite = (e: React.FormEvent) => {
         e.preventDefault();
-        // Simulate API call
         const newUser = {
-            id: `u${Date.now()}`,
+            id: `usr_${Date.now()}`,
             name: '',
             email: inviteEmail,
-            role: inviteRole,
-            status: 'INVITED'
+            role: inviteRole as UserRole,
+            assigned_venue_ids: [],
+            assigned_area_ids: [],
+            assigned_clicr_ids: [],
         };
-        setUsers([...users, newUser]);
+        addUser(newUser);
         setShowInviteModal(false);
         setInviteEmail('');
     };
 
     const handleRemoveUser = (userId: string) => {
         if (confirm('Are you sure you want to remove this user?')) {
-            setUsers(users.filter(u => u.id !== userId));
+            removeUser(userId);
         }
     };
 
@@ -114,23 +110,17 @@ export default function TeamSettingsPage() {
                             <div>
                                 <span className={cn(
                                     "px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide",
-                                    ROLE_DEFINITIONS[user.role].color
+                                    ROLE_DEFINITIONS[user.role as UserRole]?.color ?? 'text-slate-400'
                                 )}>
-                                    {ROLE_DEFINITIONS[user.role].label}
+                                    {ROLE_DEFINITIONS[user.role as UserRole]?.label ?? user.role}
                                 </span>
                             </div>
 
                             {/* Status */}
                             <div>
-                                {user.status === 'ACTIVE' ? (
-                                    <span className="flex items-center gap-2 text-emerald-500 text-xs font-bold uppercase tracking-widest">
-                                        <CheckCircle2 className="w-4 h-4" /> Active
-                                    </span>
-                                ) : (
-                                    <span className="flex items-center gap-2 text-amber-500 text-xs font-bold uppercase tracking-widest">
-                                        <Mail className="w-4 h-4" /> Invited
-                                    </span>
-                                )}
+                                <span className="flex items-center gap-2 text-emerald-500 text-xs font-bold uppercase tracking-widest">
+                                    <CheckCircle2 className="w-4 h-4" /> Active
+                                </span>
                             </div>
 
                             {/* Actions */}

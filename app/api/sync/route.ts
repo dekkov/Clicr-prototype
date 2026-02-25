@@ -353,7 +353,10 @@ export async function POST(request: Request) {
                     const { data: p } = await supabaseAdmin.from('profiles').select('business_id').eq('id', userId).single();
                     if (p) eventBizId = p.business_id;
                 }
-                const finalEventBizId = eventBizId || 'biz_001';
+                const finalEventBizId = eventBizId;
+                if (!finalEventBizId) {
+                    return NextResponse.json({ error: 'Could not resolve business_id for event' }, { status: 400 });
+                }
 
                 // ATOMIC UPDATE via RPC
                 try {
@@ -385,14 +388,13 @@ export async function POST(request: Request) {
                 const scan = payload as IDScanEvent;
                 // PERSIST: Save scan to Supabase
                 try {
-                    // D3: Resolve business_id dynamically instead of hardcoded 'biz_001'
                     let scanBizId: string | null = null;
                     if (userId) {
                         const { data: scanProfile } = await supabaseAdmin.from('profiles').select('business_id').eq('id', userId).single();
                         if (scanProfile) scanBizId = scanProfile.business_id;
                     }
                     await supabaseAdmin.from('id_scans').insert({
-                        business_id: scanBizId || scan.business_id || 'biz_001',
+                        business_id: scanBizId || scan.business_id,
                         venue_id: scan.venue_id,
                         scan_result: scan.scan_result,
                         age: scan.age,
@@ -467,10 +469,8 @@ export async function POST(request: Request) {
                     if (p) clicrBizId = p.business_id;
                 }
 
-                // Fallback for Dev/Playground or critical failure
                 if (!clicrBizId) {
-                    console.warn("No Business ID found for ADD_CLICR, falling back to biz_001");
-                    clicrBizId = 'biz_001';
+                    return NextResponse.json({ error: 'Could not resolve business_id for ADD_CLICR' }, { status: 400 });
                 }
 
                 try {

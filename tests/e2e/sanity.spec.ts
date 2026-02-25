@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('CLICR E2E Scenarios', () => {
-    const TEST_EMAIL = process.env.TEST_EMAIL || 'owner@clicr.com';
-    const TEST_PASSWORD = process.env.TEST_PASSWORD || 'password123';
+    const TEST_EMAIL = process.env.TEST_EMAIL;
+    const TEST_PASSWORD = process.env.TEST_PASSWORD;
+    if (!TEST_EMAIL || !TEST_PASSWORD) throw new Error('TEST_EMAIL and TEST_PASSWORD env vars required');
 
     // Helper to login
     async function login(page: any) {

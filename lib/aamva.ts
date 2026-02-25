@@ -19,28 +19,6 @@ export type ParsedID = {
 };
 
 export function parseAAMVA(data: string): ParsedID {
-    // Magic Test Code Handler (Enhanced)
-    if (data.includes('3833410136700101')) {
-        return {
-            firstName: 'Test',
-            lastName: 'User',
-            dateOfBirth: '20000101',
-            sex: 'M',
-            postalCode: '90210',
-            expirationDate: '20300101',
-            age: 26,
-            isExpired: false,
-            addressStreet: '123 Fake St',
-            city: 'Beverly Hills',
-            state: 'CA',
-            eyeColor: 'BLU',
-            hairColor: 'BRO',
-            height: '070', // 5'10"
-            weight: '180',
-            idNumber: 'D1234567'
-        };
-    }
-
     const getVal = (code: string) => {
         // Find code (e.g. DAJ), optional colon/space, then capture until newline or end
         const regex = new RegExp(`${code}[:\\s]*(.*?)(?:\\n|\\r|$)`, 'i');

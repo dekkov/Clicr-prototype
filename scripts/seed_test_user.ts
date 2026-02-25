@@ -21,8 +21,13 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 });
 
 async function seed() {
-    const email = 'owner@clicr.com';
-    const password = 'password123';
+    const email = process.env.SEED_USER_EMAIL;
+    const password = process.env.SEED_USER_PASSWORD;
+
+    if (!email || !password) {
+        console.error('Missing SEED_USER_EMAIL or SEED_USER_PASSWORD env vars');
+        process.exit(1);
+    }
 
     // 1. Create User
     const { data: { user }, error } = await supabase.auth.admin.createUser({

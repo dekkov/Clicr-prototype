@@ -22,7 +22,7 @@ async function runTest() {
     // 1. Setup Test Data
     const testId = Math.random().toString(36).substring(7);
     const email = `test_nuclear_${testId}@example.com`;
-    const password = 'password123';
+    const password = Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
 
     // Create User (Auth)
     const { data: authUser, error: authError } = await sbAdmin.auth.admin.createUser({

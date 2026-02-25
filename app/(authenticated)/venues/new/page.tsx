@@ -10,7 +10,7 @@ type Step = 'VENUE' | 'AREAS' | 'CLICRS';
 
 export default function NewVenuePage() {
     const router = useRouter();
-    const { addVenue, addArea, addClicr, updateBusiness } = useApp();
+    const { addVenue, addArea, addClicr, updateBusiness, business } = useApp();
     const [step, setStep] = useState<Step>('VENUE');
     const [isLoading, setIsLoading] = useState(false);
 
@@ -45,7 +45,7 @@ export default function NewVenuePage() {
         const newId = Math.random().toString(36).substring(7);
         const venue: Venue = {
             id: newId,
-            business_id: 'biz_001',
+            business_id: business?.id ?? '',
             name: venueData.name,
             city: venueData.city,
             state: venueData.state,

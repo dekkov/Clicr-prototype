@@ -5,9 +5,9 @@ import { Business, Venue, Area, Clicr, CountEvent, User, IDScanEvent, BanRecord,
 import { createClient } from '@/utils/supabase/client';
 
 const INITIAL_USER: User = {
-    id: 'usr_owner',
-    name: 'Harrison Owner',
-    email: 'owner@clicr.com',
+    id: '',
+    name: '',
+    email: '',
     role: 'OWNER',
     assigned_venue_ids: [],
     assigned_area_ids: [],

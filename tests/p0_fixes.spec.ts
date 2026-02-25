@@ -77,7 +77,9 @@ test.describe('P0 Critical Fixes', () => {
 
     // 3. Areas Tab Population
     test('Areas Tab should show list', async ({ page }) => {
-        await page.goto(`${BASE_URL}/venues/ven_001`); // Assuming venue page exists
+        const venueId = process.env.TEST_VENUE_ID;
+        if (!venueId) throw new Error('TEST_VENUE_ID env var required');
+        await page.goto(`${BASE_URL}/venues/${venueId}`);
         // Navigate to Areas? Or is it inline? "VenueAreas" component implies inline or tab.
 
         await expect(page.locator('h2:has-text("Venue Areas")')).toBeVisible();
