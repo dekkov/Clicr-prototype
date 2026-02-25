@@ -18,7 +18,6 @@ async function logError(userId: string | undefined, context: string, error: any)
             });
         }
     } catch (e) {
-        // Fallback
         console.error('Failed to log error to DB', e);
     }
 }
@@ -33,15 +32,10 @@ export async function signup(formData: FormData) {
         return redirect('/onboarding/signup?error=Passwords do not match');
     }
 
-    // attempt signup
     const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-            data: {
-                role: 'owner' // default role metadata
-            }
-        }
+        options: { data: { role: 'owner' } }
     });
 
     if (error) {
@@ -49,15 +43,14 @@ export async function signup(formData: FormData) {
         return redirect(`/onboarding/signup?error=${encodeURIComponent(error.message)}`);
     }
 
-    // Case 1: Session exists (Auto-confirm disabled or immediate login)
+    // Case 1: Session exists — initialize progress
     if (data.session) {
         const user = data.user!;
 
-        // Initialize progress
+        // FIX: removed `completed: false` — column does not exist in schema
         const { error: progressError } = await supabase.from('onboarding_progress').upsert({
             user_id: user.id,
-            current_step: 2,
-            completed: false
+            current_step: 2
         }, { onConflict: 'user_id' });
 
         if (progressError) {
@@ -67,7 +60,7 @@ export async function signup(formData: FormData) {
         return redirect('/onboarding');
     }
 
-    // Case 2: No session (Email confirmation required)
+    // Case 2: Email confirmation required
     if (data.user && !data.session) {
         return redirect('/onboarding/verify-email');
     }
@@ -83,7 +76,6 @@ export async function submitStep(formData: FormData) {
         return redirect('/auth/signin');
     }
 
-    // Get current progress with SAFE column selection (avoiding 'payload' and 'completed' errors)
     const { data: progress, error: progressFetchError } = await supabase
         .from('onboarding_progress')
         .select('user_id, business_id, current_step')
@@ -91,16 +83,18 @@ export async function submitStep(formData: FormData) {
         .single();
 
     if (progressFetchError || !progress) {
-        // Recovery
-        await logError(user.id, 'debug_progress_fetch_fail', { error: progressFetchError });
-        await supabase.from('onboarding_progress').upsert({ user_id: user.id, current_step: 2 });
+        await logError(user.id, 'progress_fetch_fail', { error: progressFetchError });
+        const { error: recoveryError } = await supabase
+            .from('onboarding_progress')
+            .upsert({ user_id: user.id, current_step: 2 }, { onConflict: 'user_id' });
+        if (recoveryError) {
+            return redirect(`/onboarding?error=${encodeURIComponent('Failed to initialize progress: ' + recoveryError.message)}`);
+        }
         return redirect('/onboarding');
     }
 
-    const step = progress.current_step;
-    // const payload = progress.payload || {}; // PAYLOAD COLUMN IS MISSING/BROKEN
-    const payload: any = {}; // Dummy payload to satisfy type checker if needed, but we won't use it for persistence
-
+    // FIX: current_step is TEXT in schema — Number() converts '2' → 2 for strict === comparisons
+    const step = Number(progress.current_step);
 
     try {
         /* ============================================================
@@ -108,9 +102,12 @@ export async function submitStep(formData: FormData) {
            ============================================================ */
         if (step === 2) {
             const businessName = formData.get('businessName') as string;
-            const venueCount = parseInt(formData.get('venueCount') as string);
+            // FIX: explicit NaN check — parseInt('') returns NaN
+            const venueCount = parseInt(formData.get('venueCount') as string, 10);
 
-            if (!businessName || !venueCount) throw new Error('Missing fields');
+            if (!businessName || isNaN(venueCount) || venueCount < 1) {
+                throw new Error('Missing fields');
+            }
 
             let businessId = progress.business_id;
 
@@ -139,7 +136,11 @@ export async function submitStep(formData: FormData) {
             }, { onConflict: 'business_id,user_id' });
 
             // PRE-SEED VENUES so step 3 has rows to update
-            const { count } = await supabaseAdmin.from('venues').select('*', { count: 'exact', head: true }).eq('business_id', businessId);
+            const { count } = await supabaseAdmin
+                .from('venues')
+                .select('*', { count: 'exact', head: true })
+                .eq('business_id', businessId);
+
             if ((count || 0) < venueCount) {
                 const needed = venueCount - (count || 0);
                 const venuesToInsert = Array.from({ length: needed }).map((_, i) => ({
@@ -151,31 +152,36 @@ export async function submitStep(formData: FormData) {
                 if (seedError) throw seedError;
             }
 
-            // Move to Step 3
-            await supabase.from('onboarding_progress').update({
+            // FIX: check error on progress update — silent failure here caused the loop
+            const { error: stepError } = await supabase.from('onboarding_progress').update({
                 business_id: businessId,
                 current_step: 3,
             }).eq('user_id', user.id);
+            if (stepError) throw stepError;
 
-            /* ============================================================
-               STEP 3: VENUE SETUP (LOOP)
-               ============================================================ */
+        /* ============================================================
+           STEP 3: VENUE SETUP (LOOP)
+           ============================================================ */
         } else if (step === 3) {
             const venueName = formData.get('venueName') as string;
-            const capacity = parseInt(formData.get('capacity') as string);
+            const capacity = parseInt(formData.get('capacity') as string, 10);
             const location = formData.get('location') as string;
-            const activeIndex = parseInt(formData.get('activeVenueIndex') as string || '0');
+            const activeIndex = parseInt(formData.get('activeVenueIndex') as string || '0', 10);
 
             if (!progress.business_id) throw new Error('No business context');
 
-            // Fetch Venues for this business (sorted)
-            const { data: venues, error: vFail } = await supabaseAdmin.from('venues').select('*').eq('business_id', progress.business_id).order('created_at');
-            if (vFail || !venues || venues.length === 0) throw new Error("No venues found for Step 3");
+            const { data: venues, error: vFail } = await supabaseAdmin
+                .from('venues')
+                .select('*')
+                .eq('business_id', progress.business_id)
+                .order('created_at');
+            if (vFail || !venues || venues.length === 0) throw new Error('No venues found for Step 3');
 
             const venueCount = venues.length;
 
             if (activeIndex >= venueCount) {
-                await supabase.from('onboarding_progress').update({ current_step: 4 }).eq('user_id', user.id);
+                const { error: stepError } = await supabase.from('onboarding_progress').update({ current_step: 4 }).eq('user_id', user.id);
+                if (stepError) throw stepError;
                 return redirect('/onboarding');
             }
 
@@ -184,7 +190,7 @@ export async function submitStep(formData: FormData) {
             if (currentVenueId) {
                 await supabaseAdmin.from('venues').update({
                     name: venueName,
-                    capacity_max: capacity || null,
+                    capacity_max: isNaN(capacity) ? null : capacity,
                     city: location || null
                 }).eq('id', currentVenueId);
             }
@@ -192,28 +198,30 @@ export async function submitStep(formData: FormData) {
             const nextIndex = activeIndex + 1;
 
             if (nextIndex < venueCount) {
-                // Redirect to next venue
                 return redirect(`/onboarding?idx=${nextIndex}`);
             } else {
-                // Done with venues -> Go to Areas
-                await supabase.from('onboarding_progress').update({ current_step: 4 }).eq('user_id', user.id);
+                const { error: stepError } = await supabase.from('onboarding_progress').update({ current_step: 4 }).eq('user_id', user.id);
+                if (stepError) throw stepError;
                 return redirect('/onboarding');
             }
 
-            /* ============================================================
-               STEP 4: AREAS SETUP (LOOP via Venues)
-               ============================================================ */
+        /* ============================================================
+           STEP 4: AREAS SETUP (LOOP via Venues)
+           ============================================================ */
         } else if (step === 4) {
-            const activeIndex = parseInt(formData.get('activeVenueIndex') as string || '0');
+            const activeIndex = parseInt(formData.get('activeVenueIndex') as string || '0', 10);
             const areasRaw = formData.get('areas');
             const areas = JSON.parse(areasRaw as string || '[]');
 
-            const { data: venues } = await supabaseAdmin.from('venues').select('id').eq('business_id', progress.business_id).order('created_at');
-            if (!venues) throw new Error("No venues");
+            const { data: venues } = await supabaseAdmin
+                .from('venues')
+                .select('id')
+                .eq('business_id', progress.business_id)
+                .order('created_at');
+            if (!venues) throw new Error('No venues');
 
             const currentVenueId = venues[activeIndex]?.id;
 
-            // Delete existing areas for this venue then re-insert
             await supabaseAdmin.from('areas').delete().eq('venue_id', currentVenueId);
 
             for (const area of areas) {
@@ -242,24 +250,27 @@ export async function submitStep(formData: FormData) {
             if (nextIndex < venues.length) {
                 return redirect(`/onboarding?idx=${nextIndex}`);
             } else {
-                // Done with Areas -> Go to Clicrs
-                await supabase.from('onboarding_progress').update({ current_step: 5 }).eq('user_id', user.id);
+                const { error: stepError } = await supabase.from('onboarding_progress').update({ current_step: 5 }).eq('user_id', user.id);
+                if (stepError) throw stepError;
                 return redirect('/onboarding');
             }
 
-            /* ============================================================
-               STEP 5: CLICRS SETUP (LOOP via Venues)
-               ============================================================ */
+        /* ============================================================
+           STEP 5: CLICRS SETUP (LOOP via Venues)
+           ============================================================ */
         } else if (step === 5) {
-            const activeIndex = parseInt(formData.get('activeVenueIndex') as string || '0');
+            const activeIndex = parseInt(formData.get('activeVenueIndex') as string || '0', 10);
             const devicesRaw = formData.get('devices');
             const devicesMap = JSON.parse(devicesRaw as string || '{}');
 
-            const { data: venues } = await supabaseAdmin.from('venues').select('id').eq('business_id', progress.business_id).order('created_at');
-            if (!venues) throw new Error("No venues");
+            const { data: venues } = await supabaseAdmin
+                .from('venues')
+                .select('id')
+                .eq('business_id', progress.business_id)
+                .order('created_at');
+            if (!venues) throw new Error('No venues');
             const currentVenueId = venues[activeIndex]?.id;
 
-            // Wipe devices for this venue then re-insert
             await supabaseAdmin.from('devices').delete().eq('venue_id', currentVenueId);
 
             for (const [areaId, devices] of Object.entries(devicesMap)) {
@@ -279,11 +290,8 @@ export async function submitStep(formData: FormData) {
             if (nextIndex < venues.length) {
                 return redirect(`/onboarding?idx=${nextIndex}`);
             } else {
-                // FINISH
-                await supabase.from('onboarding_progress').update({
-                    current_step: 999
-                }).eq('user_id', user.id);
-
+                const { error: stepError } = await supabase.from('onboarding_progress').update({ current_step: 999 }).eq('user_id', user.id);
+                if (stepError) throw stepError;
                 return redirect('/dashboard');
             }
         }

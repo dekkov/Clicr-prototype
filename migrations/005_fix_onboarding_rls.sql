@@ -17,9 +17,13 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-    INSERT INTO business_members (business_id, user_id, role)
-    VALUES (NEW.id, auth.uid(), 'OWNER')
-    ON CONFLICT (business_id, user_id) DO NOTHING;
+    -- Skip when called from service role (auth.uid() is NULL in admin context).
+    -- The application handles membership explicitly via supabaseAdmin.
+    IF auth.uid() IS NOT NULL THEN
+        INSERT INTO business_members (business_id, user_id, role)
+        VALUES (NEW.id, auth.uid(), 'OWNER')
+        ON CONFLICT (business_id, user_id) DO NOTHING;
+    END IF;
     RETURN NEW;
 END;
 $$;
