@@ -296,6 +296,8 @@ export async function submitStep(formData: FormData) {
             }
         }
     } catch (e: any) {
+        // redirect() throws a NEXT_REDIRECT internally — must re-throw so Next.js can handle it
+        if (e.digest?.startsWith('NEXT_REDIRECT')) throw e;
         await logError(user.id, `onboarding_step_${step}`, e);
         return redirect(`/onboarding?error=${encodeURIComponent(e.message || 'Error processing step')}`);
     }
