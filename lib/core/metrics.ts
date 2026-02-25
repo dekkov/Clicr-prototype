@@ -62,6 +62,7 @@ export const METRICS = {
     },
 
     getCurrentOccupancy: async (businessId: string, areaId: string): Promise<number> => {
+        if (!UUID_RE.test(businessId)) return 0;
         const sb = getSupabase();
         const { data, error } = await sb
             .from('occupancy_snapshots')
@@ -95,6 +96,7 @@ export const METRICS = {
 
     // Returns current occupancy per venue for a business
     getVenueSummaries: async (businessId: string) => {
+        if (!UUID_RE.test(businessId)) return [];
         const sb = getSupabase();
         const { data, error } = await sb
             .from('occupancy_snapshots')
@@ -109,6 +111,7 @@ export const METRICS = {
 
     // Returns hourly traffic buckets (entries_in, entries_out, net_delta per hour)
     getDailyTrafficSummary: async (businessId: string, venueId: string, startDate: string, endDate: string) => {
+        if (!UUID_RE.test(businessId)) return [];
         const sb = getSupabase();
         const { data, error } = await sb.rpc('get_hourly_traffic', {
             p_business_id: businessId,
@@ -125,6 +128,7 @@ export const METRICS = {
     },
 
     checkBanStatus: async (businessId: string, patronId: string, venueId?: string) => {
+        if (!UUID_RE.test(businessId)) return { is_banned: false };
         const sb = getSupabase();
         const { data, error } = await sb.rpc('check_ban_status', {
             p_business_id: businessId,
