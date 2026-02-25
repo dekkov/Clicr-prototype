@@ -24,7 +24,7 @@ export default function VerifyEmailPage() {
 
                 <div className="space-y-4">
                     <Link
-                        href="/auth/signin"
+                        href="/login"
                         className="block w-full bg-primary text-white font-bold py-4 rounded-xl hover:bg-primary-hover shadow-lg shadow-primary/25 transition-all flex items-center justify-center gap-2"
                     >
                         I've Verified My Email <ArrowRight className="w-4 h-4" />

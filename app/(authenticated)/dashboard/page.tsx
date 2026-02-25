@@ -8,6 +8,8 @@ import { cn } from '@/lib/utils';
 import { METRICS } from '@/lib/core/metrics';
 import { getTodayWindow } from '@/lib/core/time';
 import { Venue, Area, CountEvent } from '@/lib/types';
+import { InlineSetup } from './_components/InlineSetup';
+import { GettingStartedChecklist } from './_components/GettingStartedChecklist';
 
 // Sub-component for individual venue stats
 const VenueCard = ({ venue, areas, events }: { venue: Venue, areas: Area[], events: CountEvent[] }) => {
@@ -32,7 +34,7 @@ const VenueCard = ({ venue, areas, events }: { venue: Venue, areas: Area[], even
             }
         };
         fetchStats();
-    }, [venue.id, venue.business_id, events]); // Re-fetch on global events change (or filter events upstream)
+    }, [venue.id, venue.business_id, events]);
 
     return (
         <div className="glass-panel p-6 rounded-2xl border border-slate-800 hover:border-slate-700 transition-colors">
@@ -80,7 +82,6 @@ const VenueCard = ({ venue, areas, events }: { venue: Venue, areas: Area[], even
                 <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Area Status</h4>
                 {areas.length === 0 && <p className="text-xs text-slate-600 italic">No areas configured.</p>}
                 {areas.map(area => {
-                    // Handle fallback
                     const cap = (area as any).capacity || area.default_capacity || 0;
                     const occ = area.current_occupancy || 0;
                     const pct = cap > 0 ? (occ / cap) * 100 : 0;
@@ -116,9 +117,11 @@ const VenueCard = ({ venue, areas, events }: { venue: Venue, areas: Area[], even
 export default function DashboardPage() {
     const { business, venues, areas, events, isLoading, resetCounts } = useApp();
 
-    if (isLoading || !business) {
+    if (isLoading) {
         return <div className="p-8 text-white">Loading dashboard...</div>;
     }
+
+    const needsSetup = !business || venues.length === 0;
 
     return (
         <div className="space-y-8 animate-[fade-in_0.5s_ease-out]">
@@ -126,63 +129,49 @@ export default function DashboardPage() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-white">Dashboard</h1>
-                    <p className="text-slate-400 mt-1">Real-time overview for <span className="text-primary font-semibold">{business.name}</span></p>
+                    {business && (
+                        <p className="text-slate-400 mt-1">Real-time overview for <span className="text-primary font-semibold">{business.name}</span></p>
+                    )}
                 </div>
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={async () => {
-                            if (window.confirm("⚠️ ARE YOU SURE? \n\nThis will reset ALL occupancy counts to 0 for the entire business. This action cannot be undone.")) {
-                                await resetCounts('BUSINESS', business.id);
-                            }
-                        }}
-                        className="px-4 py-2 bg-red-900/50 hover:bg-red-900 text-red-200 border border-red-800/50 rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
-                    >
-                        Reset All Counts
-                    </button>
-
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 rounded-full text-xs font-medium border border-emerald-500/20">
-                        <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                        </span>
-                        System Operational
-                    </div>
-                </div>
-            </div>
-
-            {/* Per-Venue Sections */}
-            <div className="space-y-6">
-
-                {/* ONBOARDING EMPTY STATE */}
-                {venues.length === 0 && (
-                    <div className="bg-[#1e2330]/50 border border-white/5 rounded-3xl p-12 text-center flex flex-col items-center justify-center space-y-6 max-w-2xl mx-auto mt-12">
-                        <div className="w-24 h-24 bg-primary/20 text-primary rounded-full flex items-center justify-center shadow-lg shadow-primary/10 mb-2">
-                            <img src="/clicr-logo-white.png" alt="Clicr" className="w-16 h-16 object-contain" />
-                        </div>
-                        <div>
-                            <h2 className="text-2xl font-bold text-white mb-2">Welcome to your Dashboard</h2>
-                            <p className="text-slate-400 max-w-md mx-auto">
-                                It looks like you haven't set up any venues yet. Get started by adding your first location to track occupancy.
-                            </p>
-                        </div>
-                        <Link
-                            href="/venues/new"
-                            className="bg-primary hover:bg-primary-hover text-white font-bold py-4 px-8 rounded-full shadow-lg shadow-primary/25 transition-all flex items-center gap-2"
+                {!needsSetup && (
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={async () => {
+                                if (window.confirm("⚠️ ARE YOU SURE? \n\nThis will reset ALL occupancy counts to 0 for the entire business. This action cannot be undone.")) {
+                                    await resetCounts(business!.id);
+                                }
+                            }}
+                            className="px-4 py-2 bg-red-900/50 hover:bg-red-900 text-red-200 border border-red-800/50 rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
                         >
-                            Set up your first Venue <ArrowRight className="w-5 h-5" />
-                        </Link>
+                            Reset All Counts
+                        </button>
+
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 rounded-full text-xs font-medium border border-emerald-500/20">
+                            <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                            </span>
+                            System Operational
+                        </div>
                     </div>
                 )}
+            </div>
 
+            {/* Inline setup — shown when business or first venue is missing */}
+            {needsSetup && <InlineSetup hasBusiness={business !== null} />}
 
+            {/* Getting Started checklist — shown after setup while optional items remain */}
+            {!needsSetup && <GettingStartedChecklist />}
+
+            {/* Venue cards */}
+            {!needsSetup && (
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                     {venues.map(venue => {
-                        // Filter areas for this venue
                         const venueAreas = areas.filter(a => a.venue_id === venue.id);
                         return <VenueCard key={venue.id} venue={venue} areas={venueAreas} events={events} />;
                     })}
                 </div>
-            </div>
+            )}
         </div>
     );
 }
