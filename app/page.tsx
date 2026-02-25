@@ -1,8 +1,13 @@
 
 import Link from 'next/link';
-import { ArrowRight, BarChart3, ShieldCheck, Zap } from 'lucide-react';
+import { ArrowRight, BarChart3, ShieldCheck, Zap, LayoutDashboard } from 'lucide-react';
+import { createClient } from '@/utils/supabase/server';
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const isLoggedIn = !!user;
+
   return (
     <div className="min-h-screen bg-black text-white selection:bg-blue-500/30">
 
@@ -15,17 +20,28 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <Link href="/login" className="text-sm font-semibold text-slate-400 hover:text-white transition-colors">Log in</Link>
-            <Link href="/onboarding/signup" className="bg-white text-black px-4 py-2 rounded-full text-sm font-bold hover:bg-slate-200 transition-colors">
-              Get Started
-            </Link>
+            {isLoggedIn ? (
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-2 bg-white text-black px-4 py-2 rounded-full text-sm font-bold hover:bg-slate-200 transition-colors"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                Go to Dashboard
+              </Link>
+            ) : (
+              <>
+                <Link href="/login" className="text-sm font-semibold text-slate-400 hover:text-white transition-colors">Log in</Link>
+                <Link href="/onboarding/signup" className="bg-white text-black px-4 py-2 rounded-full text-sm font-bold hover:bg-slate-200 transition-colors">
+                  Get Started
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </nav>
 
       {/* Hero */}
       <div className="relative pt-32 pb-20 sm:pt-40 sm:pb-24 overflow-hidden">
-        {/* Background Gradients */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-primary/20 rounded-full blur-3xl opacity-30 -z-10" />
 
         <div className="max-w-4xl mx-auto px-6 text-center">
@@ -37,10 +53,17 @@ export default function LandingPage() {
             Track capacity, ban bad actors, and automate your reporting.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/onboarding/signup" className="w-full sm:w-auto px-8 py-4 bg-primary rounded-full font-bold text-lg hover:bg-primary-hover shadow-lg shadow-primary/25 transition-all flex items-center justify-center gap-2 group">
-              Start Free Trial
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </Link>
+            {isLoggedIn ? (
+              <Link href="/dashboard" className="w-full sm:w-auto px-8 py-4 bg-primary rounded-full font-bold text-lg hover:bg-primary-hover shadow-lg shadow-primary/25 transition-all flex items-center justify-center gap-2 group">
+                Go to Dashboard
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </Link>
+            ) : (
+              <Link href="/onboarding/signup" className="w-full sm:w-auto px-8 py-4 bg-primary rounded-full font-bold text-lg hover:bg-primary-hover shadow-lg shadow-primary/25 transition-all flex items-center justify-center gap-2 group">
+                Start Free Trial
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </Link>
+            )}
             <Link href="/demo" className="w-full sm:w-auto px-8 py-4 bg-white/5 border border-white/10 rounded-full font-bold text-lg hover:bg-white/10 transition-all flex items-center justify-center">
               View Demo
             </Link>
@@ -69,7 +92,7 @@ export default function LandingPage() {
         </div>
       </div>
 
-    </div >
+    </div>
   );
 }
 
