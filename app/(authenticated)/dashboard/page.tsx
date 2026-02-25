@@ -28,6 +28,7 @@ const VenueCard = ({ venue, areas, events }: { venue: Venue, areas: Area[], even
                 setLoading(false);
             } catch (e) {
                 console.error("Venue stats error", e);
+                setLoading(false);
             }
         };
         fetchStats();
