@@ -2,6 +2,7 @@
 'use server';
 
 import { createClient } from '@/utils/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import { redirect } from 'next/navigation';
 
 async function logError(userId: string | undefined, context: string, error: any) {
@@ -113,30 +114,32 @@ export async function submitStep(formData: FormData) {
 
             let businessId = progress.business_id;
 
-            // Upsert Business
+            // Upsert Business (admin client bypasses RLS)
             if (businessId) {
-                // Update existing
-                const { error: busError } = await supabase
+                const { error: busError } = await supabaseAdmin
                     .from('businesses')
                     .update({ name: businessName })
                     .eq('id', businessId);
                 if (busError) throw busError;
             } else {
-                // Insert new
-                const { data: business, error: busError } = await supabase
+                const { data: business, error: busError } = await supabaseAdmin
                     .from('businesses')
                     .insert({ name: businessName })
                     .select()
                     .single();
-
                 if (busError) throw busError;
                 businessId = business.id;
             }
 
-            // Membership is created automatically by the on_business_created trigger (005_fix_onboarding_rls.sql)
+            // Ensure OWNER membership (admin bypasses bm_insert RLS; idempotent)
+            await supabaseAdmin.from('business_members').upsert({
+                business_id: businessId,
+                user_id: user.id,
+                role: 'OWNER'
+            }, { onConflict: 'business_id,user_id' });
 
             // PRE-SEED VENUES so step 3 has rows to update
-            const { count } = await supabase.from('venues').select('*', { count: 'exact', head: true }).eq('business_id', businessId);
+            const { count } = await supabaseAdmin.from('venues').select('*', { count: 'exact', head: true }).eq('business_id', businessId);
             if ((count || 0) < venueCount) {
                 const needed = venueCount - (count || 0);
                 const venuesToInsert = Array.from({ length: needed }).map((_, i) => ({
@@ -144,12 +147,11 @@ export async function submitStep(formData: FormData) {
                     name: `Venue ${(count || 0) + i + 1}`,
                     capacity_max: 100
                 }));
-                const { error: seedError } = await supabase.from('venues').insert(venuesToInsert);
+                const { error: seedError } = await supabaseAdmin.from('venues').insert(venuesToInsert);
                 if (seedError) throw seedError;
             }
 
             // Move to Step 3
-            // We DO NOT write payload. We rely on the venues table.
             await supabase.from('onboarding_progress').update({
                 business_id: businessId,
                 current_step: 3,
@@ -167,13 +169,12 @@ export async function submitStep(formData: FormData) {
             if (!progress.business_id) throw new Error('No business context');
 
             // Fetch Venues for this business (sorted)
-            const { data: venues, error: vFail } = await supabase.from('venues').select('*').eq('business_id', progress.business_id).order('created_at');
+            const { data: venues, error: vFail } = await supabaseAdmin.from('venues').select('*').eq('business_id', progress.business_id).order('created_at');
             if (vFail || !venues || venues.length === 0) throw new Error("No venues found for Step 3");
 
             const venueCount = venues.length;
 
             if (activeIndex >= venueCount) {
-                // Should not happen, but auto-recover
                 await supabase.from('onboarding_progress').update({ current_step: 4 }).eq('user_id', user.id);
                 return redirect('/onboarding');
             }
@@ -181,8 +182,7 @@ export async function submitStep(formData: FormData) {
             const currentVenueId = venues[activeIndex]?.id;
 
             if (currentVenueId) {
-                // Update existing venue
-                await supabase.from('venues').update({
+                await supabaseAdmin.from('venues').update({
                     name: venueName,
                     capacity_max: capacity || null,
                     city: location || null
@@ -204,41 +204,20 @@ export async function submitStep(formData: FormData) {
                STEP 4: AREAS SETUP (LOOP via Venues)
                ============================================================ */
         } else if (step === 4) {
-            // Get index from Search Params via "hidden input" or just infer from DB state?
-            // "client-steps" doesn't submit index for Step 4... 
-            // We should auto-detect or modify client-steps?
-            // Or just check which venue needs areas?
-            // Safer: Modify client-steps to pass index. 
-            // BUT simpler: Iterate venues, find first without areas? No, areas might be 0.
-            // Let's assume we pass it? 
-            // Actually, for Step 4/5, we can just process ALL needed setups on one big page? No, UI is per venue.
-
-            // NOTE: Since I can't edit client-steps instantly for Step 4/5 easily without risks,
-            // I will use a clever hack:
-            // Read "referer" or just implement a "next" pointer query.
-
-            // Let's assume I modified client-steps already? Not yet.
-            // I will modify client-steps for Step 4/5 too.
-            // OR I can read it from the "areas" JSON if I embedded the venue ID? No.
-
-            // Let's rely on a URL param ?idx being present in the Referer, and if not, default to 0.
-            // But Action doesn't see Referer easily.
-            // I will Add <input name="activeVenueIndex"> to AreaStep and ClicrStep too.
-
             const activeIndex = parseInt(formData.get('activeVenueIndex') as string || '0');
             const areasRaw = formData.get('areas');
             const areas = JSON.parse(areasRaw as string || '[]');
 
-            const { data: venues } = await supabase.from('venues').select('id').eq('business_id', progress.business_id).order('created_at');
+            const { data: venues } = await supabaseAdmin.from('venues').select('id').eq('business_id', progress.business_id).order('created_at');
             if (!venues) throw new Error("No venues");
 
             const currentVenueId = venues[activeIndex]?.id;
 
-            // Delete existing areas for this venue
-            await supabase.from('areas').delete().eq('venue_id', currentVenueId);
+            // Delete existing areas for this venue then re-insert
+            await supabaseAdmin.from('areas').delete().eq('venue_id', currentVenueId);
 
             for (const area of areas) {
-                const { data: areaRow, error: areaError } = await supabase
+                const { data: areaRow, error: areaError } = await supabaseAdmin
                     .from('areas')
                     .insert({
                         business_id: progress.business_id,
@@ -251,8 +230,7 @@ export async function submitStep(formData: FormData) {
 
                 if (areaError) throw areaError;
 
-                // Create Snapshot
-                await supabase.from('occupancy_snapshots').insert({
+                await supabaseAdmin.from('occupancy_snapshots').insert({
                     business_id: progress.business_id,
                     venue_id: currentVenueId,
                     area_id: areaRow.id,
@@ -277,17 +255,17 @@ export async function submitStep(formData: FormData) {
             const devicesRaw = formData.get('devices');
             const devicesMap = JSON.parse(devicesRaw as string || '{}');
 
-            const { data: venues } = await supabase.from('venues').select('id').eq('business_id', progress.business_id).order('created_at');
+            const { data: venues } = await supabaseAdmin.from('venues').select('id').eq('business_id', progress.business_id).order('created_at');
             if (!venues) throw new Error("No venues");
             const currentVenueId = venues[activeIndex]?.id;
 
-            // Wipe devices for this venue
-            await supabase.from('devices').delete().eq('venue_id', currentVenueId);
+            // Wipe devices for this venue then re-insert
+            await supabaseAdmin.from('devices').delete().eq('venue_id', currentVenueId);
 
             for (const [areaId, devices] of Object.entries(devicesMap)) {
                 const deviceList = devices as any[];
                 for (const dev of deviceList) {
-                    await supabase.from('devices').insert({
+                    await supabaseAdmin.from('devices').insert({
                         business_id: progress.business_id,
                         venue_id: currentVenueId,
                         area_id: areaId,
