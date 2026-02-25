@@ -20,11 +20,23 @@ export function StepContainer({ title, subtitle, children, stepNumber, totalStep
 }
 
 export function BusinessStep() {
-    const [venueCount, setVenueCount] = useState(1);
-    const inputRef = useRef<HTMLInputElement>(null);
+    const [venueCount, setVenueCount] = useState<number | ''>('');
+    const [venueError, setVenueError] = useState('');
+
+    const handleSubmit = (e: React.FormEvent) => {
+        if (!venueCount || venueCount < 1) {
+            e.preventDefault();
+            setVenueError('Please enter the number of venues.');
+        }
+    };
+
+    const pick = (n: number) => {
+        setVenueCount(n);
+        setVenueError('');
+    };
 
     return (
-        <form action={submitStep} className="space-y-6">
+        <form action={submitStep} onSubmit={handleSubmit} className="space-y-6">
             <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Business Name</label>
                 <div className="relative">
@@ -38,28 +50,38 @@ export function BusinessStep() {
                 <input type="hidden" name="venueCount" value={venueCount} />
                 <div className="flex items-center gap-3 mb-3">
                     <input
-                        ref={inputRef}
                         type="number"
                         min="1"
                         max="50"
                         value={venueCount}
-                        onChange={e => setVenueCount(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="w-24 bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white text-center text-lg font-bold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                        placeholder="e.g. 2"
+                        onChange={e => {
+                            const val = e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value) || 1);
+                            setVenueCount(val);
+                            setVenueError('');
+                        }}
+                        className={`w-28 bg-black/40 border rounded-xl py-3 px-4 text-white text-center text-lg font-bold focus:outline-none focus:ring-1 transition-all placeholder-slate-600
+                            ${venueError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-white/10 focus:border-primary focus:ring-primary'}`}
                     />
-                    <span className="text-slate-400 text-sm">{venueCount === 1 ? 'venue' : 'venues'}</span>
+                    {venueCount !== '' && (
+                        <span className="text-slate-400 text-sm">{venueCount === 1 ? 'venue' : 'venues'}</span>
+                    )}
                 </div>
-                <div className="flex gap-2">
+                {venueError && (
+                    <p className="text-red-400 text-xs mb-3">{venueError}</p>
+                )}
+                <div className="flex gap-2 flex-wrap">
                     {[1, 2, 3, 4, 5].map(n => (
                         <button
                             key={n}
                             type="button"
-                            onClick={() => setVenueCount(n)}
+                            onClick={() => pick(n)}
                             className={`px-3 py-1.5 rounded-lg text-sm font-bold border transition-all ${venueCount === n ? 'bg-primary border-primary text-white' : 'border-white/10 text-slate-400 hover:border-white/30 hover:text-white'}`}
                         >
                             {n}
                         </button>
                     ))}
-                    <span className="text-slate-600 text-xs self-center ml-1">or type any number above</span>
+                    <span className="text-slate-600 text-xs self-center ml-1">quick select</span>
                 </div>
             </div>
             <button type="submit" className="w-full bg-primary text-white font-bold py-4 rounded-xl hover:bg-primary-hover shadow-lg shadow-primary/25 transition-all">

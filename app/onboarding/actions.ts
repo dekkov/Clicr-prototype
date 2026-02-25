@@ -131,20 +131,9 @@ export async function submitStep(formData: FormData) {
 
                 if (busError) throw busError;
                 businessId = business.id;
-                await logError(user.id, 'debug_biz_created', { businessId });
             }
 
-            // Ensure Membership
-            const { error: memError } = await supabase
-                .from('business_members')
-                .upsert({
-                    business_id: businessId,
-                    user_id: user.id,
-                    role: 'OWNER'
-                }, { onConflict: 'business_id,user_id' });
-
-            if (memError) throw memError;
-            await logError(user.id, 'debug_mem_upserted', { businessId });
+            // Membership is created automatically by the on_business_created trigger (005_fix_onboarding_rls.sql)
 
             // PRE-SEED VENUES so step 3 has rows to update
             const { count } = await supabase.from('venues').select('*', { count: 'exact', head: true }).eq('business_id', businessId);
