@@ -83,7 +83,7 @@ export default async function LoginPage({ searchParams }: Props) {
                     <div className="text-center mt-6">
                         <p className="text-slate-500 text-sm">
                             Don&apos;t have an account?{' '}
-                            <Link href="/signup" className="text-white font-bold hover:underline">
+                            <Link href="/onboarding/signup" className="text-white font-bold hover:underline">
                                 Create one
                             </Link>
                         </p>

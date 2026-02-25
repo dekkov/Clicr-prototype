@@ -152,6 +152,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             }
         } catch (error) {
             console.error("Failed to sync state", error);
+            setState(prev => ({ ...prev, isLoading: false }));
         }
     };
 
