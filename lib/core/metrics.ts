@@ -3,6 +3,8 @@ import { getSupabase } from './supabase';
 import { getTodayWindow } from './time';
 import { logError } from './errors';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export interface TrafficTotals {
     total_in: number;
     total_out: number;
@@ -20,6 +22,10 @@ export const METRICS = {
         scope: { venueId?: string; areaId?: string },
         window = getTodayWindow()
     ): Promise<TrafficTotals> => {
+        // Skip RPC if business_id is a mock/fixture ID (not a valid UUID)
+        if (!UUID_RE.test(businessId)) {
+            return { total_in: 0, total_out: 0, net_delta: 0, event_count: 0 };
+        }
         const sb = getSupabase();
 
         const params = {
