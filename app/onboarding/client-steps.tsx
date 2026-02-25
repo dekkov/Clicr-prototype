@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Plus, Trash, ArrowRight, Building2, MapPin, Users, Smartphone, ArrowLeft } from 'lucide-react';
 import { submitStep } from './actions';
 
@@ -20,6 +20,9 @@ export function StepContainer({ title, subtitle, children, stepNumber, totalStep
 }
 
 export function BusinessStep() {
+    const [venueCount, setVenueCount] = useState(1);
+    const inputRef = useRef<HTMLInputElement>(null);
+
     return (
         <form action={submitStep} className="space-y-6">
             <div>
@@ -32,9 +35,32 @@ export function BusinessStep() {
             </div>
             <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Number of Venues</label>
-                <select name="venueCount" className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
-                    {[1, 2, 3, 4, 5, 10].map(n => <option key={n} value={n}>{n} {n === 1 ? 'Venue' : 'Venues'}</option>)}
-                </select>
+                <input type="hidden" name="venueCount" value={venueCount} />
+                <div className="flex items-center gap-3 mb-3">
+                    <input
+                        ref={inputRef}
+                        type="number"
+                        min="1"
+                        max="50"
+                        value={venueCount}
+                        onChange={e => setVenueCount(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-24 bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white text-center text-lg font-bold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                    />
+                    <span className="text-slate-400 text-sm">{venueCount === 1 ? 'venue' : 'venues'}</span>
+                </div>
+                <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5].map(n => (
+                        <button
+                            key={n}
+                            type="button"
+                            onClick={() => setVenueCount(n)}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-bold border transition-all ${venueCount === n ? 'bg-primary border-primary text-white' : 'border-white/10 text-slate-400 hover:border-white/30 hover:text-white'}`}
+                        >
+                            {n}
+                        </button>
+                    ))}
+                    <span className="text-slate-600 text-xs self-center ml-1">or type any number above</span>
+                </div>
             </div>
             <button type="submit" className="w-full bg-primary text-white font-bold py-4 rounded-xl hover:bg-primary-hover shadow-lg shadow-primary/25 transition-all">
                 Continue <ArrowRight className="inline w-4 h-4 ml-2" />

@@ -125,7 +125,7 @@ export async function submitStep(formData: FormData) {
                 // Insert new
                 const { data: business, error: busError } = await supabase
                     .from('businesses')
-                    .insert({ name: businessName, created_by_user_id: user.id })
+                    .insert({ name: businessName })
                     .select()
                     .single();
 
@@ -140,28 +140,24 @@ export async function submitStep(formData: FormData) {
                 .upsert({
                     business_id: businessId,
                     user_id: user.id,
-                    role: 'owner'
+                    role: 'OWNER'
                 }, { onConflict: 'business_id,user_id' });
 
             if (memError) throw memError;
             await logError(user.id, 'debug_mem_upserted', { businessId });
 
-            /*
-            // PRE-SEED VENUES (Since we can't store venueCount in payload)
-            // Check if we already have venues
+            // PRE-SEED VENUES so step 3 has rows to update
             const { count } = await supabase.from('venues').select('*', { count: 'exact', head: true }).eq('business_id', businessId);
-            
             if ((count || 0) < venueCount) {
-                 const needed = venueCount - (count || 0);
-                 const venuesToInsert = Array.from({ length: needed }).map((_, i) => ({
-                     business_id: businessId,
-                     name: `Venue ${(count || 0) + i + 1}`,
-                     capacity_max: 100 // Default
-                 }));
-                 const { error: seedError } = await supabase.from('venues').insert(venuesToInsert);
-                 if (seedError) throw seedError;
+                const needed = venueCount - (count || 0);
+                const venuesToInsert = Array.from({ length: needed }).map((_, i) => ({
+                    business_id: businessId,
+                    name: `Venue ${(count || 0) + i + 1}`,
+                    capacity_max: 100
+                }));
+                const { error: seedError } = await supabase.from('venues').insert(venuesToInsert);
+                if (seedError) throw seedError;
             }
-            */
 
             // Move to Step 3
             // We DO NOT write payload. We rely on the venues table.
@@ -199,8 +195,8 @@ export async function submitStep(formData: FormData) {
                 // Update existing venue
                 await supabase.from('venues').update({
                     name: venueName,
-                    capacity_max: capacity,
-                    location_text: location
+                    capacity_max: capacity || null,
+                    city: location || null
                 }).eq('id', currentVenueId);
             }
 
