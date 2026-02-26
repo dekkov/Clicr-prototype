@@ -8,17 +8,18 @@ export const dynamic = 'force-dynamic';
 // --- HYDRATION HELPER ---
 // --- HYDRATION HELPER ---
 async function hydrateData(data: DBData): Promise<DBData> {
+    // Always clear stale db.json business — per-user context section sets the real one
+    data.business = null as any;
+
     try {
         // 0. Fetch Structural Data (Source of Truth: Supabase)
         const [
             { data: sbVenues },
             { data: sbAreas },
-            { data: sbProfiles },
             { data: sbMembers }
         ] = await Promise.all([
             supabaseAdmin.from('venues').select('*'),
             supabaseAdmin.from('areas').select('*'),
-            supabaseAdmin.from('profiles').select('*'),
             supabaseAdmin.from('business_members').select('user_id, business_id')
         ]);
 
@@ -61,30 +62,14 @@ async function hydrateData(data: DBData): Promise<DBData> {
             }));
         }
 
-        // Sync Users & Permissions — resolve business via business_members (profiles has no business_id)
-        if (sbProfiles) {
-            sbProfiles.forEach((p: any) => {
-                const existing = data.users.find(u => u.id === p.id);
-                const membership = sbMembers?.find((m: any) => m.user_id === p.id);
-                const resolvedBusinessId = membership?.business_id;
-                const businessVenues = resolvedBusinessId
-                    ? data.venues.filter(v => v.business_id === resolvedBusinessId).map(v => v.id)
-                    : [];
-
-                const userObj: User = {
-                    id: p.id,
-                    name: p.full_name || p.email?.split('@')[0] || 'User',
-                    email: p.email || existing?.email || '',
-                    role: p.role,
-                    assigned_venue_ids: businessVenues,
-                    assigned_area_ids: [],
-                    assigned_clicr_ids: []
-                };
-
-                if (existing) {
-                    Object.assign(existing, userObj);
-                } else {
-                    data.users.push(userObj);
+        // Sync assigned_venue_ids for users already in db.json via business_members
+        if (sbMembers) {
+            sbMembers.forEach((m: any) => {
+                const user = data.users.find(u => u.id === m.user_id);
+                if (user) {
+                    user.assigned_venue_ids = data.venues
+                        .filter(v => v.business_id === m.business_id)
+                        .map(v => v.id);
                 }
             });
         }
@@ -262,17 +247,18 @@ export async function GET(request: Request) {
                 assigned_clicr_ids: []
             };
             addUser(user);
-            const newData = readDB();
-            newData.currentUser = user;
 
-            // Re-hydrate logic...
-            // Optimization: Just return newData with correct current count from previous hydration?
-            // Safer to re-hydrate or just rely on the fact that addUser didn't touch counts.
-            // Let's re-attach the counts we just calculated.
-            newData.clicrs = data.clicrs;
-            newData.events = data.events;
-            newData.scanEvents = data.scanEvents;
-            return NextResponse.json(newData);
+            // Return clean state — no business/venues until they complete onboarding
+            return NextResponse.json({
+                ...data,
+                business: null,
+                venues: [],
+                areas: [],
+                clicrs: [],
+                events: [],
+                scanEvents: [],
+                currentUser: user
+            });
         } else {
             data.currentUser = user;
         }

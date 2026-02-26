@@ -273,6 +273,33 @@
       "assigned_venue_ids": [],
       "assigned_area_ids": [],
       "assigned_clicr_ids": []
+    },
+    {
+      "id": "858850a2-fad8-4485-876d-b624f7049399",
+      "name": "trhoang03",
+      "email": "trhoang03@gmail.com",
+      "role": "OWNER",
+      "assigned_venue_ids": [],
+      "assigned_area_ids": [],
+      "assigned_clicr_ids": []
+    },
+    {
+      "id": "edea0186-0c6b-4e91-be00-cdcb7dd72b2e",
+      "name": "random123",
+      "email": "random123@gmail.com",
+      "role": "OWNER",
+      "assigned_venue_ids": [],
+      "assigned_area_ids": [],
+      "assigned_clicr_ids": []
+    },
+    {
+      "id": "91c29ecf-7764-4ca4-aae2-3d373b697065",
+      "name": "dekkov",
+      "email": "dekkov@gmail.com",
+      "role": "OWNER",
+      "assigned_venue_ids": [],
+      "assigned_area_ids": [],
+      "assigned_clicr_ids": []
     }
   ],
   "bans": [],
