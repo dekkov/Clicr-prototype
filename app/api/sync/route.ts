@@ -11,20 +11,16 @@ async function hydrateData(data: DBData): Promise<DBData> {
     try {
         // 0. Fetch Structural Data (Source of Truth: Supabase)
         const [
-            { data: sbBusinesses },
             { data: sbVenues },
             { data: sbAreas },
-            { data: sbProfiles }
+            { data: sbProfiles },
+            { data: sbMembers }
         ] = await Promise.all([
-            supabaseAdmin.from('businesses').select('*'),
             supabaseAdmin.from('venues').select('*'),
             supabaseAdmin.from('areas').select('*'),
-            supabaseAdmin.from('profiles').select('*')
+            supabaseAdmin.from('profiles').select('*'),
+            supabaseAdmin.from('business_members').select('user_id, business_id')
         ]);
-
-        if (sbBusinesses) {
-            data.business = sbBusinesses[0] as any; // Single tenant mode for now, or use first found
-        }
 
         if (sbVenues) {
             // Replace local venues with Supabase venues
@@ -32,18 +28,19 @@ async function hydrateData(data: DBData): Promise<DBData> {
                 id: v.id,
                 business_id: v.business_id,
                 name: v.name,
-                address: v.address,
-                city: 'City', // Fallback as schema might differ slightly
-                state: 'State',
-                zip: '00000',
-                capacity: v.capacity_max,
+                address_line1: v.address_line1 || undefined,
+                address_line2: v.address_line2 || undefined,
+                city: v.city || undefined,
+                state: v.state || undefined,
+                postal_code: v.postal_code || undefined,
+                country: v.country || 'US',
                 timezone: v.timezone || 'UTC',
-
-                // Required fields by Type
-                status: 'ACTIVE',
-                capacity_enforcement_mode: 'WARN_ONLY',
+                status: v.status || 'ACTIVE',
+                capacity_enforcement_mode: v.capacity_enforcement_mode || 'WARN_ONLY',
+                total_capacity: v.capacity_max || undefined,
+                last_reset_at: v.last_reset_at || undefined,
                 created_at: v.created_at || new Date().toISOString(),
-                updated_at: new Date().toISOString(),
+                updated_at: v.updated_at || new Date().toISOString(),
             }));
         }
 
@@ -64,12 +61,15 @@ async function hydrateData(data: DBData): Promise<DBData> {
             }));
         }
 
-        // Sync Users & Permissions
+        // Sync Users & Permissions — resolve business via business_members (profiles has no business_id)
         if (sbProfiles) {
             sbProfiles.forEach((p: any) => {
                 const existing = data.users.find(u => u.id === p.id);
-                const businessVenues = data.venues.filter(v => v.business_id === p.business_id).map(v => v.id);
-                // Users in a business get access to all its venues for now (Owner/Manager model)
+                const membership = sbMembers?.find((m: any) => m.user_id === p.id);
+                const resolvedBusinessId = membership?.business_id;
+                const businessVenues = resolvedBusinessId
+                    ? data.venues.filter(v => v.business_id === resolvedBusinessId).map(v => v.id)
+                    : [];
 
                 const userObj: User = {
                     id: p.id,
@@ -77,7 +77,7 @@ async function hydrateData(data: DBData): Promise<DBData> {
                     email: p.email || existing?.email || '',
                     role: p.role,
                     assigned_venue_ids: businessVenues,
-                    assigned_area_ids: [], // Implicit access
+                    assigned_area_ids: [],
                     assigned_clicr_ids: []
                 };
 
@@ -277,19 +277,20 @@ export async function GET(request: Request) {
             data.currentUser = user;
         }
 
-        // --- CONTEXT AWARENESS: Load User's Business ---
+        // --- CONTEXT AWARENESS: Load User's Business via business_members ---
         try {
-            const { data: profile } = await supabaseAdmin
-                .from('profiles')
+            const { data: membership } = await supabaseAdmin
+                .from('business_members')
                 .select('business_id')
-                .eq('id', userId)
+                .eq('user_id', userId)
+                .limit(1)
                 .single();
 
-            if (profile?.business_id) {
+            if (membership?.business_id) {
                 const { data: myBusiness } = await supabaseAdmin
                     .from('businesses')
                     .select('*')
-                    .eq('id', profile.business_id)
+                    .eq('id', membership.business_id)
                     .single();
 
                 if (myBusiness) {
@@ -299,6 +300,18 @@ export async function GET(request: Request) {
                         timezone: myBusiness.timezone || 'UTC',
                         settings: myBusiness.settings || { refresh_interval_sec: 5, capacity_thresholds: [80, 90, 100], reset_rule: 'MANUAL' }
                     };
+
+                    // Ensure user has correct venue IDs (fixes newly created users whose
+                    // assigned_venue_ids may be empty if profiles hadn't synced yet)
+                    if (user.assigned_venue_ids.length === 0) {
+                        const { data: bizVenues } = await supabaseAdmin
+                            .from('venues')
+                            .select('id')
+                            .eq('business_id', membership.business_id);
+                        if (bizVenues && bizVenues.length > 0) {
+                            user.assigned_venue_ids = bizVenues.map((v: any) => v.id);
+                        }
+                    }
                 }
             }
         } catch (e) { console.error("Business Context Load Failed", e); }
@@ -350,8 +363,8 @@ export async function POST(request: Request) {
                 // Resolve Business ID dynamically
                 let eventBizId = event.business_id;
                 if (!eventBizId && userId) {
-                    const { data: p } = await supabaseAdmin.from('profiles').select('business_id').eq('id', userId).single();
-                    if (p) eventBizId = p.business_id;
+                    const { data: m } = await supabaseAdmin.from('business_members').select('business_id').eq('user_id', userId).limit(1).single();
+                    if (m) eventBizId = m.business_id;
                 }
                 const finalEventBizId = eventBizId;
                 if (!finalEventBizId) {
@@ -390,8 +403,8 @@ export async function POST(request: Request) {
                 try {
                     let scanBizId: string | null = null;
                     if (userId) {
-                        const { data: scanProfile } = await supabaseAdmin.from('profiles').select('business_id').eq('id', userId).single();
-                        if (scanProfile) scanBizId = scanProfile.business_id;
+                        const { data: scanMember } = await supabaseAdmin.from('business_members').select('business_id').eq('user_id', userId).limit(1).single();
+                        if (scanMember) scanBizId = scanMember.business_id;
                     }
                     await supabaseAdmin.from('id_scans').insert({
                         business_id: scanBizId || scan.business_id,
@@ -419,8 +432,8 @@ export async function POST(request: Request) {
                     // D2: Use reset_counts RPC to zero snapshots; events are audit records and must not be hard-deleted
                     let resetBizId: string | null = null;
                     if (userId) {
-                        const { data: resetProfile } = await supabaseAdmin.from('profiles').select('business_id').eq('id', userId).single();
-                        if (resetProfile) resetBizId = resetProfile.business_id;
+                        const { data: resetMember } = await supabaseAdmin.from('business_members').select('business_id').eq('user_id', userId).limit(1).single();
+                        if (resetMember) resetBizId = resetMember.business_id;
                     }
                     if (resetBizId) {
                         await supabaseAdmin.rpc('reset_counts', {
@@ -465,8 +478,8 @@ export async function POST(request: Request) {
                 // Resolve Business
                 let clicrBizId: string | null = null;
                 if (userId) {
-                    const { data: p } = await supabaseAdmin.from('profiles').select('business_id').eq('id', userId).single();
-                    if (p) clicrBizId = p.business_id;
+                    const { data: clicrMember } = await supabaseAdmin.from('business_members').select('business_id').eq('user_id', userId).limit(1).single();
+                    if (clicrMember) clicrBizId = clicrMember.business_id;
                 }
 
                 if (!clicrBizId) {
@@ -563,19 +576,20 @@ export async function POST(request: Request) {
 
         // --- AUTO-ASSIGNMENT & FILTERING ---
         if (userId && updatedData) {
-            // FIX: Restore correct business context for this user (otherwise hydrateData resets it to default)
+            // Restore correct business context for this user via business_members
             try {
-                const { data: profile } = await supabaseAdmin
-                    .from('profiles')
+                const { data: postMembership } = await supabaseAdmin
+                    .from('business_members')
                     .select('business_id')
-                    .eq('id', userId)
+                    .eq('user_id', userId)
+                    .limit(1)
                     .single();
 
-                if (profile?.business_id) {
+                if (postMembership?.business_id) {
                     const { data: myBusiness } = await supabaseAdmin
                         .from('businesses')
                         .select('*')
-                        .eq('id', profile.business_id)
+                        .eq('id', postMembership.business_id)
                         .single();
 
                     if (myBusiness) {

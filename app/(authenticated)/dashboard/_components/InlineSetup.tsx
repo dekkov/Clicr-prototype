@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Building2, MapPin, Users, ArrowRight, Loader2, CheckCircle2 } from 'lucide-react';
 import { createInitialBusiness, createInitialVenue } from '@/app/onboarding/setup-actions';
 
@@ -11,9 +12,16 @@ interface InlineSetupProps {
 }
 
 export function InlineSetup({ hasBusiness }: InlineSetupProps) {
+    const router = useRouter();
     const [phase, setPhase] = useState<Phase>(hasBusiness ? 'VENUE' : 'BUSINESS');
     const [isPending, setIsPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (phase === 'DONE') {
+            router.refresh();
+        }
+    }, [phase, router]);
 
     const handleSubmit = async (
         e: React.FormEvent<HTMLFormElement>,

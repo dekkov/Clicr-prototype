@@ -29,6 +29,12 @@ export async function createInitialBusiness(formData: FormData): Promise<SetupRe
                 .update({ name: businessName })
                 .eq('id', existingMembership.business_id);
             if (error) throw error;
+
+            // Ensure profile is linked (may be missing if created via broken flow)
+            await supabaseAdmin
+                .from('profiles')
+                .update({ business_id: existingMembership.business_id })
+                .eq('id', user.id);
         } else {
             // Create new business — supabaseAdmin bypasses RLS (business_members doesn't exist yet)
             const { data: business, error: busError } = await supabaseAdmin
@@ -41,10 +47,17 @@ export async function createInitialBusiness(formData: FormData): Promise<SetupRe
             const { error: memberError } = await supabaseAdmin
                 .from('business_members')
                 .upsert(
-                    { business_id: business.id, user_id: user.id, role: 'OWNER', is_default: true },
+                    { business_id: business.id, user_id: user.id, role: 'OWNER' },
                     { onConflict: 'business_id,user_id' }
                 );
             if (memberError) throw memberError;
+
+            // Link the user's profile to this business so the sync API can filter venues
+            const { error: profileError } = await supabaseAdmin
+                .from('profiles')
+                .update({ business_id: business.id })
+                .eq('id', user.id);
+            if (profileError) throw profileError;
         }
 
         revalidatePath('/dashboard');

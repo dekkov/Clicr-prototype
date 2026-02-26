@@ -7,9 +7,9 @@ import Link from 'next/link';
 import { Plus, Search, Filter, AlertTriangle, CheckCircle, XCircle, MoreVertical } from 'lucide-react';
 
 export default function BanningPage() {
-    const { business } = useApp();
+    const { business, isLoading: storeLoading } = useApp();
     const [bans, setBans] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState('');
     const [filter, setFilter] = useState<'ALL' | 'ACTIVE' | 'REVOKED'>('ACTIVE');
 
@@ -19,37 +19,43 @@ export default function BanningPage() {
     }, [business, filter]);
 
     const fetchBans = async () => {
+        if (!business) return;
         setLoading(true);
         const supabase = createClient();
 
-        // Ensure business context
-        let query = supabase
-            .from('bans')
-            .select('*')
-            .eq('business_id', business!.id)
-            .order('created_at', { ascending: false });
+        try {
+            let query = supabase
+                .from('patron_bans')
+                .select('*, banned_persons(first_name, last_name, id_number_last4)')
+                .eq('business_id', business.id)
+                .order('created_at', { ascending: false });
 
-        if (filter === 'ACTIVE') {
-            query = query.eq('active', true);
-        } else if (filter === 'REVOKED') {
-            query = query.eq('active', false);
+            if (filter === 'ACTIVE') {
+                query = query.eq('status', 'ACTIVE');
+            } else if (filter === 'REVOKED') {
+                query = query.in('status', ['REMOVED', 'EXPIRED']);
+            }
+
+            const { data, error } = await query;
+            if (error) console.error("Error fetching bans", error.message, error.code, error.details);
+            setBans(data ?? []);
+        } finally {
+            setLoading(false);
         }
-
-        const { data, error } = await query;
-        if (data) setBans(data);
-        else console.error("Error fetching bans", error);
-        setLoading(false);
     };
 
     const handleRevoke = async (id: string) => {
         if (!confirm('Are you sure you want to revoke this ban?')) return;
 
         const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
         const { error } = await supabase
-            .from('bans')
+            .from('patron_bans')
             .update({
-                active: false,
-                revoked_at: new Date().toISOString()
+                status: 'REMOVED',
+                removed_by_user_id: user?.id,
+                removed_reason: 'Manually revoked',
+                updated_at: new Date().toISOString()
             })
             .eq('id', id);
 
@@ -111,7 +117,7 @@ export default function BanningPage() {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800">
-                        {loading ? (
+                        {(storeLoading || loading) ? (
                             <tr><td colSpan={6} className="p-8 text-center text-slate-500">Loading bans...</td></tr>
                         ) : bans.length === 0 ? (
                             <tr><td colSpan={6} className="p-8 text-center text-slate-500">No bans found matching filter.</td></tr>
@@ -119,32 +125,34 @@ export default function BanningPage() {
                             <tr key={ban.id} className="hover:bg-slate-800/50 transition-colors">
                                 <td className="p-4">
                                     <span className="font-bold text-white bg-slate-800 px-2 py-1 rounded text-sm border border-slate-700">
-                                        {ban.reason_code}
+                                        {ban.reason_category}
                                     </span>
                                 </td>
                                 <td className="p-4">
-                                    {ban.active ? (
+                                    {ban.status === 'ACTIVE' ? (
                                         <span className="inline-flex items-center gap-1 text-red-400 text-xs font-bold px-2 py-1 bg-red-400/10 rounded-full">
                                             Active
                                         </span>
                                     ) : (
                                         <span className="inline-flex items-center gap-1 text-slate-500 text-xs font-bold px-2 py-1 bg-slate-700 rounded-full">
-                                            Revoked
+                                            {ban.status === 'EXPIRED' ? 'Expired' : 'Revoked'}
                                         </span>
                                     )}
                                 </td>
                                 <td className="p-4 text-sm text-slate-300">
-                                    {ban.venue_id ? 'Single Venue' : 'All Venues'}
+                                    {ban.applies_to_all_locations ? 'All Venues' : 'Single Venue'}
                                 </td>
                                 <td className="p-4">
-                                    <div className="text-sm text-white truncate max-w-xs">{ban.notes || '-'}</div>
-                                    <div className="text-xs text-slate-500 font-mono mt-1 opacity-50">Hash: {ban.identity_token_hash.substring(0, 8)}...</div>
+                                    <div className="text-sm text-white truncate max-w-xs">{ban.reason_notes || '-'}</div>
+                                    <div className="text-xs text-slate-500 font-mono mt-1 opacity-50">
+                                        {ban.banned_persons ? `${ban.banned_persons.first_name} ${ban.banned_persons.last_name}` : '-'}
+                                    </div>
                                 </td>
                                 <td className="p-4 text-sm text-slate-400">
                                     {new Date(ban.created_at).toLocaleDateString()}
                                 </td>
                                 <td className="p-4 text-right">
-                                    {ban.active && (
+                                    {ban.status === 'ACTIVE' && (
                                         <button
                                             onClick={() => handleRevoke(ban.id)}
                                             className="text-xs font-bold text-slate-400 hover:text-white border border-slate-700 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors"
