@@ -247,21 +247,12 @@ export async function GET(request: Request) {
                 assigned_clicr_ids: []
             };
             addUser(user);
-
-            // Return clean state — no business/venues until they complete onboarding
-            return NextResponse.json({
-                ...data,
-                business: null,
-                venues: [],
-                areas: [],
-                clicrs: [],
-                events: [],
-                scanEvents: [],
-                currentUser: user
-            });
-        } else {
-            data.currentUser = user;
+            // Fall through to business context loading below —
+            // this ensures existing Supabase data (business_members) is picked up
+            // even if db.json is ephemeral (serverless) or was reset.
         }
+
+        data.currentUser = user;
 
         // --- CONTEXT AWARENESS: Load User's Business via business_members ---
         try {
