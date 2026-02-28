@@ -122,13 +122,13 @@ export default function ClicrPanel({
         : null;
 
     // Subscribe to store updates
-    const areaStats = scopeKey ? areaTraffic[scopeKey] : null;
+    const areaStats = scopeKey ? (areaTraffic || {})[scopeKey] : null;
 
     useEffect(() => {
         if (!venueId || !venue?.business_id || !clicr?.area_id) return;
 
         // Initial Fetch -> Populates Store
-        refreshTrafficStats(venueId, clicr.area_id);
+        refreshTrafficStats?.(venueId, clicr.area_id);
     }, [venueId, venue?.business_id, clicr?.area_id]); // Run once per scope change
 
     const globalIn = areaStats?.total_in;
@@ -169,7 +169,7 @@ export default function ClicrPanel({
     // Force focus when modals close
     useEffect(() => {
         if (!showBulkModal && !showConfigModal) {
-            const timer = setTimeout(() => inputRef.current?.focus(), 50);
+            const timer = setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 50);
             return () => clearTimeout(timer);
         }
     }, [showBulkModal, showConfigModal]);
@@ -187,14 +187,14 @@ export default function ClicrPanel({
 
             // If input is not focused, refocus it and append the key
             if (document.activeElement !== inputRef.current) {
-                inputRef.current?.focus();
+                inputRef.current?.focus({ preventScroll: true });
             }
         };
 
         window.addEventListener('keydown', handleKeyDown);
 
         // Initial focus
-        const timer = setTimeout(() => inputRef.current?.focus(), 100);
+        const timer = setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 100);
 
         return () => {
             clearTimeout(timer);
@@ -206,7 +206,7 @@ export default function ClicrPanel({
     useEffect(() => {
         const handleBlur = () => {
             if (!showBulkModal && !showConfigModal) {
-                setTimeout(() => inputRef.current?.focus(), 100);
+                setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 100);
             }
         };
         const inputEl = inputRef.current;
@@ -639,14 +639,13 @@ export default function ClicrPanel({
     }
 
     return (
-        <div className="flex flex-col h-[100vh] bg-black relative overflow-hidden" onClick={() => inputRef.current?.focus()}>
+        <div className="flex flex-col h-[100vh] bg-black relative overflow-hidden" onClick={() => inputRef.current?.focus({ preventScroll: true })}>
             {/* Hidden Input */}
             <textarea
                 ref={inputRef as any}
                 value={scannerInput}
                 onChange={(e) => setScannerInput(e.target.value)}
                 className="opacity-0 absolute top-0 left-0 w-0 h-0 overflow-hidden pointer-events-none"
-                autoFocus
                 autoComplete="off"
             />
 
@@ -705,13 +704,13 @@ export default function ClicrPanel({
                             <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">NET (ADJ)</span>
                             {/* Placeholder logic until store updates propagate */}
                             <span className="text-white font-mono font-bold">
-                                {(totalAreaCount || 0) - (turnarounds.filter(t => t.area_id === clicr.area_id).reduce((a, b) => a + b.count, 0) || 0)}
+                                {(totalAreaCount || 0) - ((turnarounds || []).filter((t: any) => t.area_id === clicr.area_id).reduce((a, b) => a + b.count, 0) || 0)}
                             </span>
                         </div>
                         <div className="bg-slate-900/50 rounded-lg p-2 flex flex-col items-center justify-center border border-white/5 active:bg-slate-800 transition-colors cursor-pointer"
                             onClick={() => {
                                 if (navigator.vibrate) navigator.vibrate(50);
-                                recordTurnaround(venueId || '', clicr.area_id, clicr.id, 1);
+                                recordTurnaround?.(venueId || '', clicr.area_id, clicr.id, 1);
                             }}
                         >
                             <span className="text-[10px] text-purple-400 font-bold uppercase tracking-wider">TURNAROUND</span>
@@ -724,7 +723,7 @@ export default function ClicrPanel({
                         <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="bg-slate-950 rounded-md border border-slate-800 p-2 text-xs text-slate-400 flex justify-between px-4 mt-1">
                             <span>Manual: <span className="text-white font-bold">--</span></span>
                             <span>Scans: <span className="text-white font-bold">--</span></span>
-                            <span>Turns: <span className="text-white font-bold">{turnarounds.filter(t => t.area_id === clicr.area_id).reduce((a, b) => a + b.count, 0)}</span></span>
+                            <span>Turns: <span className="text-white font-bold">{(turnarounds || []).filter((t: any) => t.area_id === clicr.area_id).reduce((a, b) => a + b.count, 0)}</span></span>
                         </motion.div>
                     )}
                 </div>

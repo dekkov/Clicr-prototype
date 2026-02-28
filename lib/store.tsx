@@ -180,7 +180,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                         filter: `business_id=eq.${state.business.id}` // TENANT ISOLATION
                     },
                     (payload) => {
-                        // console.log('Realtime change received!', payload);
+                        // Skip realtime updates while writes are in flight — applying an
+                        // intermediate snapshot (e.g. after click 1 of 4) would overwrite
+                        // the optimistic state showing the final count, causing visible flicker.
+                        if (isWritingRef.current) return;
+
                         if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
                             const newSnap = payload.new as any;
                             setState(prev => ({
@@ -214,13 +218,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return fetch('/api/sync', { method: 'POST', headers, body: JSON.stringify(body) });
     };
 
-    // Simple lock to prevent polling from overwriting optimistic updates during active writes
-    const isWritingRef = useRef(false);
+    // Counter lock: incremented per in-flight write, decremented when each settles.
+    // Using a counter (not boolean) so concurrent clicks each hold their own lock slot —
+    // the lock stays active until the LAST write clears, preventing realtime/poll from
+    // overwriting optimistic state with intermediate counts.
+    const isWritingRef = useRef(0);
 
     const recordEvent = async (data: Omit<CountEvent, 'id' | 'timestamp' | 'user_id' | 'business_id'>) => {
         if (!state.business) return;
 
-        isWritingRef.current = true; // Lock polling
+        isWritingRef.current += 1; // Acquire lock slot
 
         const newEvent: CountEvent = {
             ...data,
@@ -262,23 +269,27 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             // Use authFetch to ensure user context is passed (fixes filtering/identity issues)
             const res = await authFetch({ action: 'RECORD_EVENT', payload: newEvent });
 
-            if (res.ok) {
-                const updatedDB = await res.json();
-                setState(prev => ({ ...prev, ...updatedDB }));
+            // Intentionally not applying API response to state — the optimistic update
+            // already reflects the change, and the 2-second polling interval will reconcile
+            // server truth. Applying the response here overwrites Supabase-hydrated
+            // venues/areas with stale local db.json data, causing venue name flicker,
+            // venueId becoming undefined (breaks guest-out), and fast-click races.
+            if (!res.ok) {
+                console.error("Failed to record event (server error)", res.status);
             }
         } catch (error) {
             console.error("Failed to record event", error);
             // Revert?
         } finally {
-            // Delay unlocking to allow server consistency to settle
+            // Delay releasing this slot to allow Supabase realtime to settle
             setTimeout(() => {
-                isWritingRef.current = false;
+                isWritingRef.current = Math.max(0, isWritingRef.current - 1);
             }, 500);
         }
     };
 
     const recordScan = async (data: Omit<IDScanEvent, 'id' | 'timestamp'>) => {
-        isWritingRef.current = true;
+        isWritingRef.current += 1; // Acquire lock slot
 
         const newScan: IDScanEvent = {
             ...data,
@@ -294,15 +305,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
         try {
             const res = await authFetch({ action: 'RECORD_SCAN', payload: newScan }); // Use authFetch
-            if (res.ok) {
-                const updatedDB = await res.json();
-                setState(prev => ({ ...prev, ...updatedDB }));
+            // Intentionally not applying API response to state — RECORD_SCAN is hydrated
+            // and its response includes areas.current_occupancy from Supabase, which would
+            // overwrite the optimistic occupancy from concurrent Guest IN clicks (same root
+            // cause as RECORD_EVENT). Polling reconciles server truth.
+            if (!res.ok) {
+                console.error("Failed to record scan (server error)", res.status);
             }
         } catch (error) {
             console.error("Failed to record scan", error);
         } finally {
             setTimeout(() => {
-                isWritingRef.current = false;
+                isWritingRef.current = Math.max(0, isWritingRef.current - 1);
             }, 500);
         }
     };
