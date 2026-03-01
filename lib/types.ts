@@ -123,8 +123,12 @@ export type Clicr = {
     current_count: number; // Cached value
     active: boolean;
     button_config?: {
-        label_a: string; // Defaults to "MALE"
-        label_b: string; // Defaults to "FEMALE"
+        auto_reset?: {
+            enabled: boolean;
+            time: string;     // "HH:MM" 24-hour format
+            timezone: string; // IANA timezone e.g. "America/New_York"
+        };
+        tap_token?: string;  // Random token for public /tap/[token] page
     };
     command?: string; // Hardware mapping/pairing code
     direction_mode?: 'in_only' | 'out_only' | 'bidirectional';
@@ -182,7 +186,10 @@ export type CountEvent = {
     timestamp: number;
     delta: number; // +1 or -1 (or more for bulk)
     flow_type: 'IN' | 'OUT';
-    gender?: 'M' | 'F'; // Added for gender tracking
+    gender?: 'M' | 'F' | 'OTHER' | 'DECLINE';
+    first_name?: string;
+    last_name?: string;
+    dob?: string; // YYYYMMDD
     event_type: 'TAP' | 'SCAN' | 'BULK' | 'RESET';
     idempotency_key?: string;
 };
@@ -301,18 +308,6 @@ export type SupportTicket = {
     created_at: string;
     updated_at: string;
     messages: SupportMessage[];
-};
-
-export type DeviceLayout = {
-    id: string;
-    business_id: string;
-    owner_user_id: string;
-    layout_mode: 'single' | 'dual';
-    primary_device_id?: string;
-    secondary_device_id?: string;
-    primary_label?: string;
-    secondary_label?: string;
-    updated_at: string;
 };
 
 export type TurnaroundEvent = {

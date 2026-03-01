@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 
 import { useApp } from '@/lib/store';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Settings2, Plus, Minus, ScanFace, CheckCircle2, XCircle, ArrowUpCircle, ArrowDownCircle, Trash2, Layout, Link2, Unlink, ChevronDown, Check, Zap, Bug } from 'lucide-react';
+import { Settings2, Plus, Minus, XCircle, Check, Zap, Bug, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { IDScanEvent } from '@/lib/types';
 import { parseAAMVA } from '@/lib/aamva';
@@ -36,20 +36,16 @@ const generateMockID = () => {
 
 export default function ClicrPanel({
     clicrId,
-    overrideLabel,
     className,
-    showLayoutControls = false
 }: {
     clicrId?: string,
-    overrideLabel?: string,
     className?: string,
-    showLayoutControls?: boolean
 }) {
     const {
         clicrs, areas, events, venues,
-        recordEvent, recordScan, recordTurnaround, renameDevice,
+        recordEvent, recordScan, recordTurnaround,
         resetCounts, isLoading, patrons, patronBans, updateClicr, debug, currentUser,
-        turnarounds
+        turnarounds, trafficSessionStart
     } = useApp();
 
     const id = clicrId;
@@ -70,24 +66,6 @@ export default function ClicrPanel({
             }
         };
     }, []);
-
-    // --- SPLIT VIEW STATE ---
-    const [layoutMode, setLayoutMode] = useState<'SINGLE' | 'SPLIT'>('SINGLE');
-    const [showLayoutMenu, setShowLayoutMenu] = useState(false);
-    const [showSplitSetup, setShowSplitSetup] = useState(false);
-
-    // Split Configuration
-    const [splitConfig, setSplitConfig] = useState<{
-        mode: 'INDEPENDENT' | 'LINKED';
-        secondaryClicrId: string | null;
-        primaryLabel: string;
-        secondaryLabel: string;
-    }>({
-        mode: 'INDEPENDENT',
-        secondaryClicrId: null,
-        primaryLabel: 'Primary',
-        secondaryLabel: 'Secondary'
-    });
 
     // Calculate total area occupancy from SNAPSHOT (Source of Truth)
     const currentArea = (areas || []).find(a => a.id === clicr?.area_id);
@@ -140,15 +118,15 @@ export default function ClicrPanel({
     const [showBulkModal, setShowBulkModal] = useState(false);
     const [bulkValue, setBulkValue] = useState(0);
 
-    // --- CUSTOM BUTTON LABELS ---
-    const [customLabels, setCustomLabels] = useState<{ label_a: string, label_b: string }>({
-        label_a: 'MALE',
-        label_b: 'FEMALE'
-    });
     const [showConfigModal, setShowConfigModal] = useState(false);
-    const [soloMode, setSoloMode] = useState(false);
-    const [draftSoloMode, setDraftSoloMode] = useState(false);
-    const [editLabels, setEditLabels] = useState<{ label_a: string, label_b: string }>({ label_a: '', label_b: '' });
+
+    // --- GUEST IN MODAL ---
+    const [showGuestInModal, setShowGuestInModal] = useState(false);
+    const [guestDraft, setGuestDraft] = useState<{
+        name: string;
+        dob: string;
+        gender: 'M' | 'F' | 'OTHER' | 'DECLINE' | null;
+    }>({ name: '', dob: '', gender: null });
 
     // Classification Mode State
     const [classifyMode, setClassifyMode] = useState(false);
@@ -163,16 +141,16 @@ export default function ClicrPanel({
     // Track modal state via ref to avoid listener re-binding
     const isModalOpenRef = useRef(false);
     useEffect(() => {
-        isModalOpenRef.current = showBulkModal || showConfigModal;
-    }, [showBulkModal, showConfigModal]);
+        isModalOpenRef.current = showBulkModal || showConfigModal || showGuestInModal;
+    }, [showBulkModal, showConfigModal, showGuestInModal]);
 
     // Force focus when modals close
     useEffect(() => {
-        if (!showBulkModal && !showConfigModal) {
+        if (!showBulkModal && !showConfigModal && !showGuestInModal) {
             const timer = setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 50);
             return () => clearTimeout(timer);
         }
-    }, [showBulkModal, showConfigModal]);
+    }, [showBulkModal, showConfigModal, showGuestInModal]);
 
     // Focus management for hardware scanner
     useEffect(() => {
@@ -205,140 +183,120 @@ export default function ClicrPanel({
 
     useEffect(() => {
         const handleBlur = () => {
-            if (!showBulkModal && !showConfigModal) {
+            if (!showBulkModal && !showConfigModal && !showGuestInModal) {
                 setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 100);
             }
         };
         const inputEl = inputRef.current;
         inputEl?.addEventListener('blur', handleBlur);
         return () => inputEl?.removeEventListener('blur', handleBlur);
-    }, [showBulkModal, showConfigModal]);
+    }, [showBulkModal, showConfigModal, showGuestInModal]);
 
+
+    const [editName, setEditName] = useState('');
+    const [generatingToken, setGeneratingToken] = useState(false);
+    const [copied, setCopied] = useState(false);
+
+    const TIMEZONES = [
+        { value: 'America/New_York', label: 'Eastern (ET)' },
+        { value: 'America/Chicago', label: 'Central (CT)' },
+        { value: 'America/Denver', label: 'Mountain (MT)' },
+        { value: 'America/Los_Angeles', label: 'Pacific (PT)' },
+        { value: 'America/Phoenix', label: 'Arizona (no DST)' },
+        { value: 'America/Anchorage', label: 'Alaska (AKT)' },
+        { value: 'Pacific/Honolulu', label: 'Hawaii (HT)' },
+        { value: 'Europe/London', label: 'London (GMT/BST)' },
+        { value: 'Europe/Paris', label: 'Paris / Berlin (CET)' },
+        { value: 'Asia/Dubai', label: 'Dubai (GST)' },
+        { value: 'Asia/Singapore', label: 'Singapore (SGT)' },
+        { value: 'Asia/Tokyo', label: 'Tokyo (JST)' },
+        { value: 'Australia/Sydney', label: 'Sydney (AEST)' },
+        { value: 'UTC', label: 'UTC' },
+    ];
+
+    const [autoReset, setAutoReset] = useState<{ enabled: boolean; time: string; timezone: string }>({
+        enabled: false,
+        time: '09:00',
+        timezone: (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return 'UTC'; } })(),
+    });
+
+    // Auto-reset: check if the scheduled reset time has passed and we haven't reset yet today
+    const checkAutoReset = useCallback(() => {
+        if (!autoReset.enabled || !venueId || !clicr?.area_id) return;
+
+        const now = new Date();
+        // Current HH:MM in the configured timezone
+        const currentTimeInTZ = now.toLocaleTimeString('en-US', {
+            timeZone: autoReset.timezone, hour: '2-digit', minute: '2-digit', hour12: false
+        }).replace(/^24:/, '00:');
+
+        if (currentTimeInTZ < autoReset.time) return; // Reset time not yet reached today
+
+        // Today's date in configured timezone
+        const todayInTZ = now.toLocaleDateString('en-CA', { timeZone: autoReset.timezone });
+
+        // Date + time of the last reset in configured timezone
+        const lastResetDate = new Date(trafficSessionStart).toLocaleDateString('en-CA', { timeZone: autoReset.timezone });
+        const lastResetTime = new Date(trafficSessionStart).toLocaleTimeString('en-US', {
+            timeZone: autoReset.timezone, hour: '2-digit', minute: '2-digit', hour12: false
+        }).replace(/^24:/, '00:');
+
+        // Already reset today at or after the target time — nothing to do
+        if (lastResetDate === todayInTZ && lastResetTime >= autoReset.time) return;
+
+        handleReset(true); // silent auto-reset
+    }, [autoReset, venueId, clicr?.area_id, trafficSessionStart]);
+
+    useEffect(() => {
+        checkAutoReset();
+        const interval = setInterval(checkAutoReset, 60_000); // check every minute
+        return () => clearInterval(interval);
+    }, [checkAutoReset]);
 
     // Load from local storage or Server on mount/update
     useEffect(() => {
-        // Prioritize SERVER config for sync
-        if (clicr?.button_config) {
-            setCustomLabels(clicr.button_config);
-        } else {
-            // Fallback to local if server has nothing (legacy)
-            const saved = localStorage.getItem(`clicr_config_${id}`);
-            if (saved) {
-                try {
-                    setCustomLabels(JSON.parse(saved));
-                } catch (e) { console.error("Failed to parse saved config"); }
-            }
-        }
-
-        // Load Layout Mode
-        const savedMode = localStorage.getItem(`clicr_layout_mode_${id}`);
-        if (savedMode === 'SOLO') {
-            setSoloMode(true);
-        }
-
         // Load Classify Mode
         const savedClassify = localStorage.getItem(`clicr_classify_mode_${id}`);
         if (savedClassify === 'true') {
             setClassifyMode(true);
         }
-    }, [id, clicr]);
 
-    const [editName, setEditName] = useState('');
+        // Load Auto-Reset config — skip while settings modal is open so polling
+        // doesn't overwrite the operator's in-progress edits.
+        if (!showConfigModal && clicr?.button_config?.auto_reset) {
+            setAutoReset(clicr.button_config.auto_reset);
+        }
+    }, [id, clicr, showConfigModal]);
 
-    // ... (keep existing state hooks) ...
-
-    const saveConfig = async (name: string, a: string, b: string) => {
-        const newLabels = { label_a: a.toUpperCase(), label_b: b.toUpperCase() };
-        setCustomLabels(newLabels);
-
-        // Save to Local Storage (Legacy/Offline backup)
-        localStorage.setItem(`clicr_config_${id}`, JSON.stringify(newLabels));
-
-        // Save to Server (Syncs to other devices)
+    const saveConfig = async (name: string) => {
         if (clicr) {
             await updateClicr({
                 ...clicr,
                 name: name,
-                button_config: newLabels
+                button_config: { ...(clicr.button_config ?? {}), auto_reset: autoReset }
             });
         }
-
         setShowConfigModal(false);
+    };
+
+    const generateTapToken = async () => {
+        if (!clicr || generatingToken) return;
+        setGeneratingToken(true);
+        try {
+            const token = Math.random().toString(36).slice(2, 10);
+            await updateClicr({
+                ...clicr,
+                button_config: { ...(clicr.button_config ?? {}), tap_token: token },
+            });
+        } finally {
+            setGeneratingToken(false);
+        }
     };
 
     // ...
 
     // if (isLoading) return <div className="p-8 text-white">Connecting...</div>;
     // if (!clicr) return <div className="p-8 text-white">Clicr not found</div>;
-
-    const handleGenderTap = (gender: 'M' | 'F', delta: number) => {
-        if (!clicr || !venueId) return;
-        // ENFORCEMENT CHECK
-        if (delta > 0) {
-            const { maxCapacity: maxCap, mode } = getVenueCapacityRules(venue);
-
-            if (maxCap > 0 && currentVenueOccupancy >= maxCap) {
-                if (mode === 'HARD_STOP') {
-                    alert("CAPACITY REACHED: Entry Blocked (Hard Stop Active)");
-                    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-                    return; // BLOCK
-                }
-                if (mode === 'MANAGER_OVERRIDE' || mode === 'HARD_BLOCK' as any) { // Handle variations
-                    // Require confirmation
-                    if (!window.confirm("WARNING: Capacity Reached. Authorize Override?")) {
-                        return; // BLOCK if not confirmed
-                    }
-                }
-                if (mode === 'WARN_ONLY') {
-                    if (navigator.vibrate) navigator.vibrate([50, 50, 50, 50]);
-                    // Optional: Toast warning
-                }
-            }
-        }
-
-        if (navigator.vibrate) navigator.vibrate(50);
-
-        // If we have a pending classification, clearing it is the priority
-        // We assume this tap IS the classification for that scan
-        if (pendingScan && delta > 0) {
-            // Count it!
-            setPendingScan(null);
-            setLastScan(null); // Clear the visual overlay too
-        }
-
-        // 1. Record the Count Event (Changes Occupancy) with Gender
-        recordEvent({
-            venue_id: venueId,
-            area_id: clicr.area_id,
-            clicr_id: clicr.id,
-            delta: delta,
-            flow_type: delta > 0 ? 'IN' : 'OUT',
-            gender: gender,
-            event_type: 'TAP', // Ideally 'SCAN_CLASSIFIED' but keeping simple for now
-            idempotency_key: Math.random().toString(36)
-        });
-
-        // 2. If it's an entry (Delta > 0), also log a "Scan" for the record
-        // (Optional: remove this if we rely solely on events for graph, but good for ID log consistency)
-        // NOTE: In classify mode, scan is already logged upstream. In normal mode, we might double log if not careful.
-        // But the previous requirement was "log a Scan" here. 
-        // Improvement: Only record scan HERE if it wasn't already recorded by the scanner process.
-        // However, for consistency with existing codebase, let's keep it simple.
-        // The upstream 'recordScan' logs the physical scan. This 'recordScan' here seems to be simulating a scan for manual taps?
-        // Actually, looking at original code: "If delta > 0... also log a Scan". This implies manual taps generate artificial scan records?
-        // Let's preserve existing logic for manual taps, but AVOID it if we just processed a real scan (to avoid double scan logs).
-
-        if (delta > 0 && !pendingScan) {
-            recordScan({
-                venue_id: venueId,
-                scan_result: 'ACCEPTED',
-                age: 21,
-                age_band: '21+',
-                sex: gender,
-                zip_code: '00000'
-            });
-        }
-    };
 
     const handleBulkSubmit = () => {
         if (!clicr || !venueId) return;
@@ -358,28 +316,100 @@ export default function ClicrPanel({
         }
     };
 
+    const handleGuestIn = () => {
+        if (!clicr || !venueId) return;
+
+        // Capacity enforcement
+        const { maxCapacity: maxCap, mode } = getVenueCapacityRules(venue);
+        if (maxCap > 0 && currentVenueOccupancy >= maxCap) {
+            if (mode === 'HARD_STOP') {
+                alert("CAPACITY REACHED: Entry Blocked (Hard Stop Active)");
+                if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                return;
+            }
+            if (mode === 'MANAGER_OVERRIDE' || mode === 'HARD_BLOCK' as any) {
+                if (!window.confirm("WARNING: Capacity Reached. Authorize Override?")) return;
+            }
+            if (mode === 'WARN_ONLY') {
+                if (navigator.vibrate) navigator.vibrate([50, 50, 50, 50]);
+            }
+        }
+
+        if (navigator.vibrate) navigator.vibrate(50);
+
+        // Parse name into first/last
+        const nameTrimmed = guestDraft.name.trim();
+        const spaceIdx = nameTrimmed.indexOf(' ');
+        const firstName = spaceIdx >= 0 ? nameTrimmed.slice(0, spaceIdx) : nameTrimmed;
+        const lastName = spaceIdx >= 0 ? nameTrimmed.slice(spaceIdx + 1) : undefined;
+
+        // Convert YYYY-MM-DD (from date input) to YYYYMMDD
+        const formattedDob = guestDraft.dob ? guestDraft.dob.replace(/-/g, '') : undefined;
+
+        recordEvent({
+            venue_id: venueId,
+            area_id: clicr.area_id,
+            clicr_id: clicr.id,
+            delta: 1,
+            flow_type: 'IN',
+            gender: guestDraft.gender ?? undefined,
+            first_name: firstName || undefined,
+            last_name: lastName || undefined,
+            dob: formattedDob,
+            event_type: 'TAP',
+            idempotency_key: Math.random().toString(36)
+        });
+
+        recordScan({
+            venue_id: venueId,
+            scan_result: 'ACCEPTED',
+            age: 21,
+            age_band: '21+',
+            sex: guestDraft.gender === 'M' ? 'M' : guestDraft.gender === 'F' ? 'F' : 'U',
+            zip_code: '00000',
+            first_name: firstName || undefined,
+            last_name: lastName || undefined,
+            dob: formattedDob,
+        });
+
+        setGuestDraft({ name: '', dob: '', gender: null });
+        setShowGuestInModal(false);
+    };
+
+    const handleGuestOut = () => {
+        if (!clicr || !venueId) return;
+        if (navigator.vibrate) navigator.vibrate(50);
+        recordEvent({
+            venue_id: venueId,
+            area_id: clicr.area_id,
+            clicr_id: clicr.id,
+            delta: -1,
+            flow_type: 'OUT',
+            event_type: 'TAP',
+            idempotency_key: Math.random().toString(36)
+        });
+    };
+
     // Reset Logic
-    const handleReset = async () => {
-        if (!window.confirm('WARNING: RESET ALL COUNTS TO ZERO?')) return;
+    const handleReset = async (silent = false) => {
+        if (!silent && !window.confirm('Reset all counts to zero? This cannot be undone.')) return;
         if (!venueId) return;
 
         try {
-            await resetCounts('VENUE', venueId);
+            await resetCounts(venueId);
             setBulkValue(0);
             setLastScan(null);
             setScannerInput('');
+            await refreshTrafficStats?.(venueId, clicr.area_id);
         } catch (e) {
             console.error("Reset failed", e);
-            alert("Failed to reset. Please try again or check connection.");
+            if (!silent) alert("Failed to reset. Please try again or check connection.");
         }
     };
 
     // --- ADVANCED SCANNER LOGIC ---
     // (Hooks moved to top)
 
-    // Unified Scan Processor (The Brain)
-
-    // Unified Scan Processor (The Brain)
     // Unified Scan Processor (The Brain)
     const processScan = async (parsed: ReturnType<typeof parseAAMVA>, rawData?: string) => {
         if (!venueId) return;
@@ -538,31 +568,6 @@ export default function ClicrPanel({
         }
     };
 
-    // --- SPLIT VIEW HELPERS ---
-    const activateSplit = (mode: 'INDEPENDENT' | 'LINKED') => {
-        if (!clicr) return;
-        setSplitConfig(prev => ({ ...prev, mode }));
-        setShowLayoutMenu(false);
-        // If we haven't set up yet, show setup
-        if (mode === 'INDEPENDENT' && !splitConfig.secondaryClicrId) {
-            setShowSplitSetup(true);
-        } else if (mode === 'LINKED') {
-            // Auto-setup for linked
-            setSplitConfig(prev => ({
-                ...prev,
-                mode: 'LINKED',
-                primaryLabel: 'ENTRY',
-                secondaryLabel: 'EXIT',
-                secondaryClicrId: clicr.id // Self ref for logic
-            }));
-            setLayoutMode('SPLIT');
-        } else {
-            setLayoutMode('SPLIT');
-        }
-    };
-
-
-
     // Flashlight Toggle Function
     const toggleTorch = async () => {
         try {
@@ -660,11 +665,10 @@ export default function ClicrPanel({
                         </h2>
                         <div className="flex items-center gap-2">
                             <h1 className="text-white font-bold text-2xl tracking-tight">
-                                {overrideLabel || clicr.name}
+                                {clicr.name}
                             </h1>
-                            {/* Rename Trigger (Subtle) */}
-                            <button onClick={() => setShowConfigModal(true)} className="opacity-0 hover:opacity-50 transition-opacity">
-                                <Settings2 className="w-4 h-4 text-slate-600" />
+                            <button onClick={() => { setEditName(clicr.name); setShowConfigModal(true); }} className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 active:bg-slate-700 transition-colors">
+                                <Settings2 className="w-4 h-4" />
                             </button>
                         </div>
                     </div>
@@ -699,7 +703,13 @@ export default function ClicrPanel({
 
                     {/* Turnaround & Adjusted Net Row (P0) */}
                     <div className="grid grid-cols-3 gap-3">
-                        <div /> {/* Spacer */}
+                        <button
+                            onClick={() => handleReset()}
+                            className="bg-slate-900/50 rounded-lg p-2 flex flex-col items-center justify-center border border-white/5 active:bg-slate-800 transition-colors gap-1"
+                        >
+                            <RefreshCw className="w-3 h-3 text-slate-600" />
+                            <span className="text-[9px] text-slate-600 font-bold uppercase tracking-wider">Reset</span>
+                        </button>
                         <div className="bg-slate-900/50 rounded-lg p-2 flex flex-col items-center justify-center border border-white/5 cursor-pointer" onClick={() => setShowScanBreakdown(!showScanBreakdown)}>
                             <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">NET (ADJ)</span>
                             {/* Placeholder logic until store updates propagate */}
@@ -731,8 +741,8 @@ export default function ClicrPanel({
                 {/* 4. Action Buttons */}
                 <div className="flex flex-col gap-3 px-6 pb-8 shrink-0">
                     <ActionButton
-                        label={customLabels.label_a || "GUEST IN"}
-                        onClick={() => handleGenderTap('M', 1)}
+                        label="GUEST IN"
+                        onClick={() => setShowGuestInModal(true)}
                         className="h-24 md:h-28 text-lg"
                         icon={<div className="mb-[-4px]"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4V20M4 12H20" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg></div>}
                     />
@@ -742,7 +752,7 @@ export default function ClicrPanel({
                         <ActionButton
                             label="GUEST OUT"
                             variant="out"
-                            onClick={() => handleGenderTap('M', -1)}
+                            onClick={handleGuestOut}
                             className="h-24 md:h-28 text-lg bg-[#1E3A8A] hover:bg-[#1E40AF]"
                             icon={<div className="mb-[-4px]"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 12H19" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg></div>}
                         />
@@ -777,10 +787,6 @@ export default function ClicrPanel({
                 )}
             </AnimatePresence>
 
-            {/* Debug / Config Access (Hidden or Subtle) */}
-            <div className="absolute top-8 right-6 z-20 opacity-0 hover:opacity-100 transition-opacity">
-                <button onClick={() => setShowConfigModal(true)}><Settings2 className="text-slate-700 w-6 h-6" /></button>
-            </div>
 
             {/* CAMERA SCANNER MODAL */}
             <AnimatePresence>
@@ -808,57 +814,6 @@ export default function ClicrPanel({
                     </motion.div>
                 )}
             </AnimatePresence>
-
-            {/* SPLIT SETUP MODAL */}
-            <AnimatePresence>
-                {showSplitSetup && (
-                    <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-6">
-                        <motion.div
-                            initial={{ scale: 0.9, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm p-6 space-y-6"
-                        >
-                            <div>
-                                <h3 className="text-xl font-bold text-white">Setup Split View</h3>
-                                <p className="text-slate-400 text-sm">Select another counter to display alongside {clicr.name}.</p>
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Select Counter</label>
-                                <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                                    {clicrs.filter(c => c.id !== clicr.id).map(c => (
-                                        <button
-                                            key={c.id}
-                                            onClick={() => setSplitConfig(prev => ({ ...prev, secondaryClicrId: c.id, secondaryLabel: c.name }))}
-                                            className={cn(
-                                                "w-full p-3 rounded-xl border flex items-center justify-between transition-all",
-                                                splitConfig.secondaryClicrId === c.id
-                                                    ? "bg-primary/20 border-primary text-white"
-                                                    : "bg-slate-800 border-white/5 text-slate-400 hover:bg-slate-800/80"
-                                            )}
-                                        >
-                                            <span className="font-bold">{c.name}</span>
-                                            {splitConfig.secondaryClicrId === c.id && <Check className="w-4 h-4 text-primary" />}
-                                        </button>
-                                    ))}
-                                    {clicrs.length <= 1 && <div className="text-slate-500 italic p-2">No other counters available.</div>}
-                                </div>
-                            </div>
-
-                            <button
-                                disabled={!splitConfig.secondaryClicrId}
-                                onClick={() => setShowSplitSetup(false)}
-                                className="w-full py-4 bg-primary rounded-xl text-black font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                Confirm Split View
-                            </button>
-                            <button onClick={() => { setLayoutMode('SINGLE'); setShowSplitSetup(false); }} className="w-full py-2 text-slate-500 text-xs font-bold uppercase tracking-widest">Cancel</button>
-
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
-
 
             {/* Bulk Modal (Reference Design Match) */}
             <AnimatePresence>
@@ -916,6 +871,100 @@ export default function ClicrPanel({
                 )}
             </AnimatePresence>
 
+            {/* GUEST IN MODAL */}
+            <AnimatePresence>
+                {showGuestInModal && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end justify-center"
+                        onClick={() => {
+                            setGuestDraft({ name: '', dob: '', gender: null });
+                            setShowGuestInModal(false);
+                        }}
+                    >
+                        <motion.div
+                            initial={{ y: '100%' }}
+                            animate={{ y: 0 }}
+                            exit={{ y: '100%' }}
+                            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+                            className="w-full max-w-lg bg-[#0f1117] rounded-t-3xl p-6 pb-10 space-y-5"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="w-10 h-1 bg-slate-700 rounded-full mx-auto mb-2" />
+                            <h2 className="text-white font-bold text-xl tracking-tight">Guest Check-In</h2>
+
+                            {/* Name */}
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Name (optional)</label>
+                                <input
+                                    type="text"
+                                    value={guestDraft.name}
+                                    onChange={(e) => setGuestDraft(prev => ({ ...prev, name: e.target.value }))}
+                                    placeholder="e.g. John Smith"
+                                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white font-medium focus:outline-none focus:border-blue-500 transition-colors"
+                                />
+                            </div>
+
+                            {/* DOB */}
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Date of Birth (optional)</label>
+                                <input
+                                    type="date"
+                                    value={guestDraft.dob}
+                                    onChange={(e) => setGuestDraft(prev => ({ ...prev, dob: e.target.value }))}
+                                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white font-medium focus:outline-none focus:border-blue-500 transition-colors"
+                                />
+                            </div>
+
+                            {/* Gender */}
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Gender (optional)</label>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {(['M', 'F', 'OTHER', 'DECLINE'] as const).map((g) => (
+                                        <button
+                                            key={g}
+                                            onClick={() => setGuestDraft(prev => ({
+                                                ...prev,
+                                                gender: prev.gender === g ? null : g
+                                            }))}
+                                            className={cn(
+                                                "py-3 rounded-xl text-sm font-bold transition-all border",
+                                                guestDraft.gender === g
+                                                    ? "bg-blue-600 border-blue-500 text-white"
+                                                    : "bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-500"
+                                            )}
+                                        >
+                                            {g}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="grid grid-cols-2 gap-3 pt-1">
+                                <button
+                                    onClick={() => {
+                                        setGuestDraft({ name: '', dob: '', gender: null });
+                                        setShowGuestInModal(false);
+                                    }}
+                                    className="py-4 rounded-xl text-slate-400 bg-slate-900 hover:bg-slate-800 font-semibold text-sm transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleGuestIn}
+                                    className="py-4 rounded-xl bg-white text-black font-bold text-sm hover:bg-slate-100 shadow-lg transition-all active:scale-95"
+                                >
+                                    Check In
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* CONFIG MODAL */}
             <AnimatePresence>
                 {showConfigModal && (
@@ -924,7 +973,7 @@ export default function ClicrPanel({
                             initial={{ scale: 0.9, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.9, opacity: 0 }}
-                            className="bg-[#0f1218] border border-slate-800 p-6 rounded-3xl w-full max-w-sm shadow-2xl space-y-6"
+                            className="bg-[#0f1218] border border-slate-800 p-6 rounded-3xl w-full max-w-sm shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto"
                         >
                             <div>
                                 <h3 className="text-xl font-bold text-white">Clicr Settings</h3>
@@ -941,23 +990,6 @@ export default function ClicrPanel({
                                     className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white font-bold focus:outline-none focus:border-white transition-colors"
                                     placeholder="e.g. Main Entrance"
                                 />
-                            </div>
-
-                            {/* Mode Toggle */}
-                            <div className="flex items-center justify-between bg-slate-900/50 p-3 rounded-xl border border-white/5">
-                                <span className="text-sm font-bold text-white">Dual Counter Mode</span>
-                                <button
-                                    id="mode_toggle"
-                                    onClick={(e) => {
-                                        // Toggle local draft only - prevents background thrashing
-                                        setDraftSoloMode(!draftSoloMode);
-                                    }}
-                                    className={cn("w-12 h-7 rounded-full relative transition-colors",
-                                        !draftSoloMode ? "bg-blue-500" : "bg-slate-700"
-                                    )}
-                                >
-                                    <div className="absolute left-1 top-1 w-5 h-5 bg-white rounded-full shadow-md transition-transform" style={{ transform: !draftSoloMode ? "translateX(20px)" : "translateX(0px)" }} />
-                                </button>
                             </div>
 
                             {/* Classify Toggle */}
@@ -977,40 +1009,96 @@ export default function ClicrPanel({
                                 </button>
                             </div>
 
-                            {/* Inputs */}
-                            <div className="space-y-4" onClick={(e) => e.stopPropagation()}>
-                                {/* Input A (Always visible) */}
-                                <div className="space-y-2">
-                                    <label className={cn("text-xs font-bold uppercase tracking-widest transition-colors",
-                                        draftSoloMode ? "text-white" : "text-blue-400"
-                                    )}>
-                                        {draftSoloMode ? "Button Label" : "Left Button (Blue)"}
-                                    </label>
-                                    <input
-                                        type="text"
-                                        autoFocus
-                                        value={editLabels.label_a}
-                                        onChange={(e) => setEditLabels(prev => ({ ...prev, label_a: e.target.value }))}
-                                        className={cn("w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white font-bold focus:outline-none transition-colors",
-                                            draftSoloMode ? "focus:border-white" : "focus:border-blue-500"
+                            {/* Auto-Reset */}
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between bg-slate-900/50 p-3 rounded-xl border border-white/5">
+                                    <div>
+                                        <span className="text-sm font-bold text-white">Auto-Reset Daily</span>
+                                        <p className="text-[11px] text-slate-500 mt-0.5">Resets all counts at a set time</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setAutoReset(prev => ({ ...prev, enabled: !prev.enabled }))}
+                                        className={cn("w-12 h-7 rounded-full relative transition-colors shrink-0",
+                                            autoReset.enabled ? "bg-amber-500" : "bg-slate-700"
                                         )}
-                                        placeholder={draftSoloMode ? "e.g. COUNT" : "e.g. MALE"}
-                                    />
+                                    >
+                                        <div className="absolute left-1 top-1 w-5 h-5 bg-white rounded-full shadow-md transition-transform"
+                                            style={{ transform: autoReset.enabled ? "translateX(20px)" : "translateX(0px)" }} />
+                                    </button>
                                 </div>
 
-                                {/* Input B (Hidden in Solo) */}
-                                <div className={cn("space-y-2 transition-all duration-200 overflow-hidden",
-                                    draftSoloMode ? "h-0 opacity-0 pointer-events-none" : "h-auto opacity-100"
-                                )}>
-                                    <label className="text-xs font-bold text-pink-400 uppercase tracking-widest">Right Button (Pink)</label>
-                                    <input
-                                        type="text"
-                                        value={editLabels.label_b}
-                                        onChange={(e) => setEditLabels(prev => ({ ...prev, label_b: e.target.value }))}
-                                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white font-bold focus:outline-none focus:border-pink-500 transition-colors"
-                                        placeholder="e.g. FEMALE"
-                                    />
-                                </div>
+                                {autoReset.enabled && (
+                                    <div className="space-y-2 pl-1" onClick={(e) => e.stopPropagation()}>
+                                        <div className="flex gap-2">
+                                            <div className="flex-1 space-y-1">
+                                                <label className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Time</label>
+                                                <input
+                                                    type="time"
+                                                    value={autoReset.time}
+                                                    onChange={(e) => setAutoReset(prev => ({ ...prev, time: e.target.value }))}
+                                                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-bold text-sm focus:outline-none focus:border-amber-500 transition-colors"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Timezone</label>
+                                            <select
+                                                value={autoReset.timezone}
+                                                onChange={(e) => setAutoReset(prev => ({ ...prev, timezone: e.target.value }))}
+                                                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-bold text-sm focus:outline-none focus:border-amber-500 transition-colors appearance-none"
+                                            >
+                                                {TIMEZONES.map(tz => (
+                                                    <option key={tz.value} value={tz.value}>{tz.label}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Remote Tap Link */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Remote Tap Link</label>
+                                {clicr.button_config?.tap_token ? (
+                                    <div className="space-y-2">
+                                        <div className="flex gap-2">
+                                            <input
+                                                readOnly
+                                                value={`${typeof window !== 'undefined' ? window.location.origin : ''}/tap/${clicr.button_config.tap_token}`}
+                                                className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-slate-400 text-xs font-mono focus:outline-none truncate"
+                                            />
+                                            <button
+                                                onClick={async () => {
+                                                    try {
+                                                        await navigator.clipboard.writeText(`${window.location.origin}/tap/${clicr.button_config!.tap_token}`);
+                                                        setCopied(true);
+                                                        setTimeout(() => setCopied(false), 1500);
+                                                    } catch {
+                                                        // clipboard unavailable (HTTP context, permission denied, etc.)
+                                                    }
+                                                }}
+                                                className="px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-colors shrink-0"
+                                            >
+                                                {copied ? 'Copied!' : 'Copy'}
+                                            </button>
+                                        </div>
+                                        <button
+                                            onClick={generateTapToken}
+                                            disabled={generatingToken}
+                                            className="w-full py-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-slate-500 text-slate-400 text-xs font-bold transition-colors disabled:opacity-50"
+                                        >
+                                            Regenerate Link
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={generateTapToken}
+                                        disabled={generatingToken}
+                                        className="w-full py-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-white text-white text-xs font-bold transition-colors disabled:opacity-50"
+                                    >
+                                        Generate Link
+                                    </button>
+                                )}
                             </div>
 
                             <div className="grid grid-cols-2 gap-3 pt-2">
@@ -1024,23 +1112,7 @@ export default function ClicrPanel({
                                     Cancel
                                 </button>
                                 <button
-                                    onClick={() => {
-                                        // Save Logic
-                                        // Commit draft to real state
-                                        const isSolo = draftSoloMode;
-                                        setSoloMode(isSolo);
-
-                                        let a = editLabels.label_a || (isSolo ? 'COUNT' : 'MALE');
-                                        let b = editLabels.label_b || 'FEMALE';
-
-                                        saveConfig(editName, a, b);
-
-                                        if (isSolo) {
-                                            localStorage.setItem(`clicr_layout_mode_${clicr.id}`, 'SOLO');
-                                        } else {
-                                            localStorage.removeItem(`clicr_layout_mode_${clicr.id}`);
-                                        }
-                                    }}
+                                    onClick={() => saveConfig(editName)}
                                     className="py-3 rounded-xl bg-white text-black font-bold text-sm hover:bg-slate-200 shadow-lg transition-all active:scale-95"
                                 >
                                     Save Changes
@@ -1129,134 +1201,6 @@ export default function ClicrPanel({
     );
 }
 
-
-// --- HELPER COMPONENTS ---
-
-function SplitCounterPart({
-    clicrId,
-    label,
-    color,
-    mode,
-    role,
-    onTap,
-    currentCount
-}: {
-    clicrId: string | null,
-    label: string,
-    color: 'blue' | 'pink' | 'red', // red for exit
-    mode: 'INDEPENDENT' | 'LINKED',
-    role: 'PRIMARY' | 'SECONDARY',
-    onTap: (delta: number) => void,
-    currentCount: number
-}) {
-    if (!clicrId && mode === 'INDEPENDENT') return <div className="flex-1 bg-slate-900/50 rounded-2xl flex items-center justify-center text-slate-500">No Counter Selected</div>;
-
-    // Gradient definitions
-    const gradients = {
-        blue: "from-blue-600 to-blue-800 border-blue-500/30",
-        pink: "from-pink-600 to-pink-800 border-pink-500/30",
-        red: "from-rose-600 to-rose-800 border-rose-500/30", // For Exit
-    };
-
-    const bgGradient = gradients[color] || gradients.blue;
-
-    return (
-        <div className={cn("flex-1 rounded-2xl relative overflow-hidden flex flex-col border p-1", "bg-slate-900 border-white/5")}>
-
-            {/* Background Hint (Label) */}
-            <div className="absolute top-4 left-4 z-10">
-                <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">{mode === 'LINKED' ? (role === 'PRIMARY' ? 'Entry' : 'Exit') : 'Area'}</div>
-                <div className="text-lg font-bold text-white leading-none">{label}</div>
-            </div>
-
-            {/* Count Display */}
-            <div className="absolute top-4 right-4 z-10 text-right">
-                <div className="text-4xl font-mono font-bold text-white tabular-nums leading-none">{currentCount}</div>
-            </div>
-
-            {/* Split interaction zone */}
-            <div className="flex-1 flex gap-1 mt-12">
-                {/* Minus Button (Small) */}
-                <button
-                    onClick={() => onTap(-1)}
-                    className="w-20 bg-slate-800/80 hover:bg-slate-700 active:bg-slate-600 rounded-xl flex items-center justify-center transition-colors border border-white/5"
-                >
-                    <Minus className="w-8 h-8 text-white/50" />
-                </button>
-
-                {/* Plus/Main Action Button (Large) */}
-                <motion.button
-                    onClick={() => onTap(1)}
-                    whileTap={{ scale: 0.98 }}
-                    className={cn(
-                        "flex-1 rounded-xl flex items-center justify-center bg-gradient-to-br shadow-lg relative overflow-hidden group border-t border-white/20",
-                        bgGradient
-                    )}
-                >
-                    <div className="scale-150 group-active:scale-125 transition-transform duration-100">
-                        {role === 'SECONDARY' && mode === 'LINKED' ? (
-                            <Plus className={cn("w-12 h-12 text-white/90 drop-shadow-md rotate-45")} />
-                        ) : (
-                            <Plus className="w-12 h-12 text-white/90 drop-shadow-md" />
-                        )}
-                    </div>
-                </motion.button>
-            </div>
-
-
-        </div>
-    );
-}
-
-
-function TapButton({
-    type,
-    label,
-    color,
-    onClick,
-    className
-}: {
-    type: 'plus' | 'minus',
-    label?: string,
-    color?: 'blue' | 'pink',
-    onClick: () => void,
-    className?: string
-}) {
-    // Colors
-    const blueGradient = "bg-blue-600 active:bg-blue-700 from-blue-600 to-blue-800 bg-gradient-to-br border-blue-500/50";
-    const pinkGradient = "bg-pink-600 active:bg-pink-700 from-pink-600 to-pink-800 bg-gradient-to-br border-pink-500/50";
-    // Fallback for generic
-    const greenGradient = "bg-emerald-600 active:bg-emerald-700 from-emerald-600 to-emerald-800 bg-gradient-to-br";
-    const redGradient = "bg-rose-600 active:bg-rose-700 from-rose-600 to-rose-800 bg-gradient-to-br";
-
-    let bgClass = "";
-    if (color === 'blue') bgClass = blueGradient;
-    else if (color === 'pink') bgClass = pinkGradient;
-    else bgClass = type === 'plus' ? greenGradient : redGradient;
-
-    return (
-        <motion.button
-            whileTap={{ scale: 0.95 }}
-            onClick={onClick}
-            className={cn(
-                "flex flex-col items-center justify-center relative overflow-hidden group transition-all shadow-2xl border-t border-white/20",
-                bgClass,
-                className
-            )}
-        >
-            <div className="relative z-10 flex flex-col items-center gap-1">
-                {type === 'plus' ? (
-                    <Plus className={cn("text-white drop-shadow-md transition-all", label ? "w-10 h-10 md:w-14 md:h-14" : "w-12 h-12 md:w-16 md:h-16")} />
-                ) : (
-                    <Minus className="w-6 h-6 md:w-10 md:h-10 text-white drop-shadow-md transition-all" />
-                )}
-                {label && <span className="text-white font-bold tracking-widest text-xs md:text-base uppercase">{label}</span>}
-            </div>
-
-            <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent pointer-events-none" />
-        </motion.button>
-    )
-}
 
 function CameraScanner({ onScan }: { onScan: (text: string) => void }) {
     const [torch, setTorch] = useState(false);
