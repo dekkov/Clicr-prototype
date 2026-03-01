@@ -271,10 +271,19 @@ export default function ClicrPanel({
             await updateClicr({
                 ...clicr,
                 name: name,
-                button_config: { auto_reset: autoReset }
+                button_config: { ...(clicr.button_config ?? {}), auto_reset: autoReset }
             });
         }
         setShowConfigModal(false);
+    };
+
+    const generateTapToken = async () => {
+        if (!clicr) return;
+        const token = Math.random().toString(36).slice(2, 10);
+        await updateClicr({
+            ...clicr,
+            button_config: { ...(clicr.button_config ?? {}), tap_token: token },
+        });
     };
 
     // ...
@@ -1037,6 +1046,41 @@ export default function ClicrPanel({
                                             </select>
                                         </div>
                                     </div>
+                                )}
+                            </div>
+
+                            {/* Remote Tap Link */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Remote Tap Link</label>
+                                {clicr.button_config?.tap_token ? (
+                                    <div className="space-y-2">
+                                        <div className="flex gap-2">
+                                            <input
+                                                readOnly
+                                                value={`${typeof window !== 'undefined' ? window.location.origin : ''}/tap/${clicr.button_config.tap_token}`}
+                                                className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-slate-400 text-xs font-mono focus:outline-none truncate"
+                                            />
+                                            <button
+                                                onClick={() => navigator.clipboard.writeText(`${window.location.origin}/tap/${clicr.button_config!.tap_token}`)}
+                                                className="px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-colors shrink-0"
+                                            >
+                                                Copy
+                                            </button>
+                                        </div>
+                                        <button
+                                            onClick={generateTapToken}
+                                            className="w-full py-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-slate-500 text-slate-400 text-xs font-bold transition-colors"
+                                        >
+                                            Regenerate Link
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={generateTapToken}
+                                        className="w-full py-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-white text-white text-xs font-bold transition-colors"
+                                    >
+                                        Generate Link
+                                    </button>
                                 )}
                             </div>
 
