@@ -76,7 +76,8 @@ export async function updateSession(request: NextRequest) {
         path === '/onboarding/' ||
         (path.startsWith('/onboarding') &&
             !path.startsWith('/onboarding/signup') &&
-            !path.startsWith('/onboarding/verify-email'));
+            !path.startsWith('/onboarding/verify-email') &&
+            !path.startsWith('/onboarding/setup'));
 
     if (isAuthRoute || isWizardRoute) {
         const url = request.nextUrl.clone()

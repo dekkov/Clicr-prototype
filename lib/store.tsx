@@ -38,6 +38,9 @@ export type AppState = {
     areaTraffic: Record<string, { total_in: number; total_out: number; net_delta: number; event_count: number }>;
     trafficSessionStart: number; // timestamp — traffic queries use this as start_ts so reset clears totals
 
+    businesses: Business[];
+    activeBusiness: Business | null;
+
     isLoading: boolean;
 };
 
@@ -81,6 +84,12 @@ type AppContextType = AppState & {
     // Device Rename
     renameDevice?: (deviceId: string, name: string) => Promise<void>;
     debug?: boolean;
+
+    // Multi-business
+    businesses: Business[];
+    activeBusiness: Business | null;
+    selectBusiness: (business: Business) => void;
+    clearBusiness: () => void;
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -109,10 +118,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         areaTraffic: {},
         trafficSessionStart: (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); })(),
 
+        businesses: [],
+        activeBusiness: null,
+
         isLoading: true,
     });
 
     const isResettingRef = useRef(false);
+    const activeBusinessIdRef = useRef<string | null>(null);
+    const userClearedRef = useRef(false);
 
     const refreshState = async () => {
         if (isResettingRef.current) {
@@ -134,7 +148,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 headers['x-user-email'] = user.email || '';
             }
 
-            const res = await fetch('/api/sync', {
+            const bizParam = activeBusinessIdRef.current
+                ? `?businessId=${activeBusinessIdRef.current}`
+                : '';
+            const res = await fetch(`/api/sync${bizParam}`, {
                 cache: 'no-store',
                 headers
             });
@@ -142,34 +159,77 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             if (res.ok) {
                 const data = await res.json();
 
-                // If we have a logged in user, ensure currentUser reflects that
-                // The API should handle mapping the x-user-id to the correct user in the DB
-                // but if it returned a different currentUser, we accept it.
-                // However, if we just logged in, we might need to force the state.currentUser to match
-                // We trust the API to return the "hydrated" user object for this ID.
-
                 // Avoid overwriting optimistic state if a write started while we were fetching
                 if (isWritingRef.current) {
                     console.log("Skipping sync update due to active write (Pre-setState)");
                     return;
                 }
 
-                setState(prev => ({
-                    ...prev,
-                    ...data,
-                    // Defensive: Ensure arrays are arrays
-                    venues: data.venues || [],
-                    areas: data.areas || [],
-                    clicrs: data.clicrs || [],
-                    events: data.events || [],
-                    scanEvents: data.scanEvents || [],
-                    isLoading: false
-                }));
+                // Discard stale responses from a previous business context.
+                // Cases: (a) wrong business returned, (b) no business returned when one is active
+                // (an unscoped poll that fired before selectBusiness completed).
+                if (activeBusinessIdRef.current && data.business?.id !== activeBusinessIdRef.current) {
+                    console.log('[sync] Discarding stale response, expected', activeBusinessIdRef.current, 'got', data.business?.id);
+                    return;
+                }
+
+                // Sync ref before setState so next poll includes ?businessId=
+                if (!activeBusinessIdRef.current && !userClearedRef.current && data.businesses?.length === 1) {
+                    activeBusinessIdRef.current = data.businesses[0].id;
+                }
+
+                const sortedBusinesses = (data.businesses || []).slice().sort((a: Business, b: Business) =>
+                    a.name.localeCompare(b.name)
+                );
+                const sortedVenues = (data.venues || []).slice().sort((a: Venue, b: Venue) =>
+                    a.name.localeCompare(b.name)
+                );
+
+                setState(prev => {
+                    const shouldAutoSelect = !prev.activeBusiness && !userClearedRef.current && data.businesses?.length === 1;
+                    const autoSelected = shouldAutoSelect ? data.businesses[0] : null;
+                    return {
+                        ...prev,
+                        ...data,
+                        venues: sortedVenues,
+                        areas: data.areas || [],
+                        clicrs: data.clicrs || [],
+                        events: data.events || [],
+                        scanEvents: data.scanEvents || [],
+                        businesses: sortedBusinesses.length > 0 ? sortedBusinesses : prev.businesses,
+                        activeBusiness: prev.activeBusiness ?? autoSelected,
+                        business: prev.activeBusiness ?? autoSelected,
+                        isLoading: false
+                    };
+                });
             }
         } catch (error) {
             console.error("Failed to sync state", error);
             setState(prev => ({ ...prev, isLoading: false }));
         }
+    };
+
+    const selectBusiness = (business: Business) => {
+        userClearedRef.current = false;
+        activeBusinessIdRef.current = business.id;
+        setState(prev => ({
+            ...prev,
+            activeBusiness: business,
+            business,
+            venues: [],
+            areas: [],
+            clicrs: [],
+            events: [],
+            scanEvents: [],
+            isLoading: true,
+        }));
+        refreshState();
+    };
+
+    const clearBusiness = () => {
+        userClearedRef.current = true;
+        activeBusinessIdRef.current = null;
+        setState(prev => ({ ...prev, activeBusiness: null, business: null, isLoading: true }));
     };
 
     // Initial load, polling, AND Realtime Subscription
@@ -822,7 +882,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
 
     return (
-        <AppContext.Provider value={{ ...state, recordEvent, recordScan, resetCounts, addUser, updateUser, removeUser, updateBusiness, addClicr, updateClicr, deleteClicr, addVenue, updateVenue, addArea, updateArea, addDevice, updateDevice, addCapacityOverride, addVenueAuditLog, addBan, revokeBan, createPatronBan, updatePatronBan, recordBanEnforcement, recordTurnaround, refreshTrafficStats } as AppContextType}>
+        <AppContext.Provider value={{ ...state, recordEvent, recordScan, resetCounts, addUser, updateUser, removeUser, updateBusiness, addClicr, updateClicr, deleteClicr, addVenue, updateVenue, addArea, updateArea, addDevice, updateDevice, addCapacityOverride, addVenueAuditLog, addBan, revokeBan, createPatronBan, updatePatronBan, recordBanEnforcement, recordTurnaround, refreshTrafficStats, businesses: state.businesses, activeBusiness: state.activeBusiness, selectBusiness, clearBusiness } as AppContextType}>
             {children}
         </AppContext.Provider>
     );

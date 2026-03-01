@@ -30,7 +30,7 @@ export function GettingStartedChecklist() {
             label: 'Add your first venue',
             description: 'Create a location to track occupancy',
             completed: venues.length > 0,
-            href: null,
+            href: '/venues/new',
         },
         {
             id: 'areas',

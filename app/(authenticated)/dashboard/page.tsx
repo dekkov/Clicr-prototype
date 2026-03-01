@@ -1,15 +1,16 @@
 "use client";
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '@/lib/store';
-import { Building2, MapPin, ArrowRight } from 'lucide-react';
+import { Building2, MapPin, ArrowRight, Plus } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { METRICS } from '@/lib/core/metrics';
 import { getTodayWindow } from '@/lib/core/time';
-import { Venue, Area, CountEvent } from '@/lib/types';
-import { InlineSetup } from './_components/InlineSetup';
+import { Business, Venue, Area, CountEvent } from '@/lib/types';
 import { GettingStartedChecklist } from './_components/GettingStartedChecklist';
+import { createClient } from '@/utils/supabase/client';
 
 // Sub-component for individual venue stats
 const VenueCard = ({ venue, areas, events }: { venue: Venue, areas: Area[], events: CountEvent[] }) => {
@@ -115,13 +116,143 @@ const VenueCard = ({ venue, areas, events }: { venue: Venue, areas: Area[], even
 };
 
 export default function DashboardPage() {
-    const { business, venues, areas, events, isLoading, resetCounts } = useApp();
+    const { businesses, isLoading, currentUser, resetCounts } = useApp();
+    const router = useRouter();
+
+    // dashBiz is local — resets to null on every mount so the picker always shows for multi-biz users
+    const [dashBiz, setDashBiz] = useState<Business | null>(null);
+    const [dashVenues, setDashVenues] = useState<Venue[]>([]);
+    const [dashAreas, setDashAreas] = useState<Area[]>([]);
+    const [dashEvents, setDashEvents] = useState<CountEvent[]>([]);
+    const [loadingDash, setLoadingDash] = useState(false);
+
+    // Auto-redirect new users with no business to onboarding.
+    // Guard on currentUser.id to avoid false redirects when the first sync fails (network error).
+    useEffect(() => {
+        if (!isLoading && currentUser.id && businesses.length === 0) {
+            router.push('/onboarding/setup');
+        }
+    }, [isLoading, currentUser.id, businesses.length]);
+
+    // For single-business users, auto-select so they never see the picker
+    useEffect(() => {
+        if (!dashBiz && businesses.length === 1) {
+            setDashBiz(businesses[0]);
+        }
+    }, [businesses, dashBiz]);
+
+    // Fetch dashboard data whenever dashBiz changes
+    useEffect(() => {
+        if (!dashBiz) return;
+        setLoadingDash(true);
+        const load = async () => {
+            const supabase = createClient();
+            const { data: { user } } = await supabase.auth.getUser();
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (user) {
+                headers['x-user-id'] = user.id;
+                headers['x-user-email'] = user.email || '';
+            }
+            const res = await fetch(`/api/sync?businessId=${dashBiz.id}`, { cache: 'no-store', headers });
+            if (res.ok) {
+                const data = await res.json();
+                setDashVenues(data.venues || []);
+                setDashAreas(data.areas || []);
+                setDashEvents(data.events || []);
+            }
+            setLoadingDash(false);
+        };
+        load();
+    }, [dashBiz?.id]);
 
     if (isLoading) {
-        return <div className="p-8 text-white">Loading dashboard...</div>;
+        return (
+            <div className="space-y-8 animate-pulse">
+                <div className="h-10 w-48 bg-slate-800 rounded-xl" />
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                    {[1, 2].map(i => (
+                        <div key={i} className="glass-panel p-6 rounded-2xl border border-slate-800">
+                            <div className="flex gap-4 mb-6">
+                                <div className="w-12 h-12 bg-slate-800 rounded-xl" />
+                                <div className="flex-1 space-y-2">
+                                    <div className="h-5 bg-slate-800 rounded w-1/2" />
+                                    <div className="h-3 bg-slate-800 rounded w-1/3" />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-4 mb-6">
+                                {[1, 2, 3].map(j => <div key={j} className="h-16 bg-slate-800 rounded-xl" />)}
+                            </div>
+                            <div className="space-y-3">
+                                <div className="h-3 bg-slate-800 rounded w-1/4" />
+                                <div className="h-6 bg-slate-800 rounded" />
+                                <div className="h-6 bg-slate-800 rounded" />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
     }
 
-    const needsSetup = !business || venues.length === 0;
+    // Show picker when multiple businesses exist and none is selected
+    if (businesses.length > 1 && !dashBiz) {
+        return (
+            <div className="space-y-6 animate-[fade-in_0.5s_ease-out]">
+                <div>
+                    <h1 className="text-3xl font-bold text-white">Select a Business</h1>
+                    <p className="text-slate-400 mt-1">Choose which business to manage.</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {businesses.map(biz => (
+                        <button
+                            key={biz.id}
+                            onClick={() => setDashBiz(biz)}
+                            className="text-left p-6 rounded-2xl border transition-all hover:border-primary/50 hover:bg-slate-900/60 border-slate-800 bg-slate-900/40"
+                        >
+                            <Building2 className="w-8 h-8 text-primary mb-3" />
+                            <div className="font-bold text-white text-lg">{biz.name}</div>
+                        </button>
+                    ))}
+                    <Link
+                        href="/onboarding/setup"
+                        className="text-left p-6 rounded-2xl border border-dashed border-slate-700 hover:border-primary/50 transition-all flex flex-col items-start gap-3"
+                    >
+                        <Plus className="w-8 h-8 text-slate-500" />
+                        <div className="font-bold text-slate-400">Add New Business</div>
+                    </Link>
+                </div>
+            </div>
+        );
+    }
+
+    if (loadingDash || !dashBiz) {
+        return (
+            <div className="space-y-8 animate-pulse">
+                <div className="h-10 w-48 bg-slate-800 rounded-xl" />
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                    {[1, 2].map(i => (
+                        <div key={i} className="glass-panel p-6 rounded-2xl border border-slate-800">
+                            <div className="flex gap-4 mb-6">
+                                <div className="w-12 h-12 bg-slate-800 rounded-xl" />
+                                <div className="flex-1 space-y-2">
+                                    <div className="h-5 bg-slate-800 rounded w-1/2" />
+                                    <div className="h-3 bg-slate-800 rounded w-1/3" />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-4 mb-6">
+                                {[1, 2, 3].map(j => <div key={j} className="h-16 bg-slate-800 rounded-xl" />)}
+                            </div>
+                            <div className="space-y-3">
+                                <div className="h-3 bg-slate-800 rounded w-1/4" />
+                                <div className="h-6 bg-slate-800 rounded" />
+                                <div className="h-6 bg-slate-800 rounded" />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-8 animate-[fade-in_0.5s_ease-out]">
@@ -129,49 +260,56 @@ export default function DashboardPage() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-white">Dashboard</h1>
-                    {business && (
-                        <p className="text-slate-400 mt-1">Real-time overview for <span className="text-primary font-semibold">{business.name}</span></p>
-                    )}
-                </div>
-                {!needsSetup && (
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={async () => {
-                                if (window.confirm("⚠️ ARE YOU SURE? \n\nThis will reset ALL occupancy counts to 0 for the entire business. This action cannot be undone.")) {
-                                    await resetCounts(business!.id);
-                                }
-                            }}
-                            className="px-4 py-2 bg-red-900/50 hover:bg-red-900 text-red-200 border border-red-800/50 rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
+                    <p className="text-slate-400 mt-1">Real-time overview for <span className="text-primary font-semibold">{dashBiz.name}</span></p>
+                    <div className="flex items-center gap-3 mt-1">
+                        {businesses.length > 1 && (
+                            <button
+                                onClick={() => setDashBiz(null)}
+                                className="text-xs text-slate-500 hover:text-primary transition-colors"
+                            >
+                                ← Switch Business
+                            </button>
+                        )}
+                        <Link
+                            href="/onboarding/setup"
+                            className="text-xs text-slate-500 hover:text-primary transition-colors flex items-center gap-1"
                         >
-                            Reset All Counts
-                        </button>
-
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 rounded-full text-xs font-medium border border-emerald-500/20">
-                            <span className="relative flex h-2 w-2">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                            </span>
-                            System Operational
-                        </div>
+                            <Plus className="w-3 h-3" /> Add Business
+                        </Link>
                     </div>
-                )}
+                </div>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={async () => {
+                            if (window.confirm("⚠️ ARE YOU SURE? \n\nThis will reset ALL occupancy counts to 0 for the entire business. This action cannot be undone.")) {
+                                await resetCounts(dashBiz.id);
+                            }
+                        }}
+                        className="px-4 py-2 bg-red-900/50 hover:bg-red-900 text-red-200 border border-red-800/50 rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
+                    >
+                        Reset All Counts
+                    </button>
+
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 rounded-full text-xs font-medium border border-emerald-500/20">
+                        <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        System Operational
+                    </div>
+                </div>
             </div>
 
-            {/* Inline setup — shown when business or first venue is missing */}
-            {needsSetup && <InlineSetup hasBusiness={business !== null} />}
-
             {/* Getting Started checklist — shown after setup while optional items remain */}
-            {!needsSetup && <GettingStartedChecklist />}
+            <GettingStartedChecklist />
 
             {/* Venue cards */}
-            {!needsSetup && (
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                    {venues.map(venue => {
-                        const venueAreas = areas.filter(a => a.venue_id === venue.id);
-                        return <VenueCard key={venue.id} venue={venue} areas={venueAreas} events={events} />;
-                    })}
-                </div>
-            )}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                {dashVenues.map(venue => {
+                    const venueAreas = dashAreas.filter(a => a.venue_id === venue.id);
+                    return <VenueCard key={venue.id} venue={venue} areas={venueAreas} events={dashEvents} />;
+                })}
+            </div>
         </div>
     );
 }

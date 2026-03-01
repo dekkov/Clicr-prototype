@@ -4,20 +4,20 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/store';
 import { Venue, Area, Clicr } from '@/lib/types';
-import { ArrowLeft, Check, Plus, Trash2, MapPin, Building2, Users } from 'lucide-react';
+import { ArrowLeft, Check, Plus, MapPin, Building2, Users, ChevronDown } from 'lucide-react';
 
 type Step = 'VENUE' | 'AREAS' | 'CLICRS';
 
 export default function NewVenuePage() {
     const router = useRouter();
-    const { addVenue, addArea, addClicr, updateBusiness, business } = useApp();
+    const { addVenue, addArea, addClicr, business, businesses } = useApp();
     const [step, setStep] = useState<Step>('VENUE');
     const [isLoading, setIsLoading] = useState(false);
 
     // Data State
     const [venueId, setVenueId] = useState<string>('');
+    const [selectedBizId, setSelectedBizId] = useState<string>(business?.id ?? businesses[0]?.id ?? '');
     const [venueData, setVenueData] = useState({
-        orgName: '', // New field
         name: '',
         city: '',
         state: '',
@@ -29,23 +29,22 @@ export default function NewVenuePage() {
     const [areaInput, setAreaInput] = useState({ name: '', capacity: 100 });
 
     // Clicr Form (Map areaId -> List of Clicr Names)
-    const [clicrInputs, setClicrInputs] = useState<Record<string, string>>({}); // Pending input per area
+    const [clicrInputs, setClicrInputs] = useState<Record<string, string>>({});
     const [createdClicrs, setCreatedClicrs] = useState<Clicr[]>([]);
 
     // --- STEP 1: CREATE VENUE ---
     const handleCreateVenue = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!selectedBizId) {
+            alert('Please select a business for this venue.');
+            return;
+        }
         setIsLoading(true);
 
-        // Update Org Name if provided
-        if (venueData.orgName) {
-            await updateBusiness({ name: venueData.orgName });
-        }
-
-        const newId = Math.random().toString(36).substring(7);
+        const newId = crypto.randomUUID();
         const venue: Venue = {
             id: newId,
-            business_id: business?.id ?? '',
+            business_id: selectedBizId,
             name: venueData.name,
             city: venueData.city,
             state: venueData.state,
@@ -68,19 +67,19 @@ export default function NewVenuePage() {
     const handleAddArea = async () => {
         if (!areaInput.name) return;
         setIsLoading(true);
-        const newAreaId = Math.random().toString(36).substring(7);
+        const newAreaId = crypto.randomUUID();
         const area: Area = {
             id: newAreaId,
             venue_id: venueId,
             name: areaInput.name,
-            default_capacity: areaInput.capacity, // Correct field
-            area_type: 'MAIN', // Default
+            default_capacity: areaInput.capacity,
+            area_type: 'MAIN',
             counting_mode: 'BOTH',
             is_active: true,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
             current_count: 0
-        } as Area; // Casting to handle any loose legacy props
+        } as Area;
         await addArea(area);
         setCreatedAreas([...createdAreas, area]);
         setAreaInput({ name: '', capacity: 100 });
@@ -101,7 +100,7 @@ export default function NewVenuePage() {
         if (!name) return;
 
         setIsLoading(true);
-        const newClicrId = Math.random().toString(36).substring(7);
+        const newClicrId = crypto.randomUUID();
         const clicr: Clicr = {
             id: newClicrId,
             area_id: areaId,
@@ -112,12 +111,12 @@ export default function NewVenuePage() {
         };
         await addClicr(clicr);
         setCreatedClicrs([...createdClicrs, clicr]);
-        setClicrInputs({ ...clicrInputs, [areaId]: '' }); // Clear input for this area
+        setClicrInputs({ ...clicrInputs, [areaId]: '' });
         setIsLoading(false);
     };
 
     const handleFinish = () => {
-        router.push('/dashboard');
+        router.push('/venues');
     };
 
     // --- RENDERERS ---
@@ -125,20 +124,31 @@ export default function NewVenuePage() {
     const renderVenueForm = () => (
         <form onSubmit={handleCreateVenue} className="space-y-6 bg-slate-900/50 border border-slate-800 p-8 rounded-2xl shadow-xl animate-fade-in">
             <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                <Building2 className="text-primary" /> Step 1: Business & Venue
+                <Building2 className="text-primary" /> Step 1: New Venue
             </h2>
-            <div className="space-y-2 border-b border-slate-800 pb-6 mb-6">
-                <label className="text-sm font-medium text-slate-300">Organization Name (Inc, LLC)</label>
-                <input
-                    type="text"
-                    required
-                    value={venueData.orgName}
-                    onChange={e => setVenueData({ ...venueData, orgName: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none"
-                    placeholder="e.g. Nightlife Group LLC"
-                />
-                <p className="text-xs text-slate-500">This will appear on your reports and dashboard.</p>
-            </div>
+
+            {/* Business selector — only shown when user has multiple businesses */}
+            {businesses.length > 1 && (
+                <div className="space-y-2 border-b border-slate-800 pb-6 mb-6">
+                    <label className="text-sm font-medium text-slate-300">Business</label>
+                    <div className="relative">
+                        <select
+                            value={selectedBizId}
+                            onChange={e => setSelectedBizId(e.target.value)}
+                            required
+                            className="w-full appearance-none bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none pr-10"
+                        >
+                            <option value="">Select a business…</option>
+                            {businesses.map(biz => (
+                                <option key={biz.id} value={biz.id}>{biz.name}</option>
+                            ))}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                    </div>
+                    <p className="text-xs text-slate-500">This venue will be added to the selected business.</p>
+                </div>
+            )}
+
             <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-300">Venue Name</label>
                 <input
@@ -202,7 +212,6 @@ export default function NewVenuePage() {
                 </h2>
                 <p className="text-slate-400 text-sm">Create distinct zones for your venue (e.g. "Main Floor", "VIP Lounge", "Patio").</p>
 
-                {/* List Existing */}
                 {createdAreas.length > 0 && (
                     <div className="space-y-3">
                         {createdAreas.map(area => (
@@ -219,7 +228,6 @@ export default function NewVenuePage() {
                     </div>
                 )}
 
-                {/* Add New Form */}
                 <div className="bg-slate-950/50 p-4 rounded-xl border border-dashed border-slate-700 space-y-4">
                     <div className="grid grid-cols-3 gap-4">
                         <div className="col-span-2 space-y-1">
@@ -280,7 +288,6 @@ export default function NewVenuePage() {
                                     <MapPin className="w-4 h-4 text-slate-400" /> {area.name}
                                 </h3>
 
-                                {/* Existing Clicrs */}
                                 {areaClicrs.length > 0 && (
                                     <div className="mb-4 space-y-2">
                                         {areaClicrs.map(clicr => (
@@ -292,7 +299,6 @@ export default function NewVenuePage() {
                                     </div>
                                 )}
 
-                                {/* Add Input */}
                                 <div className="flex gap-2">
                                     <input
                                         type="text"
@@ -328,21 +334,25 @@ export default function NewVenuePage() {
 
     return (
         <div className="max-w-xl mx-auto py-12 px-4">
-            {/* Simple Step Indicator */}
-            <div className="flex items-center justify-between mb-8 px-4">
-                <div className={`flex flex-col items-center gap-2 ${step === 'VENUE' ? 'text-primary' : 'text-slate-500'}`}>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${step === 'VENUE' ? 'border-primary bg-primary/10' : 'border-slate-700'}`}>1</div>
-                    <span className="text-xs font-bold">Venue</span>
-                </div>
-                <div className={`h-0.5 flex-1 mx-4 ${step !== 'VENUE' ? 'bg-primary' : 'bg-slate-800'}`}></div>
-                <div className={`flex flex-col items-center gap-2 ${step === 'AREAS' ? 'text-primary' : (step === 'CLICRS' ? 'text-primary' : 'text-slate-500')}`}>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${step === 'AREAS' ? 'border-primary bg-primary/10' : (step === 'CLICRS' ? 'border-primary bg-primary' : 'border-slate-700')}`}>2</div>
-                    <span className="text-xs font-bold">Areas</span>
-                </div>
-                <div className={`h-0.5 flex-1 mx-4 ${step === 'CLICRS' ? 'bg-primary' : 'bg-slate-800'}`}></div>
-                <div className={`flex flex-col items-center gap-2 ${step === 'CLICRS' ? 'text-primary' : 'text-slate-500'}`}>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${step === 'CLICRS' ? 'border-primary bg-primary/10' : 'border-slate-700'}`}>3</div>
-                    <span className="text-xs font-bold">Clicrs</span>
+            <div className="flex items-center gap-3 mb-8">
+                <button
+                    onClick={() => router.push('/venues')}
+                    className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                >
+                    <ArrowLeft className="w-5 h-5" />
+                </button>
+                <div className="flex items-center gap-6">
+                    {(['VENUE', 'AREAS', 'CLICRS'] as Step[]).map((s, i) => (
+                        <React.Fragment key={s}>
+                            <div className={`flex flex-col items-center gap-1 ${step === s ? 'text-primary' : 'text-slate-500'}`}>
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 text-sm font-bold ${step === s ? 'border-primary bg-primary/10' : ((['AREAS', 'CLICRS'] as Step[]).indexOf(s) < (['VENUE', 'AREAS', 'CLICRS'] as Step[]).indexOf(step) ? 'border-primary bg-primary text-white' : 'border-slate-700')}`}>
+                                    {i + 1}
+                                </div>
+                                <span className="text-xs font-bold">{s === 'VENUE' ? 'Venue' : s === 'AREAS' ? 'Areas' : 'Clicrs'}</span>
+                            </div>
+                            {i < 2 && <div className={`h-0.5 w-8 ${(['AREAS', 'CLICRS'] as Step[]).indexOf(s) < (['VENUE', 'AREAS', 'CLICRS'] as Step[]).indexOf(step) ? 'bg-primary' : 'bg-slate-800'}`} />}
+                        </React.Fragment>
+                    ))}
                 </div>
             </div>
 

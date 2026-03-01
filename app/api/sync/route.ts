@@ -215,9 +215,12 @@ async function hydrateData(data: DBData): Promise<DBData> {
 export async function GET(request: Request) {
     const userId = request.headers.get('x-user-id');
     const userEmail = request.headers.get('x-user-email');
+    const url = new URL(request.url);
+    const requestedBusinessId = url.searchParams.get('businessId');
 
     let data = readDB();
     data = await hydrateData(data); // Apply Hydration
+    let allBusinesses: any[] = [];
 
     if (userId && userEmail) {
         let user = data.users.find(u => u.id === userId);
@@ -254,47 +257,67 @@ export async function GET(request: Request) {
 
         data.currentUser = user;
 
-        // --- CONTEXT AWARENESS: Load User's Business via business_members ---
-        try {
-            const { data: membership } = await supabaseAdmin
-                .from('business_members')
-                .select('business_id')
-                .eq('user_id', userId)
-                .limit(1)
-                .single();
+        // --- LOAD ALL BUSINESSES ---
+        let activeBizId: string | null = null;
+        let allBizIds: string[] = [];
 
-            if (membership?.business_id) {
-                const { data: myBusiness } = await supabaseAdmin
+        try {
+            const { data: memberships } = await supabaseAdmin
+                .from('business_members')
+                .select('business_id, role')
+                .eq('user_id', userId);
+
+            if (memberships && memberships.length > 0) {
+                allBizIds = memberships.map((m: any) => m.business_id);
+
+                // Only accept the requested businessId if the user is actually a member
+                if (requestedBusinessId && allBizIds.includes(requestedBusinessId)) {
+                    activeBizId = requestedBusinessId;
+                } else if (allBizIds.length === 1) {
+                    // Auto-select only when the user belongs to exactly one business.
+                    // For multi-business users with no explicit selection, leave activeBizId null
+                    // so the client picker shows rather than silently defaulting to a random business.
+                    activeBizId = allBizIds[0];
+                }
+                const { data: bizRows } = await supabaseAdmin
                     .from('businesses')
                     .select('*')
-                    .eq('id', membership.business_id)
-                    .single();
+                    .in('id', allBizIds);
 
-                if (myBusiness) {
-                    data.business = {
-                        id: myBusiness.id,
-                        name: myBusiness.name,
-                        timezone: myBusiness.timezone || 'UTC',
-                        settings: myBusiness.settings || { refresh_interval_sec: 5, capacity_thresholds: [80, 90, 100], reset_rule: 'MANUAL' }
-                    };
+                if (bizRows) {
+                    allBusinesses = bizRows.map((b: any) => ({
+                        id: b.id,
+                        name: b.name,
+                        timezone: b.timezone || 'UTC',
+                        settings: b.settings || { refresh_interval_sec: 5, capacity_thresholds: [80, 90, 100], reset_rule: 'MANUAL' }
+                    }));
+                }
 
-                    // Ensure user has correct venue IDs (fixes newly created users whose
-                    // assigned_venue_ids may be empty if profiles hadn't synced yet)
-                    if (user.assigned_venue_ids.length === 0) {
-                        const { data: bizVenues } = await supabaseAdmin
-                            .from('venues')
-                            .select('id')
-                            .eq('business_id', membership.business_id);
-                        if (bizVenues && bizVenues.length > 0) {
-                            user.assigned_venue_ids = bizVenues.map((v: any) => v.id);
-                        }
+                // Set the active business
+                const activeBiz = allBusinesses.find(b => b.id === activeBizId);
+                if (activeBiz) data.business = activeBiz;
+
+                // Scope venue assignment to the active business
+                if (activeBizId && user.assigned_venue_ids.length === 0) {
+                    const { data: bizVenues } = await supabaseAdmin
+                        .from('venues')
+                        .select('id')
+                        .eq('business_id', activeBizId);
+                    if (bizVenues && bizVenues.length > 0) {
+                        user.assigned_venue_ids = bizVenues.map((v: any) => v.id);
                     }
                 }
             }
         } catch (e) { console.error("Business Context Load Failed", e); }
 
         // --- FILTERING ---
-        const visibleVenueIds = user.assigned_venue_ids || [];
+        // When a specific business is active, scope directly by business_id.
+        // This bypasses user.assigned_venue_ids, which hydrateData populates from ALL
+        // memberships (overwriting on each iteration), making it unreliable for
+        // multi-business users.
+        const visibleVenueIds = activeBizId
+            ? data.venues.filter(v => v.business_id === activeBizId).map(v => v.id)
+            : data.venues.filter(v => allBizIds.includes(v.business_id)).map(v => v.id);
         const filteredVenues = data.venues.filter(v => visibleVenueIds.includes(v.id));
         const filteredAreas = data.areas.filter(a => visibleVenueIds.includes(a.venue_id));
         const visibleAreaIds = filteredAreas.map(a => a.id);
@@ -310,6 +333,7 @@ export async function GET(request: Request) {
 
         return NextResponse.json({
             ...data,
+            businesses: allBusinesses,
             venues: filteredVenues,
             areas: filteredAreas,
             clicrs: filteredClicrs,
@@ -320,7 +344,7 @@ export async function GET(request: Request) {
         });
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json({ ...data, businesses: allBusinesses });
 }
 
 export async function POST(request: Request) {
@@ -512,6 +536,43 @@ export async function POST(request: Request) {
 
                 updatedData = addClicr(newClicr);
                 break;
+
+            case 'ADD_VENUE': {
+                const newVenue = payload as Venue;
+                // Trust the business_id sent by the client (user selected it from the picker).
+                // Fall back to first membership only if the payload omitted it.
+                let venueBizId: string | null = newVenue.business_id || null;
+                if (!venueBizId && userId) {
+                    const { data: venueMember } = await supabaseAdmin.from('business_members').select('business_id').eq('user_id', userId).limit(1).single();
+                    if (venueMember) venueBizId = venueMember.business_id;
+                }
+                if (!venueBizId) {
+                    return NextResponse.json({ error: 'Could not resolve business_id for ADD_VENUE' }, { status: 400 });
+                }
+                try {
+                    const { error } = await supabaseAdmin.from('venues').insert({
+                        id: newVenue.id,
+                        business_id: venueBizId,
+                        name: newVenue.name,
+                        city: newVenue.city || null,
+                        state: newVenue.state || null,
+                        timezone: newVenue.timezone || 'America/New_York',
+                        status: newVenue.status || 'ACTIVE',
+                        capacity_max: newVenue.default_capacity_total ?? null,
+                        capacity_enforcement_mode: newVenue.capacity_enforcement_mode || 'WARN_ONLY',
+                    });
+                    if (error) {
+                        console.error("ADD_VENUE persistence failed", error);
+                        return NextResponse.json({ error: `Database Insert Failed: ${error.message} (${error.code})` }, { status: 500 });
+                    }
+                } catch (e: any) {
+                    console.error("ADD_VENUE persistence exception", e);
+                    return NextResponse.json({ error: 'Server Error: ' + e.message }, { status: 500 });
+                }
+                updatedData = addVenue(newVenue);
+                break;
+            }
+
             case 'UPDATE_VENUE':
                 const venue = payload as Venue;
                 try {
@@ -614,6 +675,17 @@ export async function POST(request: Request) {
                     return NextResponse.json({ error: 'Server Error: ' + e.message }, { status: 500 });
                 }
                 break;
+
+            case 'UPDATE_BUSINESS': {
+                if (userId) {
+                    const { data: bizMembership } = await supabaseAdmin.from('business_members').select('business_id').eq('user_id', userId).limit(1).single();
+                    if (bizMembership?.business_id) {
+                        await supabaseAdmin.from('businesses').update(payload).eq('id', bizMembership.business_id);
+                    }
+                }
+                updatedData = updateBusiness(payload);
+                break;
+            }
 
             default:
                 return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
