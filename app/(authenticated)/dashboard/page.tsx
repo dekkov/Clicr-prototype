@@ -115,15 +115,16 @@ const VenueCard = ({ venue, areas, events }: { venue: Venue, areas: Area[], even
 };
 
 export default function DashboardPage() {
-    const { business, businesses, activeBusiness, selectBusiness, clearBusiness, venues, areas, events, isLoading, resetCounts } = useApp();
+    const { business, businesses, activeBusiness, selectBusiness, clearBusiness, venues, areas, events, isLoading, currentUser, resetCounts } = useApp();
     const router = useRouter();
 
-    // Auto-redirect new users with no business to onboarding
+    // Auto-redirect new users with no business to onboarding.
+    // Guard on currentUser.id to avoid false redirects when the first sync fails (network error).
     useEffect(() => {
-        if (!isLoading && businesses.length === 0 && !business) {
+        if (!isLoading && currentUser.id && businesses.length === 0 && !business) {
             router.push('/onboarding/setup');
         }
-    }, [isLoading, businesses.length, business]);
+    }, [isLoading, currentUser.id, businesses.length, business]);
 
     if (isLoading) {
         return <div className="p-8 text-white">Loading dashboard...</div>;

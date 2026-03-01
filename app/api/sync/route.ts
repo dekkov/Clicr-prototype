@@ -649,6 +649,17 @@ export async function POST(request: Request) {
                 }
                 break;
 
+            case 'UPDATE_BUSINESS': {
+                if (userId) {
+                    const { data: bizMembership } = await supabaseAdmin.from('business_members').select('business_id').eq('user_id', userId).limit(1).single();
+                    if (bizMembership?.business_id) {
+                        await supabaseAdmin.from('businesses').update(payload).eq('id', bizMembership.business_id);
+                    }
+                }
+                updatedData = updateBusiness(payload);
+                break;
+            }
+
             default:
                 return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
         }
