@@ -4,7 +4,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 
 import { useApp } from '@/lib/store';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Settings2, Plus, Minus, ScanFace, CheckCircle2, XCircle, ArrowUpCircle, ArrowDownCircle, Trash2, Layout, Link2, Unlink, ChevronDown, Check, Zap, Bug, RefreshCw } from 'lucide-react';
+import { Settings2, Plus, Minus, XCircle, Check, Zap, Bug, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { IDScanEvent } from '@/lib/types';
 import { parseAAMVA } from '@/lib/aamva';
@@ -43,7 +43,7 @@ export default function ClicrPanel({
 }) {
     const {
         clicrs, areas, events, venues,
-        recordEvent, recordScan, recordTurnaround, renameDevice,
+        recordEvent, recordScan, recordTurnaround,
         resetCounts, isLoading, patrons, patronBans, updateClicr, debug, currentUser,
         turnarounds, trafficSessionStart
     } = useApp();
@@ -66,24 +66,6 @@ export default function ClicrPanel({
             }
         };
     }, []);
-
-    // --- SPLIT VIEW STATE ---
-    const [layoutMode, setLayoutMode] = useState<'SINGLE' | 'SPLIT'>('SINGLE');
-    const [showLayoutMenu, setShowLayoutMenu] = useState(false);
-    const [showSplitSetup, setShowSplitSetup] = useState(false);
-
-    // Split Configuration
-    const [splitConfig, setSplitConfig] = useState<{
-        mode: 'INDEPENDENT' | 'LINKED';
-        secondaryClicrId: string | null;
-        primaryLabel: string;
-        secondaryLabel: string;
-    }>({
-        mode: 'INDEPENDENT',
-        secondaryClicrId: null,
-        primaryLabel: 'Primary',
-        secondaryLabel: 'Secondary'
-    });
 
     // Calculate total area occupancy from SNAPSHOT (Source of Truth)
     const currentArea = (areas || []).find(a => a.id === clicr?.area_id);
@@ -299,75 +281,6 @@ export default function ClicrPanel({
     // if (isLoading) return <div className="p-8 text-white">Connecting...</div>;
     // if (!clicr) return <div className="p-8 text-white">Clicr not found</div>;
 
-    const handleGenderTap = (gender: 'M' | 'F', delta: number) => {
-        if (!clicr || !venueId) return;
-        // ENFORCEMENT CHECK
-        if (delta > 0) {
-            const { maxCapacity: maxCap, mode } = getVenueCapacityRules(venue);
-
-            if (maxCap > 0 && currentVenueOccupancy >= maxCap) {
-                if (mode === 'HARD_STOP') {
-                    alert("CAPACITY REACHED: Entry Blocked (Hard Stop Active)");
-                    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-                    return; // BLOCK
-                }
-                if (mode === 'MANAGER_OVERRIDE' || mode === 'HARD_BLOCK' as any) { // Handle variations
-                    // Require confirmation
-                    if (!window.confirm("WARNING: Capacity Reached. Authorize Override?")) {
-                        return; // BLOCK if not confirmed
-                    }
-                }
-                if (mode === 'WARN_ONLY') {
-                    if (navigator.vibrate) navigator.vibrate([50, 50, 50, 50]);
-                    // Optional: Toast warning
-                }
-            }
-        }
-
-        if (navigator.vibrate) navigator.vibrate(50);
-
-        // If we have a pending classification, clearing it is the priority
-        // We assume this tap IS the classification for that scan
-        if (pendingScan && delta > 0) {
-            // Count it!
-            setPendingScan(null);
-            setLastScan(null); // Clear the visual overlay too
-        }
-
-        // 1. Record the Count Event (Changes Occupancy) with Gender
-        recordEvent({
-            venue_id: venueId,
-            area_id: clicr.area_id,
-            clicr_id: clicr.id,
-            delta: delta,
-            flow_type: delta > 0 ? 'IN' : 'OUT',
-            gender: gender,
-            event_type: 'TAP', // Ideally 'SCAN_CLASSIFIED' but keeping simple for now
-            idempotency_key: Math.random().toString(36)
-        });
-
-        // 2. If it's an entry (Delta > 0), also log a "Scan" for the record
-        // (Optional: remove this if we rely solely on events for graph, but good for ID log consistency)
-        // NOTE: In classify mode, scan is already logged upstream. In normal mode, we might double log if not careful.
-        // But the previous requirement was "log a Scan" here. 
-        // Improvement: Only record scan HERE if it wasn't already recorded by the scanner process.
-        // However, for consistency with existing codebase, let's keep it simple.
-        // The upstream 'recordScan' logs the physical scan. This 'recordScan' here seems to be simulating a scan for manual taps?
-        // Actually, looking at original code: "If delta > 0... also log a Scan". This implies manual taps generate artificial scan records?
-        // Let's preserve existing logic for manual taps, but AVOID it if we just processed a real scan (to avoid double scan logs).
-
-        if (delta > 0 && !pendingScan) {
-            recordScan({
-                venue_id: venueId,
-                scan_result: 'ACCEPTED',
-                age: 21,
-                age_band: '21+',
-                sex: gender,
-                zip_code: '00000'
-            });
-        }
-    };
-
     const handleBulkSubmit = () => {
         if (!clicr || !venueId) return;
         if (bulkValue !== 0) {
@@ -480,9 +393,6 @@ export default function ClicrPanel({
     // --- ADVANCED SCANNER LOGIC ---
     // (Hooks moved to top)
 
-    // Unified Scan Processor (The Brain)
-
-    // Unified Scan Processor (The Brain)
     // Unified Scan Processor (The Brain)
     const processScan = async (parsed: ReturnType<typeof parseAAMVA>, rawData?: string) => {
         if (!venueId) return;
@@ -640,31 +550,6 @@ export default function ClicrPanel({
             console.error("Camera scan invalid data", e);
         }
     };
-
-    // --- SPLIT VIEW HELPERS ---
-    const activateSplit = (mode: 'INDEPENDENT' | 'LINKED') => {
-        if (!clicr) return;
-        setSplitConfig(prev => ({ ...prev, mode }));
-        setShowLayoutMenu(false);
-        // If we haven't set up yet, show setup
-        if (mode === 'INDEPENDENT' && !splitConfig.secondaryClicrId) {
-            setShowSplitSetup(true);
-        } else if (mode === 'LINKED') {
-            // Auto-setup for linked
-            setSplitConfig(prev => ({
-                ...prev,
-                mode: 'LINKED',
-                primaryLabel: 'ENTRY',
-                secondaryLabel: 'EXIT',
-                secondaryClicrId: clicr.id // Self ref for logic
-            }));
-            setLayoutMode('SPLIT');
-        } else {
-            setLayoutMode('SPLIT');
-        }
-    };
-
-
 
     // Flashlight Toggle Function
     const toggleTorch = async () => {
@@ -912,57 +797,6 @@ export default function ClicrPanel({
                     </motion.div>
                 )}
             </AnimatePresence>
-
-            {/* SPLIT SETUP MODAL */}
-            <AnimatePresence>
-                {showSplitSetup && (
-                    <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-6">
-                        <motion.div
-                            initial={{ scale: 0.9, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm p-6 space-y-6"
-                        >
-                            <div>
-                                <h3 className="text-xl font-bold text-white">Setup Split View</h3>
-                                <p className="text-slate-400 text-sm">Select another counter to display alongside {clicr.name}.</p>
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Select Counter</label>
-                                <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                                    {clicrs.filter(c => c.id !== clicr.id).map(c => (
-                                        <button
-                                            key={c.id}
-                                            onClick={() => setSplitConfig(prev => ({ ...prev, secondaryClicrId: c.id, secondaryLabel: c.name }))}
-                                            className={cn(
-                                                "w-full p-3 rounded-xl border flex items-center justify-between transition-all",
-                                                splitConfig.secondaryClicrId === c.id
-                                                    ? "bg-primary/20 border-primary text-white"
-                                                    : "bg-slate-800 border-white/5 text-slate-400 hover:bg-slate-800/80"
-                                            )}
-                                        >
-                                            <span className="font-bold">{c.name}</span>
-                                            {splitConfig.secondaryClicrId === c.id && <Check className="w-4 h-4 text-primary" />}
-                                        </button>
-                                    ))}
-                                    {clicrs.length <= 1 && <div className="text-slate-500 italic p-2">No other counters available.</div>}
-                                </div>
-                            </div>
-
-                            <button
-                                disabled={!splitConfig.secondaryClicrId}
-                                onClick={() => setShowSplitSetup(false)}
-                                className="w-full py-4 bg-primary rounded-xl text-black font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                Confirm Split View
-                            </button>
-                            <button onClick={() => { setLayoutMode('SINGLE'); setShowSplitSetup(false); }} className="w-full py-2 text-slate-500 text-xs font-bold uppercase tracking-widest">Cancel</button>
-
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
-
 
             {/* Bulk Modal (Reference Design Match) */}
             <AnimatePresence>
@@ -1305,134 +1139,6 @@ export default function ClicrPanel({
     );
 }
 
-
-// --- HELPER COMPONENTS ---
-
-function SplitCounterPart({
-    clicrId,
-    label,
-    color,
-    mode,
-    role,
-    onTap,
-    currentCount
-}: {
-    clicrId: string | null,
-    label: string,
-    color: 'blue' | 'pink' | 'red', // red for exit
-    mode: 'INDEPENDENT' | 'LINKED',
-    role: 'PRIMARY' | 'SECONDARY',
-    onTap: (delta: number) => void,
-    currentCount: number
-}) {
-    if (!clicrId && mode === 'INDEPENDENT') return <div className="flex-1 bg-slate-900/50 rounded-2xl flex items-center justify-center text-slate-500">No Counter Selected</div>;
-
-    // Gradient definitions
-    const gradients = {
-        blue: "from-blue-600 to-blue-800 border-blue-500/30",
-        pink: "from-pink-600 to-pink-800 border-pink-500/30",
-        red: "from-rose-600 to-rose-800 border-rose-500/30", // For Exit
-    };
-
-    const bgGradient = gradients[color] || gradients.blue;
-
-    return (
-        <div className={cn("flex-1 rounded-2xl relative overflow-hidden flex flex-col border p-1", "bg-slate-900 border-white/5")}>
-
-            {/* Background Hint (Label) */}
-            <div className="absolute top-4 left-4 z-10">
-                <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">{mode === 'LINKED' ? (role === 'PRIMARY' ? 'Entry' : 'Exit') : 'Area'}</div>
-                <div className="text-lg font-bold text-white leading-none">{label}</div>
-            </div>
-
-            {/* Count Display */}
-            <div className="absolute top-4 right-4 z-10 text-right">
-                <div className="text-4xl font-mono font-bold text-white tabular-nums leading-none">{currentCount}</div>
-            </div>
-
-            {/* Split interaction zone */}
-            <div className="flex-1 flex gap-1 mt-12">
-                {/* Minus Button (Small) */}
-                <button
-                    onClick={() => onTap(-1)}
-                    className="w-20 bg-slate-800/80 hover:bg-slate-700 active:bg-slate-600 rounded-xl flex items-center justify-center transition-colors border border-white/5"
-                >
-                    <Minus className="w-8 h-8 text-white/50" />
-                </button>
-
-                {/* Plus/Main Action Button (Large) */}
-                <motion.button
-                    onClick={() => onTap(1)}
-                    whileTap={{ scale: 0.98 }}
-                    className={cn(
-                        "flex-1 rounded-xl flex items-center justify-center bg-gradient-to-br shadow-lg relative overflow-hidden group border-t border-white/20",
-                        bgGradient
-                    )}
-                >
-                    <div className="scale-150 group-active:scale-125 transition-transform duration-100">
-                        {role === 'SECONDARY' && mode === 'LINKED' ? (
-                            <Plus className={cn("w-12 h-12 text-white/90 drop-shadow-md rotate-45")} />
-                        ) : (
-                            <Plus className="w-12 h-12 text-white/90 drop-shadow-md" />
-                        )}
-                    </div>
-                </motion.button>
-            </div>
-
-
-        </div>
-    );
-}
-
-
-function TapButton({
-    type,
-    label,
-    color,
-    onClick,
-    className
-}: {
-    type: 'plus' | 'minus',
-    label?: string,
-    color?: 'blue' | 'pink',
-    onClick: () => void,
-    className?: string
-}) {
-    // Colors
-    const blueGradient = "bg-blue-600 active:bg-blue-700 from-blue-600 to-blue-800 bg-gradient-to-br border-blue-500/50";
-    const pinkGradient = "bg-pink-600 active:bg-pink-700 from-pink-600 to-pink-800 bg-gradient-to-br border-pink-500/50";
-    // Fallback for generic
-    const greenGradient = "bg-emerald-600 active:bg-emerald-700 from-emerald-600 to-emerald-800 bg-gradient-to-br";
-    const redGradient = "bg-rose-600 active:bg-rose-700 from-rose-600 to-rose-800 bg-gradient-to-br";
-
-    let bgClass = "";
-    if (color === 'blue') bgClass = blueGradient;
-    else if (color === 'pink') bgClass = pinkGradient;
-    else bgClass = type === 'plus' ? greenGradient : redGradient;
-
-    return (
-        <motion.button
-            whileTap={{ scale: 0.95 }}
-            onClick={onClick}
-            className={cn(
-                "flex flex-col items-center justify-center relative overflow-hidden group transition-all shadow-2xl border-t border-white/20",
-                bgClass,
-                className
-            )}
-        >
-            <div className="relative z-10 flex flex-col items-center gap-1">
-                {type === 'plus' ? (
-                    <Plus className={cn("text-white drop-shadow-md transition-all", label ? "w-10 h-10 md:w-14 md:h-14" : "w-12 h-12 md:w-16 md:h-16")} />
-                ) : (
-                    <Minus className="w-6 h-6 md:w-10 md:h-10 text-white drop-shadow-md transition-all" />
-                )}
-                {label && <span className="text-white font-bold tracking-widest text-xs md:text-base uppercase">{label}</span>}
-            </div>
-
-            <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent pointer-events-none" />
-        </motion.button>
-    )
-}
 
 function CameraScanner({ onScan }: { onScan: (text: string) => void }) {
     const [torch, setTorch] = useState(false);
