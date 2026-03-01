@@ -36,14 +36,10 @@ const generateMockID = () => {
 
 export default function ClicrPanel({
     clicrId,
-    overrideLabel,
     className,
-    showLayoutControls = false
 }: {
     clicrId?: string,
-    overrideLabel?: string,
     className?: string,
-    showLayoutControls?: boolean
 }) {
     const {
         clicrs, areas, events, venues,
@@ -140,15 +136,7 @@ export default function ClicrPanel({
     const [showBulkModal, setShowBulkModal] = useState(false);
     const [bulkValue, setBulkValue] = useState(0);
 
-    // --- CUSTOM BUTTON LABELS ---
-    const [customLabels, setCustomLabels] = useState<{ label_a: string, label_b: string }>({
-        label_a: 'MALE',
-        label_b: 'FEMALE'
-    });
     const [showConfigModal, setShowConfigModal] = useState(false);
-    const [soloMode, setSoloMode] = useState(false);
-    const [draftSoloMode, setDraftSoloMode] = useState(false);
-    const [editLabels, setEditLabels] = useState<{ label_a: string, label_b: string }>({ label_a: '', label_b: '' });
 
     // Classification Mode State
     const [classifyMode, setClassifyMode] = useState(false);
@@ -164,7 +152,7 @@ export default function ClicrPanel({
     const isModalOpenRef = useRef(false);
     useEffect(() => {
         isModalOpenRef.current = showBulkModal || showConfigModal;
-    }, [showBulkModal, showConfigModal]);
+    }, [showBulkModal, showConfigModal]); // showGuestInModal added in Task 4
 
     // Force focus when modals close
     useEffect(() => {
@@ -275,25 +263,6 @@ export default function ClicrPanel({
 
     // Load from local storage or Server on mount/update
     useEffect(() => {
-        // Prioritize SERVER config for sync
-        if (clicr?.button_config) {
-            setCustomLabels(clicr.button_config);
-        } else {
-            // Fallback to local if server has nothing (legacy)
-            const saved = localStorage.getItem(`clicr_config_${id}`);
-            if (saved) {
-                try {
-                    setCustomLabels(JSON.parse(saved));
-                } catch (e) { console.error("Failed to parse saved config"); }
-            }
-        }
-
-        // Load Layout Mode
-        const savedMode = localStorage.getItem(`clicr_layout_mode_${id}`);
-        if (savedMode === 'SOLO') {
-            setSoloMode(true);
-        }
-
         // Load Classify Mode
         const savedClassify = localStorage.getItem(`clicr_classify_mode_${id}`);
         if (savedClassify === 'true') {
@@ -306,24 +275,14 @@ export default function ClicrPanel({
         }
     }, [id, clicr]);
 
-    // ... (keep existing state hooks) ...
-
-    const saveConfig = async (name: string, a: string, b: string) => {
-        const newLabels = { label_a: a.toUpperCase(), label_b: b.toUpperCase() };
-        setCustomLabels(newLabels);
-
-        // Save to Local Storage (Legacy/Offline backup)
-        localStorage.setItem(`clicr_config_${id}`, JSON.stringify(newLabels));
-
-        // Save to Server (Syncs to other devices) — includes auto_reset settings
+    const saveConfig = async (name: string) => {
         if (clicr) {
             await updateClicr({
                 ...clicr,
                 name: name,
-                button_config: { ...newLabels, auto_reset: autoReset }
+                button_config: { auto_reset: autoReset }
             });
         }
-
         setShowConfigModal(false);
     };
 
@@ -722,7 +681,7 @@ export default function ClicrPanel({
                         </h2>
                         <div className="flex items-center gap-2">
                             <h1 className="text-white font-bold text-2xl tracking-tight">
-                                {overrideLabel || clicr.name}
+                                {clicr.name}
                             </h1>
                             <button onClick={() => setShowConfigModal(true)} className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 active:bg-slate-700 transition-colors">
                                 <Settings2 className="w-4 h-4" />
@@ -798,7 +757,7 @@ export default function ClicrPanel({
                 {/* 4. Action Buttons */}
                 <div className="flex flex-col gap-3 px-6 pb-8 shrink-0">
                     <ActionButton
-                        label={customLabels.label_a || "GUEST IN"}
+                        label="GUEST IN"
                         onClick={() => handleGenderTap('M', 1)}
                         className="h-24 md:h-28 text-lg"
                         icon={<div className="mb-[-4px]"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4V20M4 12H20" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg></div>}
@@ -1006,23 +965,6 @@ export default function ClicrPanel({
                                 />
                             </div>
 
-                            {/* Mode Toggle */}
-                            <div className="flex items-center justify-between bg-slate-900/50 p-3 rounded-xl border border-white/5">
-                                <span className="text-sm font-bold text-white">Dual Counter Mode</span>
-                                <button
-                                    id="mode_toggle"
-                                    onClick={(e) => {
-                                        // Toggle local draft only - prevents background thrashing
-                                        setDraftSoloMode(!draftSoloMode);
-                                    }}
-                                    className={cn("w-12 h-7 rounded-full relative transition-colors",
-                                        !draftSoloMode ? "bg-blue-500" : "bg-slate-700"
-                                    )}
-                                >
-                                    <div className="absolute left-1 top-1 w-5 h-5 bg-white rounded-full shadow-md transition-transform" style={{ transform: !draftSoloMode ? "translateX(20px)" : "translateX(0px)" }} />
-                                </button>
-                            </div>
-
                             {/* Classify Toggle */}
                             <div className="flex items-center justify-between bg-slate-900/50 p-3 rounded-xl border border-white/5">
                                 <span className="text-sm font-bold text-white">Classify Scans</span>
@@ -1087,42 +1029,6 @@ export default function ClicrPanel({
                                 )}
                             </div>
 
-                            {/* Inputs */}
-                            <div className="space-y-4" onClick={(e) => e.stopPropagation()}>
-                                {/* Input A (Always visible) */}
-                                <div className="space-y-2">
-                                    <label className={cn("text-xs font-bold uppercase tracking-widest transition-colors",
-                                        draftSoloMode ? "text-white" : "text-blue-400"
-                                    )}>
-                                        {draftSoloMode ? "Button Label" : "Left Button (Blue)"}
-                                    </label>
-                                    <input
-                                        type="text"
-                                        autoFocus
-                                        value={editLabels.label_a}
-                                        onChange={(e) => setEditLabels(prev => ({ ...prev, label_a: e.target.value }))}
-                                        className={cn("w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white font-bold focus:outline-none transition-colors",
-                                            draftSoloMode ? "focus:border-white" : "focus:border-blue-500"
-                                        )}
-                                        placeholder={draftSoloMode ? "e.g. COUNT" : "e.g. MALE"}
-                                    />
-                                </div>
-
-                                {/* Input B (Hidden in Solo) */}
-                                <div className={cn("space-y-2 transition-all duration-200 overflow-hidden",
-                                    draftSoloMode ? "h-0 opacity-0 pointer-events-none" : "h-auto opacity-100"
-                                )}>
-                                    <label className="text-xs font-bold text-pink-400 uppercase tracking-widest">Right Button (Pink)</label>
-                                    <input
-                                        type="text"
-                                        value={editLabels.label_b}
-                                        onChange={(e) => setEditLabels(prev => ({ ...prev, label_b: e.target.value }))}
-                                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white font-bold focus:outline-none focus:border-pink-500 transition-colors"
-                                        placeholder="e.g. FEMALE"
-                                    />
-                                </div>
-                            </div>
-
                             <div className="grid grid-cols-2 gap-3 pt-2">
                                 <button
                                     onClick={() => {
@@ -1134,23 +1040,7 @@ export default function ClicrPanel({
                                     Cancel
                                 </button>
                                 <button
-                                    onClick={() => {
-                                        // Save Logic
-                                        // Commit draft to real state
-                                        const isSolo = draftSoloMode;
-                                        setSoloMode(isSolo);
-
-                                        let a = editLabels.label_a || (isSolo ? 'COUNT' : 'MALE');
-                                        let b = editLabels.label_b || 'FEMALE';
-
-                                        saveConfig(editName, a, b);
-
-                                        if (isSolo) {
-                                            localStorage.setItem(`clicr_layout_mode_${clicr.id}`, 'SOLO');
-                                        } else {
-                                            localStorage.removeItem(`clicr_layout_mode_${clicr.id}`);
-                                        }
-                                    }}
+                                    onClick={() => saveConfig(editName)}
                                     className="py-3 rounded-xl bg-white text-black font-bold text-sm hover:bg-slate-200 shadow-lg transition-all active:scale-95"
                                 >
                                     Save Changes
