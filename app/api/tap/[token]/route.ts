@@ -26,17 +26,9 @@ export async function GET(
         return NextResponse.json({ error: 'Invalid or expired link' }, { status: 404 });
     }
 
-    // Look up venue_id from the area
-    const { data: area } = await supabaseAdmin
-        .from('areas')
-        .select('venue_id')
-        .eq('id', device.area_id)
-        .single();
-
     return NextResponse.json({
         name: device.name,
         direction_mode: device.direction_mode ?? 'bidirectional',
-        venue_id: area?.venue_id ?? null,
     });
 }
 
@@ -46,7 +38,16 @@ export async function POST(
     { params }: { params: Promise<{ token: string }> }
 ) {
     const { token } = await params;
-    const { direction } = await req.json() as { direction: 'IN' | 'OUT' };
+
+    // NOTE: This endpoint is public and has no server-side rate limiting.
+    // For production use, configure rate limiting at the CDN/proxy layer (e.g. Vercel, Cloudflare).
+    let body: { direction?: unknown };
+    try {
+        body = await req.json();
+    } catch {
+        return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+    const { direction } = body;
 
     if (direction !== 'IN' && direction !== 'OUT') {
         return NextResponse.json({ error: 'direction must be IN or OUT' }, { status: 400 });
@@ -68,7 +69,7 @@ export async function POST(
         return NextResponse.json({ error: 'Device not assigned to a venue' }, { status: 422 });
     }
 
-    const delta = direction === 'IN' ? 1 : -1;
+    const delta = (direction as 'IN' | 'OUT') === 'IN' ? 1 : -1;
 
     const { error: rpcError } = await supabaseAdmin.rpc('apply_occupancy_delta', {
         p_business_id: device.business_id,
@@ -78,7 +79,7 @@ export async function POST(
         p_source: 'manual',
         p_device_id: null,
         p_gender: null,
-        p_idempotency_key: `tap-${token}-${Date.now()}`,
+        p_idempotency_key: null,
     });
 
     if (rpcError) {
