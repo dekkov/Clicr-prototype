@@ -170,7 +170,7 @@ export default function DashboardPage() {
         );
     }
 
-    const needsSetup = !business || venues.length === 0;
+    const needsSetup = !business;
 
     return (
         <div className="space-y-8 animate-[fade-in_0.5s_ease-out]">
