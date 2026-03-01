@@ -138,6 +138,14 @@ export default function ClicrPanel({
 
     const [showConfigModal, setShowConfigModal] = useState(false);
 
+    // --- GUEST IN MODAL ---
+    const [showGuestInModal, setShowGuestInModal] = useState(false);
+    const [guestDraft, setGuestDraft] = useState<{
+        name: string;
+        dob: string;
+        gender: 'M' | 'F' | 'OTHER' | 'DECLINE' | null;
+    }>({ name: '', dob: '', gender: null });
+
     // Classification Mode State
     const [classifyMode, setClassifyMode] = useState(false);
     const [showScanBreakdown, setShowScanBreakdown] = useState(false);
@@ -151,16 +159,16 @@ export default function ClicrPanel({
     // Track modal state via ref to avoid listener re-binding
     const isModalOpenRef = useRef(false);
     useEffect(() => {
-        isModalOpenRef.current = showBulkModal || showConfigModal;
-    }, [showBulkModal, showConfigModal]); // showGuestInModal added in Task 4
+        isModalOpenRef.current = showBulkModal || showConfigModal || showGuestInModal;
+    }, [showBulkModal, showConfigModal, showGuestInModal]);
 
     // Force focus when modals close
     useEffect(() => {
-        if (!showBulkModal && !showConfigModal) {
+        if (!showBulkModal && !showConfigModal && !showGuestInModal) {
             const timer = setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 50);
             return () => clearTimeout(timer);
         }
-    }, [showBulkModal, showConfigModal]);
+    }, [showBulkModal, showConfigModal, showGuestInModal]);
 
     // Focus management for hardware scanner
     useEffect(() => {
@@ -193,14 +201,14 @@ export default function ClicrPanel({
 
     useEffect(() => {
         const handleBlur = () => {
-            if (!showBulkModal && !showConfigModal) {
+            if (!showBulkModal && !showConfigModal && !showGuestInModal) {
                 setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 100);
             }
         };
         const inputEl = inputRef.current;
         inputEl?.addEventListener('blur', handleBlur);
         return () => inputEl?.removeEventListener('blur', handleBlur);
-    }, [showBulkModal, showConfigModal]);
+    }, [showBulkModal, showConfigModal, showGuestInModal]);
 
 
     const [editName, setEditName] = useState('');
@@ -376,6 +384,77 @@ export default function ClicrPanel({
             setBulkValue(0);
             setShowBulkModal(false);
         }
+    };
+
+    const handleGuestIn = () => {
+        if (!clicr || !venueId) return;
+
+        // Capacity enforcement
+        const { maxCapacity: maxCap, mode } = getVenueCapacityRules(venue);
+        if (maxCap > 0 && currentVenueOccupancy >= maxCap) {
+            if (mode === 'HARD_STOP') {
+                alert("CAPACITY REACHED: Entry Blocked (Hard Stop Active)");
+                if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                return;
+            }
+            if (mode === 'MANAGER_OVERRIDE' || mode === 'HARD_BLOCK' as any) {
+                if (!window.confirm("WARNING: Capacity Reached. Authorize Override?")) return;
+            }
+            if (mode === 'WARN_ONLY') {
+                if (navigator.vibrate) navigator.vibrate([50, 50, 50, 50]);
+            }
+        }
+
+        if (navigator.vibrate) navigator.vibrate(50);
+
+        // Parse name into first/last
+        const nameTrimmed = guestDraft.name.trim();
+        const spaceIdx = nameTrimmed.indexOf(' ');
+        const firstName = spaceIdx >= 0 ? nameTrimmed.slice(0, spaceIdx) : nameTrimmed;
+        const lastName = spaceIdx >= 0 ? nameTrimmed.slice(spaceIdx + 1) : undefined;
+
+        recordEvent({
+            venue_id: venueId,
+            area_id: clicr.area_id,
+            clicr_id: clicr.id,
+            delta: 1,
+            flow_type: 'IN',
+            gender: guestDraft.gender ?? undefined,
+            first_name: firstName || undefined,
+            last_name: lastName || undefined,
+            dob: guestDraft.dob || undefined,
+            event_type: 'TAP',
+            idempotency_key: Math.random().toString(36)
+        });
+
+        recordScan({
+            venue_id: venueId,
+            scan_result: 'ACCEPTED',
+            age: 21,
+            age_band: '21+',
+            sex: guestDraft.gender === 'M' ? 'M' : guestDraft.gender === 'F' ? 'F' : 'U',
+            zip_code: '00000',
+            first_name: firstName || undefined,
+            last_name: lastName || undefined,
+            dob: guestDraft.dob || undefined,
+        });
+
+        setGuestDraft({ name: '', dob: '', gender: null });
+        setShowGuestInModal(false);
+    };
+
+    const handleGuestOut = () => {
+        if (!clicr || !venueId) return;
+        if (navigator.vibrate) navigator.vibrate(50);
+        recordEvent({
+            venue_id: venueId,
+            area_id: clicr.area_id,
+            clicr_id: clicr.id,
+            delta: -1,
+            flow_type: 'OUT',
+            event_type: 'TAP',
+            idempotency_key: Math.random().toString(36)
+        });
     };
 
     // Reset Logic
@@ -758,7 +837,7 @@ export default function ClicrPanel({
                 <div className="flex flex-col gap-3 px-6 pb-8 shrink-0">
                     <ActionButton
                         label="GUEST IN"
-                        onClick={() => handleGenderTap('M', 1)}
+                        onClick={() => setShowGuestInModal(true)}
                         className="h-24 md:h-28 text-lg"
                         icon={<div className="mb-[-4px]"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4V20M4 12H20" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg></div>}
                     />
@@ -768,7 +847,7 @@ export default function ClicrPanel({
                         <ActionButton
                             label="GUEST OUT"
                             variant="out"
-                            onClick={() => handleGenderTap('M', -1)}
+                            onClick={handleGuestOut}
                             className="h-24 md:h-28 text-lg bg-[#1E3A8A] hover:bg-[#1E40AF]"
                             icon={<div className="mb-[-4px]"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 12H19" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg></div>}
                         />
@@ -935,6 +1014,97 @@ export default function ClicrPanel({
                             </div>
                         </motion.div>
                     </div>
+                )}
+            </AnimatePresence>
+
+            {/* GUEST IN MODAL */}
+            <AnimatePresence>
+                {showGuestInModal && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end justify-center"
+                        onClick={() => setShowGuestInModal(false)}
+                    >
+                        <motion.div
+                            initial={{ y: '100%' }}
+                            animate={{ y: 0 }}
+                            exit={{ y: '100%' }}
+                            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+                            className="w-full max-w-lg bg-[#0f1117] rounded-t-3xl p-6 pb-10 space-y-5"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="w-10 h-1 bg-slate-700 rounded-full mx-auto mb-2" />
+                            <h2 className="text-white font-bold text-xl tracking-tight">Guest Check-In</h2>
+
+                            {/* Name */}
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Name (optional)</label>
+                                <input
+                                    type="text"
+                                    value={guestDraft.name}
+                                    onChange={(e) => setGuestDraft(prev => ({ ...prev, name: e.target.value }))}
+                                    placeholder="e.g. John Smith"
+                                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white font-medium focus:outline-none focus:border-blue-500 transition-colors"
+                                />
+                            </div>
+
+                            {/* DOB */}
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Date of Birth (optional)</label>
+                                <input
+                                    type="date"
+                                    value={guestDraft.dob}
+                                    onChange={(e) => setGuestDraft(prev => ({ ...prev, dob: e.target.value }))}
+                                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white font-medium focus:outline-none focus:border-blue-500 transition-colors"
+                                />
+                            </div>
+
+                            {/* Gender */}
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Gender (optional)</label>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {(['M', 'F', 'OTHER', 'DECLINE'] as const).map((g) => (
+                                        <button
+                                            key={g}
+                                            onClick={() => setGuestDraft(prev => ({
+                                                ...prev,
+                                                gender: prev.gender === g ? null : g
+                                            }))}
+                                            className={cn(
+                                                "py-3 rounded-xl text-sm font-bold transition-all border",
+                                                guestDraft.gender === g
+                                                    ? "bg-blue-600 border-blue-500 text-white"
+                                                    : "bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-500"
+                                            )}
+                                        >
+                                            {g}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="grid grid-cols-2 gap-3 pt-1">
+                                <button
+                                    onClick={() => {
+                                        setGuestDraft({ name: '', dob: '', gender: null });
+                                        setShowGuestInModal(false);
+                                    }}
+                                    className="py-4 rounded-xl text-slate-400 bg-slate-900 hover:bg-slate-800 font-semibold text-sm transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleGuestIn}
+                                    className="py-4 rounded-xl bg-white text-black font-bold text-sm hover:bg-slate-100 shadow-lg transition-all active:scale-95"
+                                >
+                                    Check In
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
                 )}
             </AnimatePresence>
 
