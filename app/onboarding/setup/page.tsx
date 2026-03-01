@@ -183,7 +183,7 @@ export default function OnboardingSetupPage() {
                                 <input type="text" value={venueData.state} onChange={e => setVenueData(p => ({ ...p, state: e.target.value }))} placeholder="State"
                                     className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none" />
                             </div>
-                            <input type="number" value={venueData.capacity} onChange={e => setVenueData(p => ({ ...p, capacity: parseInt(e.target.value) }))}
+                            <input type="number" value={venueData.capacity} onChange={e => setVenueData(p => ({ ...p, capacity: parseInt(e.target.value, 10) || 0 }))}
                                 placeholder="Max capacity"
                                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none" />
                         </div>
@@ -220,7 +220,7 @@ export default function OnboardingSetupPage() {
                             <input type="text" placeholder="Area name (e.g. Main Floor)" value={areaInput.name}
                                 onChange={e => setAreaInput(p => ({ ...p, name: e.target.value }))}
                                 className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none text-sm" />
-                            <input type="number" value={areaInput.capacity} onChange={e => setAreaInput(p => ({ ...p, capacity: parseInt(e.target.value) }))}
+                            <input type="number" value={areaInput.capacity} onChange={e => setAreaInput(p => ({ ...p, capacity: parseInt(e.target.value, 10) || 0 }))}
                                 className="w-24 bg-slate-950 border border-slate-800 rounded-xl px-3 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none text-sm" />
                             <button onClick={handleAddArea} disabled={!areaInput.name || isLoading}
                                 className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-sm font-medium transition-all disabled:opacity-50 flex items-center gap-1">
