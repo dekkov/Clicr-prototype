@@ -259,6 +259,7 @@ export async function GET(request: Request) {
 
         // --- LOAD ALL BUSINESSES ---
         let activeBizId: string | null = null;
+        let allBizIds: string[] = [];
 
         try {
             const { data: memberships } = await supabaseAdmin
@@ -267,21 +268,21 @@ export async function GET(request: Request) {
                 .eq('user_id', userId);
 
             if (memberships && memberships.length > 0) {
-                const bizIds = memberships.map((m: any) => m.business_id);
+                allBizIds = memberships.map((m: any) => m.business_id);
 
                 // Only accept the requested businessId if the user is actually a member
-                if (requestedBusinessId && bizIds.includes(requestedBusinessId)) {
+                if (requestedBusinessId && allBizIds.includes(requestedBusinessId)) {
                     activeBizId = requestedBusinessId;
-                } else if (bizIds.length === 1) {
+                } else if (allBizIds.length === 1) {
                     // Auto-select only when the user belongs to exactly one business.
                     // For multi-business users with no explicit selection, leave activeBizId null
                     // so the client picker shows rather than silently defaulting to a random business.
-                    activeBizId = bizIds[0];
+                    activeBizId = allBizIds[0];
                 }
                 const { data: bizRows } = await supabaseAdmin
                     .from('businesses')
                     .select('*')
-                    .in('id', bizIds);
+                    .in('id', allBizIds);
 
                 if (bizRows) {
                     allBusinesses = bizRows.map((b: any) => ({
@@ -316,7 +317,7 @@ export async function GET(request: Request) {
         // multi-business users.
         const visibleVenueIds = activeBizId
             ? data.venues.filter(v => v.business_id === activeBizId).map(v => v.id)
-            : (user.assigned_venue_ids || []);
+            : data.venues.filter(v => allBizIds.includes(v.business_id)).map(v => v.id);
         const filteredVenues = data.venues.filter(v => visibleVenueIds.includes(v.id));
         const filteredAreas = data.areas.filter(a => visibleVenueIds.includes(a.venue_id));
         const visibleAreaIds = filteredAreas.map(a => a.id);

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '@/lib/store';
 import { Building2, MapPin, ArrowRight, Plus } from 'lucide-react';
 import Link from 'next/link';
@@ -8,8 +8,9 @@ import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { METRICS } from '@/lib/core/metrics';
 import { getTodayWindow } from '@/lib/core/time';
-import { Venue, Area, CountEvent } from '@/lib/types';
+import { Business, Venue, Area, CountEvent } from '@/lib/types';
 import { GettingStartedChecklist } from './_components/GettingStartedChecklist';
+import { createClient } from '@/utils/supabase/client';
 
 // Sub-component for individual venue stats
 const VenueCard = ({ venue, areas, events }: { venue: Venue, areas: Area[], events: CountEvent[] }) => {
@@ -115,16 +116,54 @@ const VenueCard = ({ venue, areas, events }: { venue: Venue, areas: Area[], even
 };
 
 export default function DashboardPage() {
-    const { business, businesses, activeBusiness, selectBusiness, clearBusiness, venues, areas, events, isLoading, currentUser, resetCounts } = useApp();
+    const { businesses, isLoading, currentUser, resetCounts } = useApp();
     const router = useRouter();
+
+    // dashBiz is local — resets to null on every mount so the picker always shows for multi-biz users
+    const [dashBiz, setDashBiz] = useState<Business | null>(null);
+    const [dashVenues, setDashVenues] = useState<Venue[]>([]);
+    const [dashAreas, setDashAreas] = useState<Area[]>([]);
+    const [dashEvents, setDashEvents] = useState<CountEvent[]>([]);
+    const [loadingDash, setLoadingDash] = useState(false);
 
     // Auto-redirect new users with no business to onboarding.
     // Guard on currentUser.id to avoid false redirects when the first sync fails (network error).
     useEffect(() => {
-        if (!isLoading && currentUser.id && businesses.length === 0 && !business) {
+        if (!isLoading && currentUser.id && businesses.length === 0) {
             router.push('/onboarding/setup');
         }
-    }, [isLoading, currentUser.id, businesses.length, business]);
+    }, [isLoading, currentUser.id, businesses.length]);
+
+    // For single-business users, auto-select so they never see the picker
+    useEffect(() => {
+        if (!dashBiz && businesses.length === 1) {
+            setDashBiz(businesses[0]);
+        }
+    }, [businesses, dashBiz]);
+
+    // Fetch dashboard data whenever dashBiz changes
+    useEffect(() => {
+        if (!dashBiz) return;
+        setLoadingDash(true);
+        const load = async () => {
+            const supabase = createClient();
+            const { data: { user } } = await supabase.auth.getUser();
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (user) {
+                headers['x-user-id'] = user.id;
+                headers['x-user-email'] = user.email || '';
+            }
+            const res = await fetch(`/api/sync?businessId=${dashBiz.id}`, { cache: 'no-store', headers });
+            if (res.ok) {
+                const data = await res.json();
+                setDashVenues(data.venues || []);
+                setDashAreas(data.areas || []);
+                setDashEvents(data.events || []);
+            }
+            setLoadingDash(false);
+        };
+        load();
+    }, [dashBiz?.id]);
 
     if (isLoading) {
         return (
@@ -156,9 +195,7 @@ export default function DashboardPage() {
     }
 
     // Show picker when multiple businesses exist and none is selected
-    const showPicker = businesses.length > 1 && !activeBusiness;
-
-    if (showPicker) {
+    if (businesses.length > 1 && !dashBiz) {
         return (
             <div className="space-y-6 animate-[fade-in_0.5s_ease-out]">
                 <div>
@@ -169,19 +206,11 @@ export default function DashboardPage() {
                     {businesses.map(biz => (
                         <button
                             key={biz.id}
-                            onClick={() => selectBusiness(biz)}
-                            className={cn(
-                                "text-left p-6 rounded-2xl border transition-all hover:border-primary/50 hover:bg-slate-900/60",
-                                activeBusiness?.id === biz.id
-                                    ? "border-primary bg-primary/5"
-                                    : "border-slate-800 bg-slate-900/40"
-                            )}
+                            onClick={() => setDashBiz(biz)}
+                            className="text-left p-6 rounded-2xl border transition-all hover:border-primary/50 hover:bg-slate-900/60 border-slate-800 bg-slate-900/40"
                         >
                             <Building2 className="w-8 h-8 text-primary mb-3" />
                             <div className="font-bold text-white text-lg">{biz.name}</div>
-                            {activeBusiness?.id === biz.id && (
-                                <div className="text-xs text-primary mt-1">Currently viewing</div>
-                            )}
                         </button>
                     ))}
                     <Link
@@ -196,7 +225,34 @@ export default function DashboardPage() {
         );
     }
 
-    const needsSetup = !business;
+    if (loadingDash || !dashBiz) {
+        return (
+            <div className="space-y-8 animate-pulse">
+                <div className="h-10 w-48 bg-slate-800 rounded-xl" />
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                    {[1, 2].map(i => (
+                        <div key={i} className="glass-panel p-6 rounded-2xl border border-slate-800">
+                            <div className="flex gap-4 mb-6">
+                                <div className="w-12 h-12 bg-slate-800 rounded-xl" />
+                                <div className="flex-1 space-y-2">
+                                    <div className="h-5 bg-slate-800 rounded w-1/2" />
+                                    <div className="h-3 bg-slate-800 rounded w-1/3" />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-4 mb-6">
+                                {[1, 2, 3].map(j => <div key={j} className="h-16 bg-slate-800 rounded-xl" />)}
+                            </div>
+                            <div className="space-y-3">
+                                <div className="h-3 bg-slate-800 rounded w-1/4" />
+                                <div className="h-6 bg-slate-800 rounded" />
+                                <div className="h-6 bg-slate-800 rounded" />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-8 animate-[fade-in_0.5s_ease-out]">
@@ -204,13 +260,11 @@ export default function DashboardPage() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-white">Dashboard</h1>
-                    {business && (
-                        <p className="text-slate-400 mt-1">Real-time overview for <span className="text-primary font-semibold">{business.name}</span></p>
-                    )}
+                    <p className="text-slate-400 mt-1">Real-time overview for <span className="text-primary font-semibold">{dashBiz.name}</span></p>
                     <div className="flex items-center gap-3 mt-1">
                         {businesses.length > 1 && (
                             <button
-                                onClick={clearBusiness}
+                                onClick={() => setDashBiz(null)}
                                 className="text-xs text-slate-500 hover:text-primary transition-colors"
                             >
                                 ← Switch Business
@@ -224,42 +278,38 @@ export default function DashboardPage() {
                         </Link>
                     </div>
                 </div>
-                {!needsSetup && (
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={async () => {
-                                if (window.confirm("⚠️ ARE YOU SURE? \n\nThis will reset ALL occupancy counts to 0 for the entire business. This action cannot be undone.")) {
-                                    await resetCounts(business!.id);
-                                }
-                            }}
-                            className="px-4 py-2 bg-red-900/50 hover:bg-red-900 text-red-200 border border-red-800/50 rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
-                        >
-                            Reset All Counts
-                        </button>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={async () => {
+                            if (window.confirm("⚠️ ARE YOU SURE? \n\nThis will reset ALL occupancy counts to 0 for the entire business. This action cannot be undone.")) {
+                                await resetCounts(dashBiz.id);
+                            }
+                        }}
+                        className="px-4 py-2 bg-red-900/50 hover:bg-red-900 text-red-200 border border-red-800/50 rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
+                    >
+                        Reset All Counts
+                    </button>
 
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 rounded-full text-xs font-medium border border-emerald-500/20">
-                            <span className="relative flex h-2 w-2">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                            </span>
-                            System Operational
-                        </div>
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 rounded-full text-xs font-medium border border-emerald-500/20">
+                        <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        System Operational
                     </div>
-                )}
+                </div>
             </div>
 
             {/* Getting Started checklist — shown after setup while optional items remain */}
-            {!needsSetup && <GettingStartedChecklist />}
+            <GettingStartedChecklist />
 
             {/* Venue cards */}
-            {!needsSetup && (
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                    {venues.map(venue => {
-                        const venueAreas = areas.filter(a => a.venue_id === venue.id);
-                        return <VenueCard key={venue.id} venue={venue} areas={venueAreas} events={events} />;
-                    })}
-                </div>
-            )}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                {dashVenues.map(venue => {
+                    const venueAreas = dashAreas.filter(a => a.venue_id === venue.id);
+                    return <VenueCard key={venue.id} venue={venue} areas={venueAreas} events={dashEvents} />;
+                })}
+            </div>
         </div>
     );
 }
