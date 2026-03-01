@@ -37,6 +37,9 @@ export type AppState = {
     turnarounds: TurnaroundEvent[];
     areaTraffic: Record<string, { total_in: number; total_out: number; net_delta: number; event_count: number }>;
 
+    businesses: Business[];
+    activeBusiness: Business | null;
+
     isLoading: boolean;
 };
 
@@ -80,6 +83,12 @@ type AppContextType = AppState & {
     // Device Rename
     renameDevice?: (deviceId: string, name: string) => Promise<void>;
     debug?: boolean;
+
+    // Multi-business
+    businesses: Business[];
+    activeBusiness: Business | null;
+    selectBusiness: (business: Business) => void;
+    clearBusiness: () => void;
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -107,10 +116,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         turnarounds: [],
         areaTraffic: {},
 
+        businesses: [],
+        activeBusiness: null,
+
         isLoading: true,
     });
 
     const isResettingRef = useRef(false);
+    const activeBusinessIdRef = useRef<string | null>(null);
 
     const refreshState = async () => {
         if (isResettingRef.current) {
@@ -132,7 +145,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 headers['x-user-email'] = user.email || '';
             }
 
-            const res = await fetch('/api/sync', {
+            const bizParam = activeBusinessIdRef.current
+                ? `?businessId=${activeBusinessIdRef.current}`
+                : '';
+            const res = await fetch(`/api/sync${bizParam}`, {
                 cache: 'no-store',
                 headers
             });
@@ -155,12 +171,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 setState(prev => ({
                     ...prev,
                     ...data,
-                    // Defensive: Ensure arrays are arrays
                     venues: data.venues || [],
                     areas: data.areas || [],
                     clicrs: data.clicrs || [],
                     events: data.events || [],
                     scanEvents: data.scanEvents || [],
+                    businesses: data.businesses || prev.businesses,
+                    // Preserve activeBusiness — only selectBusiness() changes it.
+                    // Auto-select if there is exactly one business and none selected yet.
+                    activeBusiness: prev.activeBusiness ?? (data.businesses?.length === 1 ? data.businesses[0] : null),
+                    business: prev.activeBusiness ?? (data.businesses?.length === 1 ? data.businesses[0] : null),
                     isLoading: false
                 }));
             }
@@ -168,6 +188,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             console.error("Failed to sync state", error);
             setState(prev => ({ ...prev, isLoading: false }));
         }
+    };
+
+    const selectBusiness = (business: Business) => {
+        activeBusinessIdRef.current = business.id;
+        setState(prev => ({ ...prev, activeBusiness: business, business }));
+        refreshState(); // immediate refresh scoped to new business
+    };
+
+    const clearBusiness = () => {
+        activeBusinessIdRef.current = null;
+        setState(prev => ({ ...prev, activeBusiness: null, business: null }));
     };
 
     // Initial load, polling, AND Realtime Subscription
@@ -818,7 +849,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
 
     return (
-        <AppContext.Provider value={{ ...state, recordEvent, recordScan, resetCounts, addUser, updateUser, removeUser, updateBusiness, addClicr, updateClicr, deleteClicr, addVenue, updateVenue, addArea, updateArea, addDevice, updateDevice, addCapacityOverride, addVenueAuditLog, addBan, revokeBan, createPatronBan, updatePatronBan, recordBanEnforcement, recordTurnaround, refreshTrafficStats } as AppContextType}>
+        <AppContext.Provider value={{ ...state, recordEvent, recordScan, resetCounts, addUser, updateUser, removeUser, updateBusiness, addClicr, updateClicr, deleteClicr, addVenue, updateVenue, addArea, updateArea, addDevice, updateDevice, addCapacityOverride, addVenueAuditLog, addBan, revokeBan, createPatronBan, updatePatronBan, recordBanEnforcement, recordTurnaround, refreshTrafficStats, businesses: state.businesses, activeBusiness: state.activeBusiness, selectBusiness, clearBusiness } as AppContextType}>
             {children}
         </AppContext.Provider>
     );
