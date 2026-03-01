@@ -124,6 +124,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     const isResettingRef = useRef(false);
     const activeBusinessIdRef = useRef<string | null>(null);
+    const userClearedRef = useRef(false);
 
     const refreshState = async () => {
         if (isResettingRef.current) {
@@ -168,21 +169,27 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                     return;
                 }
 
-                setState(prev => ({
-                    ...prev,
-                    ...data,
-                    venues: data.venues || [],
-                    areas: data.areas || [],
-                    clicrs: data.clicrs || [],
-                    events: data.events || [],
-                    scanEvents: data.scanEvents || [],
-                    businesses: data.businesses || prev.businesses,
-                    // Preserve activeBusiness — only selectBusiness() changes it.
-                    // Auto-select if there is exactly one business and none selected yet.
-                    activeBusiness: prev.activeBusiness ?? (data.businesses?.length === 1 ? data.businesses[0] : null),
-                    business: prev.activeBusiness ?? (data.businesses?.length === 1 ? data.businesses[0] : null),
-                    isLoading: false
-                }));
+                // Sync ref before setState so next poll includes ?businessId=
+                if (!activeBusinessIdRef.current && !userClearedRef.current && data.businesses?.length === 1) {
+                    activeBusinessIdRef.current = data.businesses[0].id;
+                }
+                setState(prev => {
+                    const shouldAutoSelect = !prev.activeBusiness && !userClearedRef.current && data.businesses?.length === 1;
+                    const autoSelected = shouldAutoSelect ? data.businesses[0] : null;
+                    return {
+                        ...prev,
+                        ...data,
+                        venues: data.venues || [],
+                        areas: data.areas || [],
+                        clicrs: data.clicrs || [],
+                        events: data.events || [],
+                        scanEvents: data.scanEvents || [],
+                        businesses: data.businesses || prev.businesses,
+                        activeBusiness: prev.activeBusiness ?? autoSelected,
+                        business: prev.activeBusiness ?? autoSelected,
+                        isLoading: false
+                    };
+                });
             }
         } catch (error) {
             console.error("Failed to sync state", error);
@@ -191,12 +198,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const selectBusiness = (business: Business) => {
+        userClearedRef.current = false;
         activeBusinessIdRef.current = business.id;
         setState(prev => ({ ...prev, activeBusiness: business, business }));
         refreshState(); // immediate refresh scoped to new business
     };
 
     const clearBusiness = () => {
+        userClearedRef.current = true;
         activeBusinessIdRef.current = null;
         setState(prev => ({ ...prev, activeBusiness: null, business: null }));
     };
