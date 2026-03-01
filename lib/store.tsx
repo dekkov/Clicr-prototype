@@ -200,7 +200,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const selectBusiness = (business: Business) => {
         userClearedRef.current = false;
         activeBusinessIdRef.current = business.id;
-        setState(prev => ({ ...prev, activeBusiness: business, business }));
+        // Clear tenant-scoped data immediately so old business's venues/areas/clicrs
+        // don't flash on screen while the scoped fetch is in-flight.
+        setState(prev => ({
+            ...prev,
+            activeBusiness: business,
+            business,
+            venues: [],
+            areas: [],
+            clicrs: [],
+            events: [],
+            scanEvents: [],
+        }));
         refreshState(); // immediate refresh scoped to new business
     };
 
