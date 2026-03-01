@@ -5,13 +5,13 @@ import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/store';
 import { Area, Clicr, Venue } from '@/lib/types';
 import { Building2, MapPin, Users, Check, Plus, ArrowRight } from 'lucide-react';
-import { createInitialBusiness } from '@/app/onboarding/setup-actions';
+import { createInitialBusiness, createAdditionalBusiness } from '@/app/onboarding/setup-actions';
 
 type Step = 'BUSINESS' | 'VENUE' | 'AREAS' | 'CLICRS';
 
 export default function OnboardingSetupPage() {
     const router = useRouter();
-    const { addVenue, addArea, addClicr, business, clearBusiness } = useApp();
+    const { addVenue, addArea, addClicr, business, businesses, clearBusiness } = useApp();
 
     const [step, setStep] = useState<Step>('BUSINESS');
     const [isLoading, setIsLoading] = useState(false);
@@ -42,7 +42,9 @@ export default function OnboardingSetupPage() {
         setError(null);
         const fd = new FormData();
         fd.append('businessName', businessName);
-        const result = await createInitialBusiness(fd);
+        const result = businesses.length > 0
+            ? await createAdditionalBusiness(fd)
+            : await createInitialBusiness(fd);
         setIsLoading(false);
         if (!result.success) {
             setError(result.error);
