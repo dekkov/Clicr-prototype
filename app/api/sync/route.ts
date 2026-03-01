@@ -267,10 +267,14 @@ export async function GET(request: Request) {
                 .eq('user_id', userId);
 
             if (memberships && memberships.length > 0) {
-                // Default to first membership if no specific business requested
-                if (!activeBizId) activeBizId = memberships[0].business_id;
-
                 const bizIds = memberships.map((m: any) => m.business_id);
+
+                // Only accept the requested businessId if the user is actually a member
+                if (requestedBusinessId && bizIds.includes(requestedBusinessId)) {
+                    activeBizId = requestedBusinessId;
+                } else {
+                    activeBizId = memberships[0].business_id;
+                }
                 const { data: bizRows } = await supabaseAdmin
                     .from('businesses')
                     .select('*')
