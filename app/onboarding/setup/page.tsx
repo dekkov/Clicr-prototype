@@ -11,7 +11,7 @@ type Step = 'BUSINESS' | 'VENUE' | 'AREAS' | 'CLICRS';
 
 export default function OnboardingSetupPage() {
     const router = useRouter();
-    const { addVenue, addArea, addClicr, business } = useApp();
+    const { addVenue, addArea, addClicr, business, clearBusiness } = useApp();
 
     const [step, setStep] = useState<Step>('BUSINESS');
     const [isLoading, setIsLoading] = useState(false);
@@ -119,7 +119,7 @@ export default function OnboardingSetupPage() {
         setIsLoading(false);
     };
 
-    const finish = () => router.push('/dashboard');
+    const finish = () => { clearBusiness(); router.push('/dashboard'); };
 
     return (
         <div className="min-h-screen bg-slate-950 flex items-start justify-center px-4 py-12">

@@ -182,14 +182,22 @@ export default function DashboardPage() {
                     {business && (
                         <p className="text-slate-400 mt-1">Real-time overview for <span className="text-primary font-semibold">{business.name}</span></p>
                     )}
-                    {businesses.length > 1 && (
-                        <button
-                            onClick={clearBusiness}
-                            className="text-xs text-slate-500 hover:text-primary transition-colors mt-1"
+                    <div className="flex items-center gap-3 mt-1">
+                        {businesses.length > 1 && (
+                            <button
+                                onClick={clearBusiness}
+                                className="text-xs text-slate-500 hover:text-primary transition-colors"
+                            >
+                                ← Switch Business
+                            </button>
+                        )}
+                        <Link
+                            href="/onboarding/setup"
+                            className="text-xs text-slate-500 hover:text-primary transition-colors flex items-center gap-1"
                         >
-                            ← Switch Business
-                        </button>
-                    )}
+                            <Plus className="w-3 h-3" /> Add Business
+                        </Link>
+                    </div>
                 </div>
                 {!needsSetup && (
                     <div className="flex items-center gap-3">
