@@ -61,8 +61,6 @@ export default function TapPage() {
 
     const showIn = device.direction_mode !== 'out_only';
     const showOut = device.direction_mode !== 'in_only';
-    const isLoading = tapState === 'loading';
-
     return (
         <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 gap-6">
             <div className="text-center">
@@ -78,7 +76,7 @@ export default function TapPage() {
                 {showIn && (
                     <button
                         onClick={() => tap('IN')}
-                        disabled={isLoading}
+                        disabled={tapState !== 'idle'}
                         className="w-full py-8 rounded-3xl bg-blue-600 hover:bg-blue-500 active:scale-95 disabled:opacity-50 text-white text-2xl font-black tracking-wide transition-all shadow-xl"
                     >
                         {tapState === 'success_in' ? '✓ Checked In' : 'GUEST IN'}
@@ -87,7 +85,7 @@ export default function TapPage() {
                 {showOut && (
                     <button
                         onClick={() => tap('OUT')}
-                        disabled={isLoading}
+                        disabled={tapState !== 'idle'}
                         className="w-full py-8 rounded-3xl bg-slate-800 hover:bg-slate-700 active:scale-95 disabled:opacity-50 text-white text-2xl font-black tracking-wide transition-all shadow-xl"
                     >
                         {tapState === 'success_out' ? '✓ Checked Out' : 'GUEST OUT'}
