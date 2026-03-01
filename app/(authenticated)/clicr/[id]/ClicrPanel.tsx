@@ -413,6 +413,9 @@ export default function ClicrPanel({
         const firstName = spaceIdx >= 0 ? nameTrimmed.slice(0, spaceIdx) : nameTrimmed;
         const lastName = spaceIdx >= 0 ? nameTrimmed.slice(spaceIdx + 1) : undefined;
 
+        // Convert YYYY-MM-DD (from date input) to YYYYMMDD
+        const formattedDob = guestDraft.dob ? guestDraft.dob.replace(/-/g, '') : undefined;
+
         recordEvent({
             venue_id: venueId,
             area_id: clicr.area_id,
@@ -422,7 +425,7 @@ export default function ClicrPanel({
             gender: guestDraft.gender ?? undefined,
             first_name: firstName || undefined,
             last_name: lastName || undefined,
-            dob: guestDraft.dob || undefined,
+            dob: formattedDob,
             event_type: 'TAP',
             idempotency_key: Math.random().toString(36)
         });
@@ -436,7 +439,7 @@ export default function ClicrPanel({
             zip_code: '00000',
             first_name: firstName || undefined,
             last_name: lastName || undefined,
-            dob: guestDraft.dob || undefined,
+            dob: formattedDob,
         });
 
         setGuestDraft({ name: '', dob: '', gender: null });
