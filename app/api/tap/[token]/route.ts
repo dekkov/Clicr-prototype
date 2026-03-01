@@ -79,6 +79,8 @@ export async function POST(
         p_source: 'manual',
         p_device_id: null,
         p_gender: null,
+        // null = no deduplication; each tap is a distinct event.
+        // Client-side buttons are disabled during the request to prevent double-taps.
         p_idempotency_key: null,
     });
 

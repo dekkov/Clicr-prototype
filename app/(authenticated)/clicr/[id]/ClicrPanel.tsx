@@ -282,12 +282,15 @@ export default function ClicrPanel({
     const generateTapToken = async () => {
         if (!clicr || generatingToken) return;
         setGeneratingToken(true);
-        const token = Math.random().toString(36).slice(2, 10);
-        await updateClicr({
-            ...clicr,
-            button_config: { ...(clicr.button_config ?? {}), tap_token: token },
-        });
-        setGeneratingToken(false);
+        try {
+            const token = Math.random().toString(36).slice(2, 10);
+            await updateClicr({
+                ...clicr,
+                button_config: { ...(clicr.button_config ?? {}), tap_token: token },
+            });
+        } finally {
+            setGeneratingToken(false);
+        }
     };
 
     // ...
