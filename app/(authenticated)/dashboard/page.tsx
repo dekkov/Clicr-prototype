@@ -2,13 +2,13 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { useApp } from '@/lib/store';
-import { Building2, MapPin, ArrowRight } from 'lucide-react';
+import { Building2, MapPin, ArrowRight, Plus } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { METRICS } from '@/lib/core/metrics';
 import { getTodayWindow } from '@/lib/core/time';
 import { Venue, Area, CountEvent } from '@/lib/types';
-import { InlineSetup } from './_components/InlineSetup';
 import { GettingStartedChecklist } from './_components/GettingStartedChecklist';
 
 // Sub-component for individual venue stats
@@ -115,10 +115,59 @@ const VenueCard = ({ venue, areas, events }: { venue: Venue, areas: Area[], even
 };
 
 export default function DashboardPage() {
-    const { business, venues, areas, events, isLoading, resetCounts } = useApp();
+    const { business, businesses, activeBusiness, selectBusiness, clearBusiness, venues, areas, events, isLoading, resetCounts } = useApp();
+    const router = useRouter();
+
+    // Auto-redirect new users with no business to onboarding
+    useEffect(() => {
+        if (!isLoading && businesses.length === 0 && !business) {
+            router.push('/onboarding/setup');
+        }
+    }, [isLoading, businesses.length, business]);
 
     if (isLoading) {
         return <div className="p-8 text-white">Loading dashboard...</div>;
+    }
+
+    // Show picker when multiple businesses exist and none is selected
+    const showPicker = businesses.length > 1 && !activeBusiness;
+
+    if (showPicker) {
+        return (
+            <div className="space-y-6 animate-[fade-in_0.5s_ease-out]">
+                <div>
+                    <h1 className="text-3xl font-bold text-white">Select a Business</h1>
+                    <p className="text-slate-400 mt-1">Choose which business to manage.</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {businesses.map(biz => (
+                        <button
+                            key={biz.id}
+                            onClick={() => selectBusiness(biz)}
+                            className={cn(
+                                "text-left p-6 rounded-2xl border transition-all hover:border-primary/50 hover:bg-slate-900/60",
+                                activeBusiness?.id === biz.id
+                                    ? "border-primary bg-primary/5"
+                                    : "border-slate-800 bg-slate-900/40"
+                            )}
+                        >
+                            <Building2 className="w-8 h-8 text-primary mb-3" />
+                            <div className="font-bold text-white text-lg">{biz.name}</div>
+                            {activeBusiness?.id === biz.id && (
+                                <div className="text-xs text-primary mt-1">Currently viewing</div>
+                            )}
+                        </button>
+                    ))}
+                    <Link
+                        href="/onboarding/setup"
+                        className="text-left p-6 rounded-2xl border border-dashed border-slate-700 hover:border-primary/50 transition-all flex flex-col items-start gap-3"
+                    >
+                        <Plus className="w-8 h-8 text-slate-500" />
+                        <div className="font-bold text-slate-400">Add New Business</div>
+                    </Link>
+                </div>
+            </div>
+        );
     }
 
     const needsSetup = !business || venues.length === 0;
@@ -131,6 +180,14 @@ export default function DashboardPage() {
                     <h1 className="text-3xl font-bold text-white">Dashboard</h1>
                     {business && (
                         <p className="text-slate-400 mt-1">Real-time overview for <span className="text-primary font-semibold">{business.name}</span></p>
+                    )}
+                    {businesses.length > 1 && (
+                        <button
+                            onClick={clearBusiness}
+                            className="text-xs text-slate-500 hover:text-primary transition-colors mt-1"
+                        >
+                            ← Switch Business
+                        </button>
                     )}
                 </div>
                 {!needsSetup && (
@@ -156,9 +213,6 @@ export default function DashboardPage() {
                     </div>
                 )}
             </div>
-
-            {/* Inline setup — shown when business or first venue is missing */}
-            {needsSetup && <InlineSetup hasBusiness={business !== null} />}
 
             {/* Getting Started checklist — shown after setup while optional items remain */}
             {!needsSetup && <GettingStartedChecklist />}
