@@ -194,6 +194,8 @@ export default function ClicrPanel({
 
 
     const [editName, setEditName] = useState('');
+    const [generatingToken, setGeneratingToken] = useState(false);
+    const [copied, setCopied] = useState(false);
 
     const TIMEZONES = [
         { value: 'America/New_York', label: 'Eastern (ET)' },
@@ -278,12 +280,14 @@ export default function ClicrPanel({
     };
 
     const generateTapToken = async () => {
-        if (!clicr) return;
+        if (!clicr || generatingToken) return;
+        setGeneratingToken(true);
         const token = Math.random().toString(36).slice(2, 10);
         await updateClicr({
             ...clicr,
             button_config: { ...(clicr.button_config ?? {}), tap_token: token },
         });
+        setGeneratingToken(false);
     };
 
     // ...
@@ -1061,15 +1065,24 @@ export default function ClicrPanel({
                                                 className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-slate-400 text-xs font-mono focus:outline-none truncate"
                                             />
                                             <button
-                                                onClick={() => navigator.clipboard.writeText(`${window.location.origin}/tap/${clicr.button_config!.tap_token}`)}
+                                                onClick={async () => {
+                                                    try {
+                                                        await navigator.clipboard.writeText(`${window.location.origin}/tap/${clicr.button_config!.tap_token}`);
+                                                        setCopied(true);
+                                                        setTimeout(() => setCopied(false), 1500);
+                                                    } catch {
+                                                        // clipboard unavailable (HTTP context, permission denied, etc.)
+                                                    }
+                                                }}
                                                 className="px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-colors shrink-0"
                                             >
-                                                Copy
+                                                {copied ? 'Copied!' : 'Copy'}
                                             </button>
                                         </div>
                                         <button
                                             onClick={generateTapToken}
-                                            className="w-full py-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-slate-500 text-slate-400 text-xs font-bold transition-colors"
+                                            disabled={generatingToken}
+                                            className="w-full py-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-slate-500 text-slate-400 text-xs font-bold transition-colors disabled:opacity-50"
                                         >
                                             Regenerate Link
                                         </button>
@@ -1077,7 +1090,8 @@ export default function ClicrPanel({
                                 ) : (
                                     <button
                                         onClick={generateTapToken}
-                                        className="w-full py-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-white text-white text-xs font-bold transition-colors"
+                                        disabled={generatingToken}
+                                        className="w-full py-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-white text-white text-xs font-bold transition-colors disabled:opacity-50"
                                     >
                                         Generate Link
                                     </button>
