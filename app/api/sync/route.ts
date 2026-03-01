@@ -576,6 +576,21 @@ export async function POST(request: Request) {
                 break;
             }
 
+            case 'UPDATE_CLICR': {
+                const clicrPayload = payload as Clicr;
+                try {
+                    await supabaseAdmin.from('devices').update({
+                        name: clicrPayload.name,
+                        button_config: clicrPayload.button_config || null,
+                        direction_mode: clicrPayload.direction_mode || 'bidirectional',
+                    }).eq('id', clicrPayload.id);
+                } catch (e) {
+                    console.error("UPDATE_CLICR persistence failed", e);
+                }
+                updatedData = updateClicr(clicrPayload);
+                break;
+            }
+
             case 'DELETE_CLICR':
                 const delPayload = payload as { id: string };
                 try {

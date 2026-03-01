@@ -125,6 +125,11 @@ export type Clicr = {
     button_config?: {
         label_a: string; // Defaults to "MALE"
         label_b: string; // Defaults to "FEMALE"
+        auto_reset?: {
+            enabled: boolean;
+            time: string;     // "HH:MM" 24-hour format
+            timezone: string; // IANA timezone e.g. "America/New_York"
+        };
     };
     command?: string; // Hardware mapping/pairing code
     direction_mode?: 'in_only' | 'out_only' | 'bidirectional';

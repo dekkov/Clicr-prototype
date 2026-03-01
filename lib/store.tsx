@@ -36,6 +36,7 @@ export type AppState = {
 
     turnarounds: TurnaroundEvent[];
     areaTraffic: Record<string, { total_in: number; total_out: number; net_delta: number; event_count: number }>;
+    trafficSessionStart: number; // timestamp — traffic queries use this as start_ts so reset clears totals
 
     isLoading: boolean;
 };
@@ -106,6 +107,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
         turnarounds: [],
         areaTraffic: {},
+        trafficSessionStart: (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); })(),
 
         isLoading: true,
     });
@@ -341,19 +343,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         // LOCK polling to prevent race conditions
         isResettingRef.current = true;
 
-        // Optimistic update
+        // Optimistic update — zero all counters and start a fresh traffic session
         const optimisticState = {
             ...state,
-            // If venueId is provided, only reset Clicrs in that venue, otherwise reset all
-            clicrs: state.clicrs.map(c => {
-                // To do this strictly correct we need to know the clicr's venue.
-                // Assuming areas map to venues. For now, if venueId is passed, we rely on backend mainly,
-                // but visually we wipe everything for safety or implement complex logic.
-                // Given the simple requirement: "Reset All Counts", wiping all local is visually responsive.
-                return { ...c, current_count: 0 };
-            }),
+            clicrs: state.clicrs.map(c => ({ ...c, current_count: 0 })),
+            areas: state.areas.map(a => ({ ...a, current_occupancy: 0 })),
             events: [],
-            scanEvents: []
+            scanEvents: [],
+            turnarounds: [],
+            areaTraffic: {},
+            trafficSessionStart: Date.now(),
         };
         setState(optimisticState);
 
@@ -752,7 +751,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             const res = await fetch('/api/rpc/traffic', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ business_id: state.business.id, venue_id: venueId, area_id: areaId })
+                body: JSON.stringify({
+                    business_id: state.business.id,
+                    venue_id: venueId,
+                    area_id: areaId,
+                    start_ts: new Date(state.trafficSessionStart).toISOString()
+                })
             });
             if (res.ok) {
                 const data = await res.json();

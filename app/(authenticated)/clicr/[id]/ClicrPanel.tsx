@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 
 import { useApp } from '@/lib/store';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Settings2, Plus, Minus, ScanFace, CheckCircle2, XCircle, ArrowUpCircle, ArrowDownCircle, Trash2, Layout, Link2, Unlink, ChevronDown, Check, Zap, Bug } from 'lucide-react';
+import { ArrowLeft, Settings2, Plus, Minus, ScanFace, CheckCircle2, XCircle, ArrowUpCircle, ArrowDownCircle, Trash2, Layout, Link2, Unlink, ChevronDown, Check, Zap, Bug, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { IDScanEvent } from '@/lib/types';
 import { parseAAMVA } from '@/lib/aamva';
@@ -49,7 +49,7 @@ export default function ClicrPanel({
         clicrs, areas, events, venues,
         recordEvent, recordScan, recordTurnaround, renameDevice,
         resetCounts, isLoading, patrons, patronBans, updateClicr, debug, currentUser,
-        turnarounds
+        turnarounds, trafficSessionStart
     } = useApp();
 
     const id = clicrId;
@@ -215,6 +215,64 @@ export default function ClicrPanel({
     }, [showBulkModal, showConfigModal]);
 
 
+    const [editName, setEditName] = useState('');
+
+    const TIMEZONES = [
+        { value: 'America/New_York', label: 'Eastern (ET)' },
+        { value: 'America/Chicago', label: 'Central (CT)' },
+        { value: 'America/Denver', label: 'Mountain (MT)' },
+        { value: 'America/Los_Angeles', label: 'Pacific (PT)' },
+        { value: 'America/Phoenix', label: 'Arizona (no DST)' },
+        { value: 'America/Anchorage', label: 'Alaska (AKT)' },
+        { value: 'Pacific/Honolulu', label: 'Hawaii (HT)' },
+        { value: 'Europe/London', label: 'London (GMT/BST)' },
+        { value: 'Europe/Paris', label: 'Paris / Berlin (CET)' },
+        { value: 'Asia/Dubai', label: 'Dubai (GST)' },
+        { value: 'Asia/Singapore', label: 'Singapore (SGT)' },
+        { value: 'Asia/Tokyo', label: 'Tokyo (JST)' },
+        { value: 'Australia/Sydney', label: 'Sydney (AEST)' },
+        { value: 'UTC', label: 'UTC' },
+    ];
+
+    const [autoReset, setAutoReset] = useState<{ enabled: boolean; time: string; timezone: string }>({
+        enabled: false,
+        time: '09:00',
+        timezone: (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return 'UTC'; } })(),
+    });
+
+    // Auto-reset: check if the scheduled reset time has passed and we haven't reset yet today
+    const checkAutoReset = useCallback(() => {
+        if (!autoReset.enabled || !venueId || !clicr?.area_id) return;
+
+        const now = new Date();
+        // Current HH:MM in the configured timezone
+        const currentTimeInTZ = now.toLocaleTimeString('en-US', {
+            timeZone: autoReset.timezone, hour: '2-digit', minute: '2-digit', hour12: false
+        }).replace(/^24:/, '00:');
+
+        if (currentTimeInTZ < autoReset.time) return; // Reset time not yet reached today
+
+        // Today's date in configured timezone
+        const todayInTZ = now.toLocaleDateString('en-CA', { timeZone: autoReset.timezone });
+
+        // Date + time of the last reset in configured timezone
+        const lastResetDate = new Date(trafficSessionStart).toLocaleDateString('en-CA', { timeZone: autoReset.timezone });
+        const lastResetTime = new Date(trafficSessionStart).toLocaleTimeString('en-US', {
+            timeZone: autoReset.timezone, hour: '2-digit', minute: '2-digit', hour12: false
+        }).replace(/^24:/, '00:');
+
+        // Already reset today at or after the target time — nothing to do
+        if (lastResetDate === todayInTZ && lastResetTime >= autoReset.time) return;
+
+        handleReset(true); // silent auto-reset
+    }, [autoReset, venueId, clicr?.area_id, trafficSessionStart]);
+
+    useEffect(() => {
+        checkAutoReset();
+        const interval = setInterval(checkAutoReset, 60_000); // check every minute
+        return () => clearInterval(interval);
+    }, [checkAutoReset]);
+
     // Load from local storage or Server on mount/update
     useEffect(() => {
         // Prioritize SERVER config for sync
@@ -241,9 +299,12 @@ export default function ClicrPanel({
         if (savedClassify === 'true') {
             setClassifyMode(true);
         }
-    }, [id, clicr]);
 
-    const [editName, setEditName] = useState('');
+        // Load Auto-Reset config
+        if (clicr?.button_config?.auto_reset) {
+            setAutoReset(clicr.button_config.auto_reset);
+        }
+    }, [id, clicr]);
 
     // ... (keep existing state hooks) ...
 
@@ -254,12 +315,12 @@ export default function ClicrPanel({
         // Save to Local Storage (Legacy/Offline backup)
         localStorage.setItem(`clicr_config_${id}`, JSON.stringify(newLabels));
 
-        // Save to Server (Syncs to other devices)
+        // Save to Server (Syncs to other devices) — includes auto_reset settings
         if (clicr) {
             await updateClicr({
                 ...clicr,
                 name: name,
-                button_config: newLabels
+                button_config: { ...newLabels, auto_reset: autoReset }
             });
         }
 
@@ -359,18 +420,19 @@ export default function ClicrPanel({
     };
 
     // Reset Logic
-    const handleReset = async () => {
-        if (!window.confirm('WARNING: RESET ALL COUNTS TO ZERO?')) return;
+    const handleReset = async (silent = false) => {
+        if (!silent && !window.confirm('Reset all counts to zero? This cannot be undone.')) return;
         if (!venueId) return;
 
         try {
-            await resetCounts('VENUE', venueId);
+            await resetCounts(venueId);
             setBulkValue(0);
             setLastScan(null);
             setScannerInput('');
+            await refreshTrafficStats?.(venueId, clicr.area_id);
         } catch (e) {
             console.error("Reset failed", e);
-            alert("Failed to reset. Please try again or check connection.");
+            if (!silent) alert("Failed to reset. Please try again or check connection.");
         }
     };
 
@@ -662,9 +724,8 @@ export default function ClicrPanel({
                             <h1 className="text-white font-bold text-2xl tracking-tight">
                                 {overrideLabel || clicr.name}
                             </h1>
-                            {/* Rename Trigger (Subtle) */}
-                            <button onClick={() => setShowConfigModal(true)} className="opacity-0 hover:opacity-50 transition-opacity">
-                                <Settings2 className="w-4 h-4 text-slate-600" />
+                            <button onClick={() => setShowConfigModal(true)} className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 active:bg-slate-700 transition-colors">
+                                <Settings2 className="w-4 h-4" />
                             </button>
                         </div>
                     </div>
@@ -699,7 +760,13 @@ export default function ClicrPanel({
 
                     {/* Turnaround & Adjusted Net Row (P0) */}
                     <div className="grid grid-cols-3 gap-3">
-                        <div /> {/* Spacer */}
+                        <button
+                            onClick={() => handleReset()}
+                            className="bg-slate-900/50 rounded-lg p-2 flex flex-col items-center justify-center border border-white/5 active:bg-slate-800 transition-colors gap-1"
+                        >
+                            <RefreshCw className="w-3 h-3 text-slate-600" />
+                            <span className="text-[9px] text-slate-600 font-bold uppercase tracking-wider">Reset</span>
+                        </button>
                         <div className="bg-slate-900/50 rounded-lg p-2 flex flex-col items-center justify-center border border-white/5 cursor-pointer" onClick={() => setShowScanBreakdown(!showScanBreakdown)}>
                             <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">NET (ADJ)</span>
                             {/* Placeholder logic until store updates propagate */}
@@ -777,10 +844,6 @@ export default function ClicrPanel({
                 )}
             </AnimatePresence>
 
-            {/* Debug / Config Access (Hidden or Subtle) */}
-            <div className="absolute top-8 right-6 z-20 opacity-0 hover:opacity-100 transition-opacity">
-                <button onClick={() => setShowConfigModal(true)}><Settings2 className="text-slate-700 w-6 h-6" /></button>
-            </div>
 
             {/* CAMERA SCANNER MODAL */}
             <AnimatePresence>
@@ -924,7 +987,7 @@ export default function ClicrPanel({
                             initial={{ scale: 0.9, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.9, opacity: 0 }}
-                            className="bg-[#0f1218] border border-slate-800 p-6 rounded-3xl w-full max-w-sm shadow-2xl space-y-6"
+                            className="bg-[#0f1218] border border-slate-800 p-6 rounded-3xl w-full max-w-sm shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto"
                         >
                             <div>
                                 <h3 className="text-xl font-bold text-white">Clicr Settings</h3>
@@ -975,6 +1038,53 @@ export default function ClicrPanel({
                                 >
                                     <div className="absolute left-1 top-1 w-5 h-5 bg-white rounded-full shadow-md transition-transform" style={{ transform: classifyMode ? "translateX(20px)" : "translateX(0px)" }} />
                                 </button>
+                            </div>
+
+                            {/* Auto-Reset */}
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between bg-slate-900/50 p-3 rounded-xl border border-white/5">
+                                    <div>
+                                        <span className="text-sm font-bold text-white">Auto-Reset Daily</span>
+                                        <p className="text-[11px] text-slate-500 mt-0.5">Resets all counts at a set time</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setAutoReset(prev => ({ ...prev, enabled: !prev.enabled }))}
+                                        className={cn("w-12 h-7 rounded-full relative transition-colors shrink-0",
+                                            autoReset.enabled ? "bg-amber-500" : "bg-slate-700"
+                                        )}
+                                    >
+                                        <div className="absolute left-1 top-1 w-5 h-5 bg-white rounded-full shadow-md transition-transform"
+                                            style={{ transform: autoReset.enabled ? "translateX(20px)" : "translateX(0px)" }} />
+                                    </button>
+                                </div>
+
+                                {autoReset.enabled && (
+                                    <div className="space-y-2 pl-1" onClick={(e) => e.stopPropagation()}>
+                                        <div className="flex gap-2">
+                                            <div className="flex-1 space-y-1">
+                                                <label className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Time</label>
+                                                <input
+                                                    type="time"
+                                                    value={autoReset.time}
+                                                    onChange={(e) => setAutoReset(prev => ({ ...prev, time: e.target.value }))}
+                                                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-bold text-sm focus:outline-none focus:border-amber-500 transition-colors"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Timezone</label>
+                                            <select
+                                                value={autoReset.timezone}
+                                                onChange={(e) => setAutoReset(prev => ({ ...prev, timezone: e.target.value }))}
+                                                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-bold text-sm focus:outline-none focus:border-amber-500 transition-colors appearance-none"
+                                            >
+                                                {TIMEZONES.map(tz => (
+                                                    <option key={tz.value} value={tz.value}>{tz.label}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Inputs */}
