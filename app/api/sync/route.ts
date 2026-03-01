@@ -258,7 +258,7 @@ export async function GET(request: Request) {
         data.currentUser = user;
 
         // --- LOAD ALL BUSINESSES ---
-        let activeBizId: string | null = requestedBusinessId;
+        let activeBizId: string | null = null;
 
         try {
             const { data: memberships } = await supabaseAdmin
