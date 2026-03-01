@@ -128,6 +128,7 @@ export type Clicr = {
             time: string;     // "HH:MM" 24-hour format
             timezone: string; // IANA timezone e.g. "America/New_York"
         };
+        tap_token?: string;  // Random token for public /tap/[token] page
     };
     command?: string; // Hardware mapping/pairing code
     direction_mode?: 'in_only' | 'out_only' | 'bidirectional';
