@@ -259,11 +259,12 @@ export default function ClicrPanel({
             setClassifyMode(true);
         }
 
-        // Load Auto-Reset config
-        if (clicr?.button_config?.auto_reset) {
+        // Load Auto-Reset config — skip while settings modal is open so polling
+        // doesn't overwrite the operator's in-progress edits.
+        if (!showConfigModal && clicr?.button_config?.auto_reset) {
             setAutoReset(clicr.button_config.auto_reset);
         }
-    }, [id, clicr]);
+    }, [id, clicr, showConfigModal]);
 
     const saveConfig = async (name: string) => {
         if (clicr) {
