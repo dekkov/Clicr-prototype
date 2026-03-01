@@ -539,8 +539,10 @@ export async function POST(request: Request) {
 
             case 'ADD_VENUE': {
                 const newVenue = payload as Venue;
-                let venueBizId: string | null = null;
-                if (userId) {
+                // Trust the business_id sent by the client (user selected it from the picker).
+                // Fall back to first membership only if the payload omitted it.
+                let venueBizId: string | null = newVenue.business_id || null;
+                if (!venueBizId && userId) {
                     const { data: venueMember } = await supabaseAdmin.from('business_members').select('business_id').eq('user_id', userId).limit(1).single();
                     if (venueMember) venueBizId = venueMember.business_id;
                 }
