@@ -157,15 +157,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             if (res.ok) {
                 const data = await res.json();
 
-                // If we have a logged in user, ensure currentUser reflects that
-                // The API should handle mapping the x-user-id to the correct user in the DB
-                // but if it returned a different currentUser, we accept it.
-                // However, if we just logged in, we might need to force the state.currentUser to match
-                // We trust the API to return the "hydrated" user object for this ID.
-
                 // Avoid overwriting optimistic state if a write started while we were fetching
                 if (isWritingRef.current) {
                     console.log("Skipping sync update due to active write (Pre-setState)");
+                    return;
+                }
+
+                // Discard stale responses from a previous business context.
+                // Cases: (a) wrong business returned, (b) no business returned when one is active
+                // (an unscoped poll that fired before selectBusiness completed).
+                if (activeBusinessIdRef.current && data.business?.id !== activeBusinessIdRef.current) {
+                    console.log('[sync] Discarding stale response, expected', activeBusinessIdRef.current, 'got', data.business?.id);
                     return;
                 }
 
@@ -173,18 +175,26 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 if (!activeBusinessIdRef.current && !userClearedRef.current && data.businesses?.length === 1) {
                     activeBusinessIdRef.current = data.businesses[0].id;
                 }
+
+                const sortedBusinesses = (data.businesses || []).slice().sort((a: Business, b: Business) =>
+                    a.name.localeCompare(b.name)
+                );
+                const sortedVenues = (data.venues || []).slice().sort((a: Venue, b: Venue) =>
+                    a.name.localeCompare(b.name)
+                );
+
                 setState(prev => {
                     const shouldAutoSelect = !prev.activeBusiness && !userClearedRef.current && data.businesses?.length === 1;
                     const autoSelected = shouldAutoSelect ? data.businesses[0] : null;
                     return {
                         ...prev,
                         ...data,
-                        venues: data.venues || [],
+                        venues: sortedVenues,
                         areas: data.areas || [],
                         clicrs: data.clicrs || [],
                         events: data.events || [],
                         scanEvents: data.scanEvents || [],
-                        businesses: data.businesses || prev.businesses,
+                        businesses: sortedBusinesses.length > 0 ? sortedBusinesses : prev.businesses,
                         activeBusiness: prev.activeBusiness ?? autoSelected,
                         business: prev.activeBusiness ?? autoSelected,
                         isLoading: false
@@ -200,8 +210,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const selectBusiness = (business: Business) => {
         userClearedRef.current = false;
         activeBusinessIdRef.current = business.id;
-        // Clear tenant-scoped data immediately so old business's venues/areas/clicrs
-        // don't flash on screen while the scoped fetch is in-flight.
         setState(prev => ({
             ...prev,
             activeBusiness: business,
@@ -211,14 +219,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             clicrs: [],
             events: [],
             scanEvents: [],
+            isLoading: true,
         }));
-        refreshState(); // immediate refresh scoped to new business
+        refreshState();
     };
 
     const clearBusiness = () => {
         userClearedRef.current = true;
         activeBusinessIdRef.current = null;
-        setState(prev => ({ ...prev, activeBusiness: null, business: null }));
+        setState(prev => ({ ...prev, activeBusiness: null, business: null, isLoading: true }));
     };
 
     // Initial load, polling, AND Realtime Subscription

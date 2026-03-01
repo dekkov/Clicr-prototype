@@ -69,6 +69,20 @@
       "created_at": "2026-01-31T08:58:05.541Z",
       "updated_at": "2026-01-31T08:58:05.541Z",
       "active": true
+    },
+    {
+      "id": "b7bfd830-710d-4c06-979e-afa956657690",
+      "business_id": "eb00dfbb-0bd2-41c6-9b71-333182760fac",
+      "name": "Peacok",
+      "city": "Corvallis",
+      "state": "OR",
+      "default_capacity_total": 500,
+      "capacity_enforcement_mode": "WARN_ONLY",
+      "status": "ACTIVE",
+      "timezone": "America/New_York",
+      "created_at": "2026-03-01T02:55:18.935Z",
+      "updated_at": "2026-03-01T02:55:18.935Z",
+      "active": true
     }
   ],
   "areas": [
@@ -120,6 +134,18 @@
       "venue_id": "x19ty",
       "name": "Lounge",
       "default_capacity": 45,
+      "current_count": 0
+    },
+    {
+      "id": "1dbb763c-7dfc-4b02-8595-6abee8b97d4c",
+      "venue_id": "b7bfd830-710d-4c06-979e-afa956657690",
+      "name": "VIP",
+      "default_capacity": 100,
+      "area_type": "MAIN",
+      "counting_mode": "BOTH",
+      "is_active": true,
+      "created_at": "2026-03-01T02:55:26.227Z",
+      "updated_at": "2026-03-01T02:55:26.227Z",
       "current_count": 0
     }
   ],
@@ -179,6 +205,14 @@
       "status": "ACTIVE",
       "current_count": 0,
       "battery_level": 100
+    },
+    {
+      "id": "dc5df2f4-d84b-4f2c-8d52-841427d3dc4b",
+      "area_id": "1dbb763c-7dfc-4b02-8595-6abee8b97d4c",
+      "name": "Door1",
+      "flow_mode": "BIDIRECTIONAL",
+      "active": true,
+      "current_count": 0
     }
   ],
   "devices": [
@@ -300,6 +334,21 @@
       "assigned_venue_ids": [],
       "assigned_area_ids": [],
       "assigned_clicr_ids": []
+    },
+    {
+      "id": "fab22d5b-c889-42e5-a1c6-9b1d4c9cf2b1",
+      "name": "trhoang2003",
+      "email": "trhoang2003@gmail.com",
+      "role": "OWNER",
+      "assigned_venue_ids": [
+        "b7bfd830-710d-4c06-979e-afa956657690"
+      ],
+      "assigned_area_ids": [
+        "1dbb763c-7dfc-4b02-8595-6abee8b97d4c"
+      ],
+      "assigned_clicr_ids": [
+        "dc5df2f4-d84b-4f2c-8d52-841427d3dc4b"
+      ]
     }
   ],
   "bans": [],

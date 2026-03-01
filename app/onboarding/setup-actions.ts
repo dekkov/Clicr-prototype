@@ -55,35 +55,6 @@ export async function createInitialBusiness(formData: FormData): Promise<SetupRe
     }
 }
 
-export async function createAdditionalBusiness(formData: FormData): Promise<SetupResult> {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: 'Not authenticated' };
-
-    const businessName = (formData.get('businessName') as string)?.trim();
-    if (!businessName) return { success: false, error: 'Business name is required' };
-
-    try {
-        const { data: business, error: busError } = await supabaseAdmin
-            .from('businesses')
-            .insert({ name: businessName })
-            .select()
-            .single();
-        if (busError) throw busError;
-
-        const { error: memberError } = await supabaseAdmin
-            .from('business_members')
-            .insert({ business_id: business.id, user_id: user.id, role: 'OWNER' });
-        if (memberError) throw memberError;
-
-        revalidatePath('/dashboard');
-        return { success: true };
-    } catch (e: any) {
-        console.error('[setup] createAdditionalBusiness error:', e);
-        return { success: false, error: e.message || 'Failed to create business' };
-    }
-}
-
 export async function createInitialVenue(formData: FormData): Promise<SetupResult> {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();

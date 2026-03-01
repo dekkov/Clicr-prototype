@@ -127,7 +127,32 @@ export default function DashboardPage() {
     }, [isLoading, currentUser.id, businesses.length, business]);
 
     if (isLoading) {
-        return <div className="p-8 text-white">Loading dashboard...</div>;
+        return (
+            <div className="space-y-8 animate-pulse">
+                <div className="h-10 w-48 bg-slate-800 rounded-xl" />
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                    {[1, 2].map(i => (
+                        <div key={i} className="glass-panel p-6 rounded-2xl border border-slate-800">
+                            <div className="flex gap-4 mb-6">
+                                <div className="w-12 h-12 bg-slate-800 rounded-xl" />
+                                <div className="flex-1 space-y-2">
+                                    <div className="h-5 bg-slate-800 rounded w-1/2" />
+                                    <div className="h-3 bg-slate-800 rounded w-1/3" />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-4 mb-6">
+                                {[1, 2, 3].map(j => <div key={j} className="h-16 bg-slate-800 rounded-xl" />)}
+                            </div>
+                            <div className="space-y-3">
+                                <div className="h-3 bg-slate-800 rounded w-1/4" />
+                                <div className="h-6 bg-slate-800 rounded" />
+                                <div className="h-6 bg-slate-800 rounded" />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
     }
 
     // Show picker when multiple businesses exist and none is selected
@@ -135,51 +160,36 @@ export default function DashboardPage() {
 
     if (showPicker) {
         return (
-            <div className="space-y-8 animate-[fade-in_0.5s_ease-out]">
+            <div className="space-y-6 animate-[fade-in_0.5s_ease-out]">
                 <div>
-                    <h1 className="text-3xl font-bold text-white">Your Businesses</h1>
-                    <p className="text-slate-400 mt-1">Select a business to manage.</p>
+                    <h1 className="text-3xl font-bold text-white">Select a Business</h1>
+                    <p className="text-slate-400 mt-1">Choose which business to manage.</p>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {businesses.map(biz => (
-                        <div
+                        <button
                             key={biz.id}
-                            className="glass-panel border border-slate-800 rounded-2xl overflow-hidden hover:border-primary/40 transition-all group"
+                            onClick={() => selectBusiness(biz)}
+                            className={cn(
+                                "text-left p-6 rounded-2xl border transition-all hover:border-primary/50 hover:bg-slate-900/60",
+                                activeBusiness?.id === biz.id
+                                    ? "border-primary bg-primary/5"
+                                    : "border-slate-800 bg-slate-900/40"
+                            )}
                         >
-                            {/* Card header */}
-                            <div className="bg-primary/5 border-b border-slate-800 px-6 py-5 flex items-center gap-4">
-                                <div className="p-2.5 bg-primary/10 rounded-xl">
-                                    <Building2 className="w-6 h-6 text-primary" />
-                                </div>
-                                <div className="min-w-0">
-                                    <div className="font-bold text-white text-base truncate">{biz.name}</div>
-                                    <div className="text-xs text-slate-500 mt-0.5">Business account</div>
-                                </div>
-                            </div>
-                            {/* Card footer */}
-                            <div className="px-6 py-4 flex items-center justify-between">
-                                <div className="text-xs text-slate-600">ID: {biz.id.slice(0, 8)}…</div>
-                                <button
-                                    onClick={() => selectBusiness(biz)}
-                                    className="flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-white bg-primary/10 hover:bg-primary px-4 py-1.5 rounded-lg transition-all"
-                                >
-                                    Enter <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-                                </button>
-                            </div>
-                        </div>
+                            <Building2 className="w-8 h-8 text-primary mb-3" />
+                            <div className="font-bold text-white text-lg">{biz.name}</div>
+                            {activeBusiness?.id === biz.id && (
+                                <div className="text-xs text-primary mt-1">Currently viewing</div>
+                            )}
+                        </button>
                     ))}
-                    {/* Add new business card */}
                     <Link
                         href="/onboarding/setup"
-                        className="glass-panel border border-dashed border-slate-700 rounded-2xl overflow-hidden hover:border-primary/40 transition-all flex flex-col items-center justify-center gap-3 py-10 text-center"
+                        className="text-left p-6 rounded-2xl border border-dashed border-slate-700 hover:border-primary/50 transition-all flex flex-col items-start gap-3"
                     >
-                        <div className="p-3 bg-slate-800 rounded-xl">
-                            <Plus className="w-6 h-6 text-slate-400" />
-                        </div>
-                        <div>
-                            <div className="font-semibold text-slate-300 text-sm">Add New Business</div>
-                            <div className="text-xs text-slate-600 mt-0.5">Set up another account</div>
-                        </div>
+                        <Plus className="w-8 h-8 text-slate-500" />
+                        <div className="font-bold text-slate-400">Add New Business</div>
                     </Link>
                 </div>
             </div>

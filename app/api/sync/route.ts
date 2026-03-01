@@ -272,8 +272,11 @@ export async function GET(request: Request) {
                 // Only accept the requested businessId if the user is actually a member
                 if (requestedBusinessId && bizIds.includes(requestedBusinessId)) {
                     activeBizId = requestedBusinessId;
-                } else {
-                    activeBizId = memberships[0].business_id;
+                } else if (bizIds.length === 1) {
+                    // Auto-select only when the user belongs to exactly one business.
+                    // For multi-business users with no explicit selection, leave activeBizId null
+                    // so the client picker shows rather than silently defaulting to a random business.
+                    activeBizId = bizIds[0];
                 }
                 const { data: bizRows } = await supabaseAdmin
                     .from('businesses')
@@ -307,7 +310,13 @@ export async function GET(request: Request) {
         } catch (e) { console.error("Business Context Load Failed", e); }
 
         // --- FILTERING ---
-        const visibleVenueIds = user.assigned_venue_ids || [];
+        // When a specific business is active, scope directly by business_id.
+        // This bypasses user.assigned_venue_ids, which hydrateData populates from ALL
+        // memberships (overwriting on each iteration), making it unreliable for
+        // multi-business users.
+        const visibleVenueIds = activeBizId
+            ? data.venues.filter(v => v.business_id === activeBizId).map(v => v.id)
+            : (user.assigned_venue_ids || []);
         const filteredVenues = data.venues.filter(v => visibleVenueIds.includes(v.id));
         const filteredAreas = data.areas.filter(a => visibleVenueIds.includes(a.venue_id));
         const visibleAreaIds = filteredAreas.map(a => a.id);

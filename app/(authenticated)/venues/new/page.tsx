@@ -42,7 +42,7 @@ export default function NewVenuePage() {
             await updateBusiness({ name: venueData.orgName });
         }
 
-        const newId = Math.random().toString(36).substring(7);
+        const newId = crypto.randomUUID();
         const venue: Venue = {
             id: newId,
             business_id: business?.id ?? '',
@@ -68,7 +68,7 @@ export default function NewVenuePage() {
     const handleAddArea = async () => {
         if (!areaInput.name) return;
         setIsLoading(true);
-        const newAreaId = Math.random().toString(36).substring(7);
+        const newAreaId = crypto.randomUUID();
         const area: Area = {
             id: newAreaId,
             venue_id: venueId,
@@ -101,7 +101,7 @@ export default function NewVenuePage() {
         if (!name) return;
 
         setIsLoading(true);
-        const newClicrId = Math.random().toString(36).substring(7);
+        const newClicrId = crypto.randomUUID();
         const clicr: Clicr = {
             id: newClicrId,
             area_id: areaId,
