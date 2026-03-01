@@ -651,7 +651,7 @@ export default function ClicrPanel({
                             <h1 className="text-white font-bold text-2xl tracking-tight">
                                 {clicr.name}
                             </h1>
-                            <button onClick={() => setShowConfigModal(true)} className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 active:bg-slate-700 transition-colors">
+                            <button onClick={() => { setEditName(clicr.name); setShowConfigModal(true); }} className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 active:bg-slate-700 transition-colors">
                                 <Settings2 className="w-4 h-4" />
                             </button>
                         </div>
