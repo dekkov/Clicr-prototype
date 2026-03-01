@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { readDB, addEvent, addScan, resetAllCounts, addUser, updateUser, removeUser, writeDB, addClicr, updateClicr, updateArea, factoryResetDB, addBan, revokeBan, isUserBanned, createPatronBan, updatePatronBan, recordBanEnforcement, addVenue, updateVenue, addArea, addDevice, updateDevice, addCapacityOverride, addVenueAuditLog, assignEntityToUser, updateBusiness, DBData } from '@/lib/db';
-import { CountEvent, IDScanEvent, User, Clicr, Area, BanRecord, BanEnforcementEvent, Venue } from '@/lib/types';
+import { CountEvent, IDScanEvent, User, Clicr, Area, BanRecord, BanEnforcementEvent, Venue, TurnaroundEvent } from '@/lib/types';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export const dynamic = 'force-dynamic';
@@ -425,6 +425,33 @@ export async function POST(request: Request) {
                 updatedData = resetAllCounts(body.venue_id);
                 break;
 
+            case 'RECORD_TURNAROUND': {
+                const turnaround = payload as TurnaroundEvent;
+                let bizId = turnaround.business_id;
+                if (!bizId && userId) {
+                    const { data: m } = await supabaseAdmin.from('business_members').select('business_id').eq('user_id', userId).limit(1).single();
+                    if (m) bizId = m.business_id;
+                }
+                if (!bizId) {
+                    return NextResponse.json({ error: 'Could not resolve business_id' }, { status: 400 });
+                }
+                try {
+                    await supabaseAdmin.from('turnarounds').insert({
+                        business_id: bizId,
+                        venue_id: turnaround.venue_id || null,
+                        area_id: turnaround.area_id || null,
+                        device_id: turnaround.device_id || null,
+                        count: turnaround.count,
+                        reason: turnaround.reason || null,
+                        created_by: userId || turnaround.created_by
+                    });
+                } catch (e) {
+                    console.error("Turnaround persistence failed", e);
+                    return NextResponse.json({ error: 'Failed to record turnaround' }, { status: 500 });
+                }
+                return NextResponse.json({ success: true });
+            }
+
             // ... (Pass through other cases directly) ...
             case 'ADD_USER': updatedData = addUser(payload as User); break;
             case 'UPDATE_USER': updatedData = updateUser(payload as User); break;
@@ -515,6 +542,39 @@ export async function POST(request: Request) {
                 }
                 updatedData = updateArea(areaPayload);
                 break;
+
+            case 'ADD_AREA': {
+                const newArea = payload as Area;
+                let areaBizId: string | null = null;
+                if (userId) {
+                    const { data: areaMember } = await supabaseAdmin.from('business_members').select('business_id').eq('user_id', userId).limit(1).single();
+                    if (areaMember) areaBizId = areaMember.business_id;
+                }
+                if (!areaBizId) {
+                    return NextResponse.json({ error: 'Could not resolve business_id for ADD_AREA' }, { status: 400 });
+                }
+                try {
+                    const { error } = await supabaseAdmin.from('areas').insert({
+                        id: newArea.id,
+                        venue_id: newArea.venue_id,
+                        business_id: areaBizId,
+                        name: newArea.name,
+                        area_type: newArea.area_type || 'MAIN',
+                        capacity_max: newArea.default_capacity ?? (newArea as any).capacity_max ?? null,
+                        counting_mode: newArea.counting_mode || 'MANUAL',
+                        is_active: newArea.is_active ?? true,
+                    });
+                    if (error) {
+                        console.error("ADD_AREA persistence failed", error);
+                        return NextResponse.json({ error: `Database Insert Failed: ${error.message} (${error.code})` }, { status: 500 });
+                    }
+                } catch (e: any) {
+                    console.error("ADD_AREA persistence exception", e);
+                    return NextResponse.json({ error: 'Server Error: ' + e.message }, { status: 500 });
+                }
+                updatedData = addArea(newArea);
+                break;
+            }
 
             case 'DELETE_CLICR':
                 const delPayload = payload as { id: string };

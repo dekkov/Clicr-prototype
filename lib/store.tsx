@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
-import { Business, Venue, Area, Clicr, CountEvent, User, IDScanEvent, BanRecord, BannedPerson, PatronBan, BanEnforcementEvent, BanAuditLog, Device, CapacityOverride, VenueAuditLog } from './types';
+import { Business, Venue, Area, Clicr, CountEvent, User, IDScanEvent, BanRecord, BannedPerson, PatronBan, BanEnforcementEvent, BanAuditLog, Device, CapacityOverride, VenueAuditLog, TurnaroundEvent } from './types';
 import { createClient } from '@/utils/supabase/client';
 
 const INITIAL_USER: User = {
@@ -33,6 +33,9 @@ export type AppState = {
     patronBans: PatronBan[];
     banAuditLogs: BanAuditLog[];
     banEnforcementEvents: BanEnforcementEvent[];
+
+    turnarounds: TurnaroundEvent[];
+    areaTraffic: Record<string, { total_in: number; total_out: number; net_delta: number; event_count: number }>;
 
     isLoading: boolean;
 };
@@ -69,6 +72,14 @@ type AppContextType = AppState & {
     createPatronBan: (person: BannedPerson, ban: PatronBan, log: BanAuditLog) => Promise<void>;
     updatePatronBan: (ban: PatronBan, log: BanAuditLog) => Promise<void>;
     recordBanEnforcement: (event: BanEnforcementEvent) => Promise<void>;
+
+    // Traffic & Turnarounds
+    recordTurnaround: (venueId: string, areaId: string, deviceId: string, count: number) => Promise<void>;
+    refreshTrafficStats: (venueId: string, areaId: string) => Promise<void>;
+
+    // Device Rename
+    renameDevice?: (deviceId: string, name: string) => Promise<void>;
+    debug?: boolean;
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -92,6 +103,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         patronBans: [],
         banAuditLogs: [],
         banEnforcementEvents: [],
+
+        turnarounds: [],
+        areaTraffic: {},
 
         isLoading: true,
     });
@@ -281,9 +295,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             console.error("Failed to record event", error);
             // Revert?
         } finally {
-            // Delay releasing this slot to allow Supabase realtime to settle
+            // Delay releasing this slot to allow Supabase realtime to settle,
+            // then refresh traffic totals so TOTAL IN/OUT reflect the new event.
             setTimeout(() => {
                 isWritingRef.current = Math.max(0, isWritingRef.current - 1);
+                refreshTrafficStats(data.venue_id, data.area_id);
             }, 500);
         }
     };
@@ -729,6 +745,60 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
+    const refreshTrafficStats = async (venueId: string, areaId: string) => {
+        if (!state.business?.id) return;
+        const scopeKey = `area:${state.business.id}:${venueId}:${areaId}`;
+        try {
+            const res = await fetch('/api/rpc/traffic', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ business_id: state.business.id, venue_id: venueId, area_id: areaId })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setState(prev => ({
+                    ...prev,
+                    areaTraffic: {
+                        ...prev.areaTraffic,
+                        [scopeKey]: {
+                            total_in: data.total_in,
+                            total_out: data.total_out,
+                            net_delta: data.net_delta,
+                            event_count: data.event_count
+                        }
+                    }
+                }));
+            }
+        } catch (error) {
+            console.error("Failed to refresh traffic stats", error);
+        }
+    };
+
+    const recordTurnaround = async (venueId: string, areaId: string, deviceId: string, count: number) => {
+        if (!state.business) return;
+
+        const newTurnaround: TurnaroundEvent = {
+            id: Math.random().toString(36).substring(7),
+            timestamp: Date.now(),
+            business_id: state.business.id,
+            venue_id: venueId,
+            area_id: areaId,
+            device_id: deviceId,
+            count,
+            created_by: state.currentUser.id
+        };
+
+        // Optimistic update
+        setState(prev => ({ ...prev, turnarounds: [newTurnaround, ...prev.turnarounds] }));
+
+        try {
+            const res = await authFetch({ action: 'RECORD_TURNAROUND', payload: newTurnaround });
+            if (!res.ok) console.error("Failed to record turnaround (server error)", res.status);
+        } catch (error) {
+            console.error("Failed to record turnaround", error);
+        }
+    };
+
     const updateBusiness = async (updates: Partial<Business>) => {
         // Optimistic
         if (state.business) {
@@ -748,7 +818,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
 
     return (
-        <AppContext.Provider value={{ ...state, recordEvent, recordScan, resetCounts, addUser, updateUser, removeUser, updateBusiness, addClicr, updateClicr, deleteClicr, addVenue, updateVenue, addArea, updateArea, addDevice, updateDevice, addCapacityOverride, addVenueAuditLog, addBan, revokeBan, createPatronBan, updatePatronBan, recordBanEnforcement } as AppContextType}>
+        <AppContext.Provider value={{ ...state, recordEvent, recordScan, resetCounts, addUser, updateUser, removeUser, updateBusiness, addClicr, updateClicr, deleteClicr, addVenue, updateVenue, addArea, updateArea, addDevice, updateDevice, addCapacityOverride, addVenueAuditLog, addBan, revokeBan, createPatronBan, updatePatronBan, recordBanEnforcement, recordTurnaround, refreshTrafficStats } as AppContextType}>
             {children}
         </AppContext.Provider>
     );
