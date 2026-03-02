@@ -622,6 +622,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const updateClicr = async (clicr: Clicr) => {
+        // Optimistic update — applies name/config change immediately
         setState(prev => ({ ...prev, clicrs: prev.clicrs.map(c => c.id === clicr.id ? clicr : c) }));
         try {
             const res = await fetch('/api/sync', {
@@ -629,10 +630,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'UPDATE_CLICR', payload: clicr })
             });
-            if (res.ok) {
-                const updatedDB = await res.json();
-                setState(prev => ({ ...prev, ...updatedDB }));
+            if (!res.ok) {
+                console.error("UPDATE_CLICR failed (server error)", res.status);
+                // Intentionally NOT reverting — optimistic state is user's intent.
+                // The 2-second polling interval will reconcile if needed.
             }
+            // Intentionally NOT spreading updatedDB — the optimistic update is correct
+            // and the 2-second polling interval will confirm server truth.
         } catch (error) { console.error("Failed to update clicr", error); }
     };
 
