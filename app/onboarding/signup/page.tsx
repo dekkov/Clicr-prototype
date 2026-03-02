@@ -14,7 +14,7 @@ export default async function SignupPage({ searchParams }: Props) {
 
     return (
         <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 relative overflow-hidden">
-            <Link href="https://clicr.co" className="absolute top-8 left-8 text-slate-500 hover:text-white flex items-center gap-2 transition-colors font-bold text-sm z-10">
+            <Link href="/" className="absolute top-8 left-8 text-slate-500 hover:text-white flex items-center gap-2 transition-colors font-bold text-sm z-10">
                 <ArrowLeft className="w-4 h-4" /> Back to Home
             </Link>
 
@@ -61,7 +61,7 @@ export default async function SignupPage({ searchParams }: Props) {
                     </button>
 
                     <p className="text-center text-xs text-slate-500 mt-4">
-                        Already have an account? <Link href="/auth/signin" className="text-white hover:underline">Sign In</Link>
+                        Already have an account? <Link href="/login" className="text-white hover:underline">Sign In</Link>
                     </p>
                 </form>
             </div>
