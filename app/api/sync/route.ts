@@ -75,16 +75,25 @@ async function hydrateData(data: DBData): Promise<DBData> {
         }
 
         // 1. Fetch Occupancy Events first (needed as fallback inside snapshot mapping below)
-        const { data: occEvents } = await supabaseAdmin
+        // Try created_at first (migration schema), fall back to timestamp (manual_rpc_install.sql schema)
+        let { data: occEvents, error: evError } = await supabaseAdmin
             .from('occupancy_events')
             .select('*')
             .order('created_at', { ascending: false })
             .limit(100);
+        if (evError) {
+            ({ data: occEvents } = await supabaseAdmin
+                .from('occupancy_events')
+                .select('*')
+                .order('timestamp', { ascending: false })
+                .limit(100));
+        }
 
         // 2. Fetch Occupancy Snapshots (Source of Truth for Counts)
         const { data: snapshots, error: snapError } = await supabaseAdmin
             .from('occupancy_snapshots')
             .select('*');
+        if (snapError) console.error('[sync] occupancy_snapshots query failed:', snapError.message);
 
         if (!snapError && snapshots) {
             data.areas = data.areas.map(a => {
@@ -141,7 +150,7 @@ async function hydrateData(data: DBData): Promise<DBData> {
                 clicr_id: e.device_id || '',
                 user_id: 'system',
                 business_id: e.business_id,
-                timestamp: new Date(e.created_at).getTime(),
+                timestamp: new Date(e.created_at ?? e.timestamp).getTime(),
                 delta: e.delta,
                 flow_type: e.flow_type as any,
                 event_type: e.event_type as any,

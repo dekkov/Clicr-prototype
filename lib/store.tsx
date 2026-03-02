@@ -127,6 +127,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const isResettingRef = useRef(false);
     const activeBusinessIdRef = useRef<string | null>(null);
     const userClearedRef = useRef(false);
+    // Tracks when the last realtime snapshot update fired. Polls that started
+    // before this timestamp carry stale area counts and must not overwrite
+    // the realtime value (classic in-flight race for tap-link events).
+    const lastRealtimeTsRef = useRef<number>(0);
 
     const LAST_BIZ_KEY = 'clicr_last_biz_id';
 
@@ -143,6 +147,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             console.log("Skipping poll due to pending reset");
             return;
         }
+
+        const pollStartTs = Date.now();
 
         try {
             // Get current Supabase Session
@@ -207,11 +213,23 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                     const autoSelected = shouldAutoSelect
                         ? (data.businesses?.find((b: Business) => b.id === activeBusinessIdRef.current) ?? data.businesses?.[0] ?? null)
                         : null;
+
+                    // If realtime fired after this poll started reading from the DB, its
+                    // snapshot values are newer — don't let this stale poll overwrite them.
+                    const realtimeIsNewer = lastRealtimeTsRef.current >= pollStartTs;
+                    const mergedAreas = (data.areas || []).map((polledArea: Area) => {
+                        if (realtimeIsNewer) {
+                            const live = prev.areas.find(a => a.id === polledArea.id);
+                            if (live) return { ...polledArea, current_occupancy: live.current_occupancy };
+                        }
+                        return polledArea;
+                    });
+
                     return {
                         ...prev,
                         ...data,
                         venues: sortedVenues,
-                        areas: data.areas || [],
+                        areas: mergedAreas,
                         clicrs: data.clicrs || [],
                         events: data.events || [],
                         scanEvents: data.scanEvents || [],
@@ -283,6 +301,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
                         if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
                             const newSnap = payload.new as any;
+                            // Mark that realtime fired NOW so any in-flight poll (which read
+                            // a stale snapshot before this event) won't overwrite this value.
+                            lastRealtimeTsRef.current = Date.now();
                             setState(prev => ({
                                 ...prev,
                                 areas: prev.areas.map(a => {
