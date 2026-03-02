@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS areas (
                           CHECK (counting_mode IN ('MANUAL', 'AUTO_FROM_SCANS', 'BOTH')),
     is_active         BOOLEAN NOT NULL DEFAULT true,
     sort_order        INTEGER DEFAULT 0,
+    current_occupancy INTEGER NOT NULL DEFAULT 0,
     last_reset_at     TIMESTAMPTZ,
     deleted_at        TIMESTAMPTZ, -- soft delete
     created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -107,22 +108,8 @@ CREATE TABLE IF NOT EXISTS devices (
 );
 
 -- ────────────────────────────────────────────────────────────────────────────
--- 6. OCCUPANCY SNAPSHOTS (source of truth for current state)
--- One row per business+venue+area. Updated atomically by RPC.
--- ────────────────────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS occupancy_snapshots (
-    id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    business_id         UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
-    venue_id            UUID NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
-    area_id             UUID NOT NULL REFERENCES areas(id) ON DELETE CASCADE,
-    current_occupancy   INTEGER NOT NULL DEFAULT 0,
-    last_reset_at       TIMESTAMPTZ,
-    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (business_id, venue_id, area_id)
-);
-
--- ────────────────────────────────────────────────────────────────────────────
--- 7. OCCUPANCY EVENTS (immutable append-only log)
+-- 6. OCCUPANCY EVENTS (immutable append-only log)
+-- NOTE: current_occupancy is stored directly on areas (no occupancy_snapshots table).
 -- Every tap, scan, bulk adjustment, reset generates an event.
 -- ────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS occupancy_events (

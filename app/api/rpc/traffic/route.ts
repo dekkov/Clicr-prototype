@@ -10,8 +10,23 @@ export async function POST(request: Request) {
         }
 
         // Validate Timestamps (Required for correctness)
-        const start = start_ts ? new Date(start_ts).toISOString() : new Date(Date.now() - 86400000).toISOString();
+        let start = start_ts ? new Date(start_ts).toISOString() : new Date(Date.now() - 86400000).toISOString();
         const end = end_ts ? new Date(end_ts).toISOString() : new Date().toISOString();
+
+        // Clamp start to the latest last_reset_at so pre-reset events are excluded
+        try {
+            let query = supabaseAdmin.from('areas').select('last_reset_at');
+            if (area_id) query = query.eq('id', area_id);
+            else if (venue_id) query = query.eq('venue_id', venue_id);
+            else query = query.eq('business_id', business_id);
+            const { data: resetAreas } = await query;
+            if (resetAreas?.length) {
+                const latestReset = Math.max(0, ...resetAreas.map((a: any) => a.last_reset_at ? new Date(a.last_reset_at).getTime() : 0));
+                if (latestReset && new Date(latestReset).toISOString() > start) {
+                    start = new Date(latestReset).toISOString();
+                }
+            }
+        } catch { /* best-effort — fall through with original start */ }
 
         // 1. Try RPC Approach (Optimal)
         const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('get_traffic_totals', {

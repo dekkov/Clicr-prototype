@@ -30,17 +30,17 @@ export class RealtimeManager {
 
         // Channel Name: occupancy_stream_BUSINESSID
         this.channel = this.supabase.channel(`occupancy_stream_${businessId}`)
-            // 1. Listen for Snapshots Updates (Live Occupancy Source of Truth)
+            // 1. Listen for Area Updates (Live Occupancy Source of Truth — current_occupancy on areas)
             .on(
                 'postgres_changes',
                 {
                     event: '*', // INSERT/UPDATE/DELETE
                     schema: 'public',
-                    table: 'occupancy_snapshots',
+                    table: 'areas',
                     filter: `business_id=eq.${businessId}`
                 },
                 (payload) => {
-                    // console.log('[Realtime] Snapshot:', payload.eventType);
+                    // console.log('[Realtime] Area update:', payload.eventType);
                     callbacks.onSnapshot(payload);
                 }
             )

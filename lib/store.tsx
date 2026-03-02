@@ -127,6 +127,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const isResettingRef = useRef(false);
     const activeBusinessIdRef = useRef<string | null>(null);
     const userClearedRef = useRef(false);
+    const lastAuthUserIdRef = useRef<string | null>(null);
     // Tracks when the last realtime snapshot update fired. Polls that started
     // before this timestamp carry stale area counts and must not overwrite
     // the realtime value (classic in-flight race for tap-link events).
@@ -154,6 +155,29 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             // Get current Supabase Session
             const supabase = createClient();
             const { data: { user } } = await supabase.auth.getUser();
+
+            // Detect user change — clear stale state so new user never sees previous user's data
+            if (user && lastAuthUserIdRef.current !== null && lastAuthUserIdRef.current !== user.id) {
+                activeBusinessIdRef.current = null;
+                userClearedRef.current = false;
+                lastAuthUserIdRef.current = user.id;
+                try { localStorage.removeItem(LAST_BIZ_KEY); } catch { }
+                setState(prev => ({
+                    ...prev,
+                    business: null,
+                    businesses: [],
+                    activeBusiness: null,
+                    venues: [],
+                    areas: [],
+                    clicrs: [],
+                    events: [],
+                    scanEvents: [],
+                    currentUser: INITIAL_USER,
+                    isLoading: true,
+                }));
+                return; // Next poll will fetch fresh data for the new user
+            }
+            if (user) lastAuthUserIdRef.current = user.id;
 
             const headers: Record<string, string> = {
                 'Content-Type': 'application/json'
@@ -290,28 +314,32 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                     {
                         event: '*', // Listen to INSERT/UPDATE
                         schema: 'public',
-                        table: 'occupancy_snapshots',
+                        table: 'areas',
                         filter: `business_id=eq.${state.business.id}` // TENANT ISOLATION
                     },
                     (payload) => {
                         // Skip realtime updates while writes are in flight — applying an
-                        // intermediate snapshot (e.g. after click 1 of 4) would overwrite
+                        // intermediate value (e.g. after click 1 of 4) would overwrite
                         // the optimistic state showing the final count, causing visible flicker.
                         if (isWritingRef.current) return;
 
                         if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
-                            const newSnap = payload.new as any;
+                            const newArea = payload.new as any;
+                            // Guard: Supabase UPDATE events without REPLICA IDENTITY FULL only
+                            // deliver the primary key — id and current_occupancy are absent.
+                            // If we stamp lastRealtimeTsRef on an incomplete payload, the next
+                            // poll is blocked but state is never updated → count stays stale.
+                            if (!newArea?.id || newArea.current_occupancy == null) return;
                             // Mark that realtime fired NOW so any in-flight poll (which read
-                            // a stale snapshot before this event) won't overwrite this value.
+                            // a stale value before this event) won't overwrite this value.
                             lastRealtimeTsRef.current = Date.now();
                             setState(prev => ({
                                 ...prev,
-                                areas: prev.areas.map(a => {
-                                    if (a.id === newSnap.area_id) {
-                                        return { ...a, current_occupancy: newSnap.current_occupancy };
-                                    }
-                                    return a;
-                                })
+                                areas: prev.areas.map(a =>
+                                    a.id === newArea.id
+                                        ? { ...a, current_occupancy: newArea.current_occupancy }
+                                        : a
+                                )
                             }));
                         }
                     }

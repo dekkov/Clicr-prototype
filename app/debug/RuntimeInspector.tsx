@@ -73,17 +73,10 @@ export default function RuntimeInspector() {
             .in('venue_id', venueIds)
             .limit(10);
 
-        // 2. Raw Snapshots
-        const { data: rawSnaps, error: snapErr } = await sb
-            .from('occupancy_snapshots')
-            .select('*')
-            .eq('business_id', business.id)
-            .limit(10);
-
         setTruthC({
             areas: { count: rawAreas?.length, sample: rawAreas?.slice(0, 5), error: areaErr?.message },
-            snapshots: { count: rawSnaps?.length, sample: rawSnaps?.slice(0, 5), error: snapErr?.message },
-            rlsSuspicion: (rawAreas?.length === 0 && !areaErr) || (rawSnaps?.length === 0 && !snapErr)
+            snapshots: { count: rawAreas?.length, sample: rawAreas?.slice(0, 5), error: null },
+            rlsSuspicion: rawAreas?.length === 0 && !areaErr
         });
     };
 

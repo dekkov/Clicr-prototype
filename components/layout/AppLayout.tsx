@@ -161,6 +161,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
     const handleSignOut = useCallback(async () => {
         await supabase.auth.signOut();
+        try { localStorage.removeItem('clicr_last_biz_id'); } catch { }
         router.refresh();
         router.push('/login');
     }, [supabase, router]);

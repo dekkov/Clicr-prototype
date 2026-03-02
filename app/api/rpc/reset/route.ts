@@ -59,13 +59,13 @@ export async function POST(request: Request) {
 
         for (const areaId of areasToReset) {
             // A. Get Current Occupancy
-            const { data: snap } = await supabaseAdmin
-                .from('occupancy_snapshots')
+            const { data: area } = await supabaseAdmin
+                .from('areas')
                 .select('current_occupancy, venue_id')
-                .eq('area_id', areaId)
+                .eq('id', areaId)
                 .single();
 
-            const currentVal = snap?.current_occupancy || 0;
+            const currentVal = area?.current_occupancy || 0;
 
             if (currentVal !== 0) {
                 // B. Insert Reset Event (Audit Trail)
@@ -73,31 +73,30 @@ export async function POST(request: Request) {
                     .from('occupancy_events')
                     .insert({
                         business_id,
-                        venue_id: snap?.venue_id,
+                        venue_id: area?.venue_id,
                         area_id: areaId,
                         delta: -currentVal,
-                        occupancy_new: 0,
-                        event_type: 'RESET', // Special type
-                        source: 'reset',   // Special source
+                        flow_type: 'OUT',
+                        event_type: 'RESET',
+                        source: 'reset',
                         user_id: user_id || null,
-                        timestamp: new Date().toISOString()
                     });
 
                 if (eventError) console.error("Error logging reset event", eventError);
             }
 
-            // C. Force Snapshot to 0 (Source of Truth)
-            const { error: snapError } = await supabaseAdmin
-                .from('occupancy_snapshots')
+            // C. Zero the area's count (source of truth)
+            const { error: areaError } = await supabaseAdmin
+                .from('areas')
                 .update({
                     current_occupancy: 0,
-                    last_activity: new Date().toISOString()
+                    last_reset_at: new Date().toISOString()
                 })
-                .eq('area_id', areaId);
+                .eq('id', areaId);
 
-            if (snapError) console.error("Error updating snapshot", snapError);
+            if (areaError) console.error("Error updating area", areaError);
 
-            results.push({ areaId, success: !snapError });
+            results.push({ areaId, success: !areaError });
         }
 
         return NextResponse.json({ success: true, results });

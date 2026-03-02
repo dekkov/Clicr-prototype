@@ -15,13 +15,11 @@
 -- Called on every tap/click. Must be fast, atomic, and idempotent-safe.
 -- ────────────────────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION apply_occupancy_delta(
-    p_business_id UUID,
-    p_venue_id    UUID,
-    p_area_id     UUID,
-    p_delta       INTEGER,
-    p_source      TEXT DEFAULT 'manual',
-    p_device_id   UUID DEFAULT NULL,
-    p_gender      TEXT DEFAULT NULL,
+    p_area_id         UUID,
+    p_delta           INTEGER,
+    p_source          TEXT DEFAULT 'manual',
+    p_device_id       UUID DEFAULT NULL,
+    p_gender          TEXT DEFAULT NULL,
     p_idempotency_key TEXT DEFAULT NULL
 )
 RETURNS TABLE(new_occupancy INTEGER, event_id UUID)
@@ -29,10 +27,11 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
-    v_snapshot_id UUID;
-    v_new_occ    INTEGER;
-    v_event_id   UUID;
-    v_flow_type  TEXT;
+    v_new_occ      INTEGER;
+    v_event_id     UUID;
+    v_flow_type    TEXT;
+    v_business_id  UUID;
+    v_venue_id     UUID;
 BEGIN
     -- Determine flow type from delta sign
     v_flow_type := CASE WHEN p_delta > 0 THEN 'IN' ELSE 'OUT' END;
@@ -44,40 +43,31 @@ BEGIN
             WHERE idempotency_key = p_idempotency_key
         ) THEN
             -- Return existing values (idempotent retry)
-            SELECT os.current_occupancy, oe.id
+            SELECT a.current_occupancy, oe.id
             INTO v_new_occ, v_event_id
-            FROM occupancy_snapshots os
+            FROM areas a
             JOIN occupancy_events oe ON oe.idempotency_key = p_idempotency_key
-            WHERE os.business_id = p_business_id
-              AND os.venue_id = p_venue_id
-              AND os.area_id = p_area_id;
+            WHERE a.id = p_area_id;
 
             RETURN QUERY SELECT v_new_occ, v_event_id;
             RETURN;
         END IF;
     END IF;
 
-    -- UPSERT snapshot row (SELECT FOR UPDATE to prevent race conditions)
-    INSERT INTO occupancy_snapshots (business_id, venue_id, area_id, current_occupancy)
-    VALUES (p_business_id, p_venue_id, p_area_id, 0)
-    ON CONFLICT (business_id, venue_id, area_id) DO NOTHING;
-
-    -- Lock and update
-    SELECT id, current_occupancy + p_delta
-    INTO v_snapshot_id, v_new_occ
-    FROM occupancy_snapshots
-    WHERE business_id = p_business_id
-      AND venue_id = p_venue_id
-      AND area_id = p_area_id
+    -- Lock the area row and compute new occupancy
+    SELECT current_occupancy + p_delta, business_id, venue_id
+    INTO v_new_occ, v_business_id, v_venue_id
+    FROM areas
+    WHERE id = p_area_id
     FOR UPDATE;
 
     -- Floor at 0 (occupancy can never go negative)
     v_new_occ := GREATEST(v_new_occ, 0);
 
-    UPDATE occupancy_snapshots
+    UPDATE areas
     SET current_occupancy = v_new_occ,
         updated_at = now()
-    WHERE id = v_snapshot_id;
+    WHERE id = p_area_id;
 
     -- Insert the immutable event log entry
     INSERT INTO occupancy_events (
@@ -86,7 +76,7 @@ BEGIN
         gender, idempotency_key
     )
     VALUES (
-        p_business_id, p_venue_id, p_area_id, p_device_id,
+        v_business_id, v_venue_id, p_area_id, p_device_id,
         auth.uid(), p_delta, v_flow_type,
         CASE WHEN p_source = 'auto_scan' THEN 'AUTO_SCAN' ELSE 'TAP' END,
         p_source, p_gender, p_idempotency_key
@@ -116,32 +106,28 @@ DECLARE
     v_reset_ts   TIMESTAMPTZ := now();
     v_count      INTEGER := 0;
 BEGIN
-    -- Reset snapshots
+    -- Reset areas (current_occupancy now lives directly on areas)
     IF p_scope = 'AREA' AND p_area_id IS NOT NULL THEN
-        UPDATE occupancy_snapshots
+        UPDATE areas
         SET current_occupancy = 0, last_reset_at = v_reset_ts, updated_at = v_reset_ts
-        WHERE business_id = p_business_id AND area_id = p_area_id;
+        WHERE business_id = p_business_id AND id = p_area_id;
         GET DIAGNOSTICS v_count = ROW_COUNT;
 
-        UPDATE areas SET last_reset_at = v_reset_ts WHERE id = p_area_id;
-
     ELSIF p_scope = 'VENUE' AND p_venue_id IS NOT NULL THEN
-        UPDATE occupancy_snapshots
+        UPDATE areas
         SET current_occupancy = 0, last_reset_at = v_reset_ts, updated_at = v_reset_ts
         WHERE business_id = p_business_id AND venue_id = p_venue_id;
         GET DIAGNOSTICS v_count = ROW_COUNT;
 
         UPDATE venues SET last_reset_at = v_reset_ts WHERE id = p_venue_id;
-        UPDATE areas SET last_reset_at = v_reset_ts WHERE venue_id = p_venue_id;
 
     ELSE -- BUSINESS scope
-        UPDATE occupancy_snapshots
+        UPDATE areas
         SET current_occupancy = 0, last_reset_at = v_reset_ts, updated_at = v_reset_ts
         WHERE business_id = p_business_id;
         GET DIAGNOSTICS v_count = ROW_COUNT;
 
         UPDATE venues SET last_reset_at = v_reset_ts WHERE business_id = p_business_id;
-        UPDATE areas SET last_reset_at = v_reset_ts WHERE business_id = p_business_id;
     END IF;
 
     -- Audit log

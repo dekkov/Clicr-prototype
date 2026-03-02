@@ -84,6 +84,7 @@ export default function DashboardPage() {
     } = useApp();
 
     const router = useRouter();
+    const [isResetting, setIsResetting] = useState(false);
 
     // Auto-redirect if no businesses exist after load
     useEffect(() => {
@@ -235,6 +236,11 @@ export default function DashboardPage() {
         return groups;
     }, [liveEventLog, venueNameMap]);
 
+    // --- Render: No businesses (new user / redirecting to onboarding) ---
+    if (!isLoading && businesses.length === 0) {
+        return null;
+    }
+
     // --- Render: Loading ---
     if (isLoading) {
         return (
@@ -294,6 +300,7 @@ export default function DashboardPage() {
                     </button>
                     {/* Reset Data */}
                     <button
+                        disabled={isResetting}
                         onClick={async () => {
                             if (
                                 activeBusiness &&
@@ -301,13 +308,20 @@ export default function DashboardPage() {
                                     'Are you sure you want to reset all occupancy counts to 0?'
                                 )
                             ) {
+                                setIsResetting(true);
                                 await resetCounts();
+                                setIsResetting(false);
                             }
                         }}
-                        className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-sm font-medium transition-colors"
+                        className={cn(
+                            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+                            isResetting
+                                ? "bg-slate-800/50 text-slate-500 cursor-not-allowed"
+                                : "bg-slate-800 hover:bg-slate-700 text-slate-200"
+                        )}
                     >
-                        <RefreshCw className="w-4 h-4" />
-                        Reset Data
+                        <RefreshCw className={cn("w-4 h-4", isResetting && "animate-spin")} />
+                        {isResetting ? 'Resetting…' : 'Reset Data'}
                     </button>
                     {/* Export */}
                     <button className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-primary/25">
@@ -321,7 +335,7 @@ export default function DashboardPage() {
             <GettingStartedChecklist />
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+            <div className={cn("grid grid-cols-2 xl:grid-cols-4 gap-4 transition-opacity duration-300", isResetting && "opacity-40 pointer-events-none")}>
                 <KpiCard
                     label="Live Occupancy"
                     value={liveOccupancy}
@@ -354,7 +368,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Age Distribution + Live Event Log */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className={cn("grid grid-cols-1 lg:grid-cols-2 gap-6 transition-opacity duration-300", isResetting && "opacity-40 pointer-events-none")}>
                 {/* Age Distribution */}
                 <div className="glass-panel p-6 rounded-2xl border border-slate-800">
                     <div className="flex items-center gap-2 mb-1">

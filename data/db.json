@@ -197,116 +197,8 @@
   ],
   "capacityOverrides": [],
   "venueAuditLogs": [],
-  "events": [
-    {
-      "venue_id": "b7bfd830-710d-4c06-979e-afa956657690",
-      "area_id": "1dbb763c-7dfc-4b02-8595-6abee8b97d4c",
-      "clicr_id": "dc5df2f4-d84b-4f2c-8d52-841427d3dc4b",
-      "delta": 1,
-      "flow_type": "IN",
-      "event_type": "TAP",
-      "idempotency_key": "0.wuai43ez5dr",
-      "id": "w1q6oo",
-      "timestamp": 1772349240518,
-      "user_id": "fab22d5b-c889-42e5-a1c6-9b1d4c9cf2b1",
-      "business_id": "eb00dfbb-0bd2-41c6-9b71-333182760fac"
-    },
-    {
-      "venue_id": "e913a671-5ca7-4a37-a996-9dc7248ddd88",
-      "area_id": "13a51e9c-434f-47d8-a858-28d46ac7d660",
-      "clicr_id": "9cc3cc7a-3e4e-4dfd-b5d3-ad3dd71f3c95",
-      "delta": 1,
-      "flow_type": "IN",
-      "event_type": "TAP",
-      "idempotency_key": "0.y3rjw98bjwr",
-      "id": "die7be",
-      "timestamp": 1772336867088,
-      "user_id": "91c29ecf-7764-4ca4-aae2-3d373b697065",
-      "business_id": "41998701-16e1-439d-b63c-3945a822a968"
-    },
-    {
-      "venue_id": "e913a671-5ca7-4a37-a996-9dc7248ddd88",
-      "area_id": "13a51e9c-434f-47d8-a858-28d46ac7d660",
-      "clicr_id": "9cc3cc7a-3e4e-4dfd-b5d3-ad3dd71f3c95",
-      "delta": 1,
-      "flow_type": "IN",
-      "gender": "DECLINE",
-      "event_type": "TAP",
-      "idempotency_key": "0.94lfo1mumik",
-      "id": "l07frss",
-      "timestamp": 1772336864609,
-      "user_id": "91c29ecf-7764-4ca4-aae2-3d373b697065",
-      "business_id": "41998701-16e1-439d-b63c-3945a822a968"
-    },
-    {
-      "venue_id": "e913a671-5ca7-4a37-a996-9dc7248ddd88",
-      "area_id": "13a51e9c-434f-47d8-a858-28d46ac7d660",
-      "clicr_id": "9cc3cc7a-3e4e-4dfd-b5d3-ad3dd71f3c95",
-      "delta": -1,
-      "flow_type": "OUT",
-      "event_type": "TAP",
-      "idempotency_key": "0.lq96is2nxe9",
-      "id": "6zcl8n",
-      "timestamp": 1772336847789,
-      "user_id": "91c29ecf-7764-4ca4-aae2-3d373b697065",
-      "business_id": "41998701-16e1-439d-b63c-3945a822a968"
-    },
-    {
-      "venue_id": "e913a671-5ca7-4a37-a996-9dc7248ddd88",
-      "area_id": "13a51e9c-434f-47d8-a858-28d46ac7d660",
-      "clicr_id": "9cc3cc7a-3e4e-4dfd-b5d3-ad3dd71f3c95",
-      "delta": 1,
-      "flow_type": "IN",
-      "event_type": "TAP",
-      "idempotency_key": "0.uf46i2gj2t8",
-      "id": "do2sp8",
-      "timestamp": 1772336820293,
-      "user_id": "91c29ecf-7764-4ca4-aae2-3d373b697065",
-      "business_id": "41998701-16e1-439d-b63c-3945a822a968"
-    }
-  ],
-  "scanEvents": [
-    {
-      "venue_id": "b7bfd830-710d-4c06-979e-afa956657690",
-      "scan_result": "ACCEPTED",
-      "age": 21,
-      "age_band": "21+",
-      "sex": "U",
-      "zip_code": "00000",
-      "id": "487pg7",
-      "timestamp": 1772349240518
-    },
-    {
-      "venue_id": "e913a671-5ca7-4a37-a996-9dc7248ddd88",
-      "scan_result": "ACCEPTED",
-      "age": 21,
-      "age_band": "21+",
-      "sex": "U",
-      "zip_code": "00000",
-      "id": "hdvr2g",
-      "timestamp": 1772336867088
-    },
-    {
-      "venue_id": "e913a671-5ca7-4a37-a996-9dc7248ddd88",
-      "scan_result": "ACCEPTED",
-      "age": 21,
-      "age_band": "21+",
-      "sex": "U",
-      "zip_code": "00000",
-      "id": "aqohs",
-      "timestamp": 1772336864609
-    },
-    {
-      "venue_id": "e913a671-5ca7-4a37-a996-9dc7248ddd88",
-      "scan_result": "ACCEPTED",
-      "age": 21,
-      "age_band": "21+",
-      "sex": "U",
-      "zip_code": "00000",
-      "id": "sck7ij",
-      "timestamp": 1772336820293
-    }
-  ],
+  "events": [],
+  "scanEvents": [],
   "currentUser": {
     "id": "usr_owner",
     "name": "Harrison Owner",
@@ -413,6 +305,78 @@
       "id": "fab22d5b-c889-42e5-a1c6-9b1d4c9cf2b1",
       "name": "trhoang2003",
       "email": "trhoang2003@gmail.com",
+      "role": "OWNER",
+      "assigned_venue_ids": [],
+      "assigned_area_ids": [],
+      "assigned_clicr_ids": []
+    },
+    {
+      "id": "9cddb196-afa1-434b-bd77-6fb909ba55df",
+      "name": "hoangtran",
+      "email": "hoangtran@oregonstate.edu",
+      "role": "OWNER",
+      "assigned_venue_ids": [],
+      "assigned_area_ids": [],
+      "assigned_clicr_ids": []
+    },
+    {
+      "id": "d349ab81-0a9b-438d-abee-edddcf3fff1f",
+      "name": "hoangtran1",
+      "email": "hoangtran1@gmail.com",
+      "role": "OWNER",
+      "assigned_venue_ids": [],
+      "assigned_area_ids": [],
+      "assigned_clicr_ids": []
+    },
+    {
+      "id": "33ae6345-dbc2-4abf-8439-8d668f4cdd84",
+      "name": "lalala",
+      "email": "lalala@gmail.com",
+      "role": "OWNER",
+      "assigned_venue_ids": [],
+      "assigned_area_ids": [],
+      "assigned_clicr_ids": []
+    },
+    {
+      "id": "f1cadcca-0eb7-4652-83ec-1a0fab462ff3",
+      "name": "lalala1",
+      "email": "lalala1@gmail.com",
+      "role": "OWNER",
+      "assigned_venue_ids": [],
+      "assigned_area_ids": [],
+      "assigned_clicr_ids": []
+    },
+    {
+      "id": "d6e3e130-895e-4536-a813-97b3c161757d",
+      "name": "lalala2",
+      "email": "lalala2@gmail.com",
+      "role": "OWNER",
+      "assigned_venue_ids": [],
+      "assigned_area_ids": [],
+      "assigned_clicr_ids": []
+    },
+    {
+      "id": "d83b30b5-98fc-4fbd-a91b-305d6c60a7cc",
+      "name": "hello",
+      "email": "hello@gmail.com",
+      "role": "OWNER",
+      "assigned_venue_ids": [],
+      "assigned_area_ids": [],
+      "assigned_clicr_ids": []
+    },
+    {
+      "id": "da6aef43-9031-44cf-a28f-85bbe0a92be3",
+      "name": "lalallalfdaslfasd",
+      "email": "lalallalfdaslfasd@gmail.com",
+      "role": "OWNER",
+      "assigned_venue_ids": [],
+      "assigned_area_ids": [],
+      "assigned_clicr_ids": []
+    },
+    {
+      "id": "fa18e7e8-abfa-47cf-89a7-ffa091b1c215",
+      "name": "heheh",
+      "email": "heheh@gmail.com",
       "role": "OWNER",
       "assigned_venue_ids": [],
       "assigned_area_ids": [],

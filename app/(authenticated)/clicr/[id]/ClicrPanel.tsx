@@ -105,9 +105,9 @@ export default function ClicrPanel({
     useEffect(() => {
         if (!venueId || !venue?.business_id || !clicr?.area_id) return;
 
-        // Initial Fetch -> Populates Store
+        // Fetch on mount and whenever events change (e.g. from tap route or polling)
         refreshTrafficStats?.(venueId, clicr.area_id);
-    }, [venueId, venue?.business_id, clicr?.area_id]); // Run once per scope change
+    }, [venueId, venue?.business_id, clicr?.area_id, events]); // Re-run when events update
 
     const globalIn = areaStats?.total_in;
     const globalOut = areaStats?.total_out;
@@ -220,32 +220,33 @@ export default function ClicrPanel({
         timezone: (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return 'UTC'; } })(),
     });
 
-    // Auto-reset: check if the scheduled reset time has passed and we haven't reset yet today
+    // Auto-reset: check if the scheduled reset time has passed and we haven't reset yet today.
+    // Uses the server-authoritative last_reset_at from the area (survives page refresh),
+    // falling back to trafficSessionStart for backwards compatibility.
     const checkAutoReset = useCallback(() => {
         if (!autoReset.enabled || !venueId || !clicr?.area_id) return;
 
         const now = new Date();
-        // Current HH:MM in the configured timezone
         const currentTimeInTZ = now.toLocaleTimeString('en-US', {
             timeZone: autoReset.timezone, hour: '2-digit', minute: '2-digit', hour12: false
         }).replace(/^24:/, '00:');
 
-        if (currentTimeInTZ < autoReset.time) return; // Reset time not yet reached today
+        if (currentTimeInTZ < autoReset.time) return;
 
-        // Today's date in configured timezone
         const todayInTZ = now.toLocaleDateString('en-CA', { timeZone: autoReset.timezone });
 
-        // Date + time of the last reset in configured timezone
-        const lastResetDate = new Date(trafficSessionStart).toLocaleDateString('en-CA', { timeZone: autoReset.timezone });
-        const lastResetTime = new Date(trafficSessionStart).toLocaleTimeString('en-US', {
+        const lastResetSource = currentArea?.last_reset_at
+            ? new Date(currentArea.last_reset_at).getTime()
+            : trafficSessionStart;
+        const lastResetDate = new Date(lastResetSource).toLocaleDateString('en-CA', { timeZone: autoReset.timezone });
+        const lastResetTime = new Date(lastResetSource).toLocaleTimeString('en-US', {
             timeZone: autoReset.timezone, hour: '2-digit', minute: '2-digit', hour12: false
         }).replace(/^24:/, '00:');
 
-        // Already reset today at or after the target time — nothing to do
         if (lastResetDate === todayInTZ && lastResetTime >= autoReset.time) return;
 
-        handleReset(true); // silent auto-reset
-    }, [autoReset, venueId, clicr?.area_id, trafficSessionStart]);
+        handleReset(true);
+    }, [autoReset, venueId, clicr?.area_id, currentArea?.last_reset_at, trafficSessionStart]);
 
     useEffect(() => {
         checkAutoReset();

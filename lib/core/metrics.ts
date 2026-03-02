@@ -65,14 +65,13 @@ export const METRICS = {
         if (!UUID_RE.test(businessId)) return 0;
         const sb = getSupabase();
         const { data, error } = await sb
-            .from('occupancy_snapshots')
+            .from('areas')
             .select('current_occupancy')
             .eq('business_id', businessId)
-            .eq('area_id', areaId)
+            .eq('id', areaId)
             .single();
 
         if (error) {
-            // It might be missing if no events yet. Return 0.
             if (error.code === 'PGRST116') return 0; // No rows
             logError('metrics:occupancy', error.message, { areaId }, undefined, businessId);
             return 0;
@@ -84,8 +83,8 @@ export const METRICS = {
     getAreaSummaries: async (venueId: string) => {
         const sb = getSupabase();
         const { data, error } = await sb
-            .from('occupancy_snapshots')
-            .select('area_id, current_occupancy, updated_at, areas(name, capacity_max)')
+            .from('areas')
+            .select('id, current_occupancy, updated_at, name, capacity_max')
             .eq('venue_id', venueId);
         if (error) {
             logError('metrics:getAreaSummaries', error.message, { venueId });
@@ -99,7 +98,7 @@ export const METRICS = {
         if (!UUID_RE.test(businessId)) return [];
         const sb = getSupabase();
         const { data, error } = await sb
-            .from('occupancy_snapshots')
+            .from('areas')
             .select('venue_id, current_occupancy, venues(name, capacity_max)')
             .eq('business_id', businessId);
         if (error) {

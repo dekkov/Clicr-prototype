@@ -15,7 +15,7 @@ export default function AreasTruthPage() {
         const fetchSnapshots = async () => {
             const supabase = createClient();
             if (business?.id) {
-                const { data } = await supabase.from('occupancy_snapshots').select('*').eq('business_id', business.id);
+                const { data } = await supabase.from('areas').select('id, name, current_occupancy, venue_id, business_id, updated_at').eq('business_id', business.id);
                 setSnapshots(data || []);
             }
         };

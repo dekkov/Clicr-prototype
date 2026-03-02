@@ -49,9 +49,12 @@ async function hydrateData(data: DBData): Promise<DBData> {
             data.areas = sbAreas.map((a: any) => ({
                 id: a.id,
                 venue_id: a.venue_id,
+                business_id: a.business_id,
                 name: a.name,
                 default_capacity: a.capacity_max,
                 parent_area_id: a.parent_area_id,
+                current_occupancy: a.current_occupancy ?? 0,
+                last_reset_at: a.last_reset_at || undefined,
 
                 // Required fields by Type
                 area_type: 'MAIN',
@@ -74,74 +77,15 @@ async function hydrateData(data: DBData): Promise<DBData> {
             });
         }
 
-        // 1. Fetch Occupancy Events first (needed as fallback inside snapshot mapping below)
-        // Try created_at first (migration schema), fall back to timestamp (manual_rpc_install.sql schema)
-        let { data: occEvents, error: evError } = await supabaseAdmin
+        // 1. Fetch Occupancy Events (for live log)
+        // current_occupancy is now on areas directly — no snapshot fetch needed.
+        const { data: occEvents } = await supabaseAdmin
             .from('occupancy_events')
             .select('*')
             .order('created_at', { ascending: false })
             .limit(100);
-        if (evError) {
-            ({ data: occEvents } = await supabaseAdmin
-                .from('occupancy_events')
-                .select('*')
-                .order('timestamp', { ascending: false })
-                .limit(100));
-        }
 
-        // 2. Fetch Occupancy Snapshots (Source of Truth for Counts)
-        const { data: snapshots, error: snapError } = await supabaseAdmin
-            .from('occupancy_snapshots')
-            .select('*');
-        if (snapError) console.error('[sync] occupancy_snapshots query failed:', snapError.message);
-
-        if (!snapError && snapshots) {
-            data.areas = data.areas.map(a => {
-                const snap = snapshots.find((s: any) => s.area_id === a.id);
-                // We inject the true count here. 
-                // However, the frontend sums up `clicr.current_count`.
-                // We need to distribute this count or ensure the frontend uses `area.current_occupancy` if available.
-                // For minimally invasive fix: We will set the count on a 'virtual' clicr or update existing clicrs?
-                // NO, updating existing clicrs is confusing if we don't know which one contributed.
-                // BEST FIX: The frontend should prioritize Area Occupancy if we send it.
-                // Let's add it to the Area object.
-                // Fallback Logic:
-                // 1. Snapshot (Best)
-                // 2. If no snapshot, try to sum from recent events (Partial fix)
-                // 3. 0
-
-                let validCount = 0;
-                if (snap) {
-                    validCount = snap.current_occupancy;
-                } else if (!snapError && occEvents) {
-                    // Try to reconstruct from events if snapshot missing
-                    // This is imperfect (limit 100) but better than 0 for recent bursts
-                    // Filter events for this area
-                    const areaEvents = occEvents.filter((e: any) => e.area_id === a.id);
-                    if (areaEvents.length > 0) {
-                        validCount = areaEvents.reduce((acc: number, e: any) => acc + e.delta, 0);
-                        // Since events are desc, we are just summing deltas. 
-                        // This assumes start was 0.
-                        // It's a weak fallback.
-                    }
-                }
-
-                return {
-                    ...a,
-                    current_occupancy: validCount
-                };
-            });
-
-            // PROPAGATION FIX:
-            // Since the frontend sums `clicr.current_count` to display "Live Occupancy", we need to make sure `clicrs` reflect reality too.
-            // Or we change the frontend to read `area.current_occupancy`.
-            // Changing frontend is safer. But let's see if we can patch clicrs loosely.
-            // If we have 1 clicr per area, easy. If multiple, hard.
-            // Let's rely on Events to populate Clicr counts for "session stats", 
-            // BUT use snapshots for "Total Area Occupancy".
-        }
-
-        // 3. Map Occupancy Events to app format (occEvents already fetched above)
+        // 2. Map Occupancy Events to app format
         if (occEvents) {
             data.events = occEvents.map((e: any) => ({
                 id: e.id,
@@ -208,6 +152,7 @@ async function hydrateData(data: DBData): Promise<DBData> {
                     return {
                         ...c,
                         name: match.name, // Persisted name
+                        area_id: match.area_id || c.area_id, // Sync area_id from Supabase — stale db.json IDs break currentArea lookup
                         button_config: match.button_config || c.button_config // Persisted buttons
                     };
                 }
@@ -331,8 +276,14 @@ export async function GET(request: Request) {
         const filteredAreas = data.areas.filter(a => visibleVenueIds.includes(a.venue_id));
         const visibleAreaIds = filteredAreas.map(a => a.id);
         const filteredClicrs = data.clicrs.filter(c => visibleAreaIds.includes(c.area_id));
-        const filteredEvents = data.events.filter(e => visibleVenueIds.includes(e.venue_id));
-        const filteredScans = data.scanEvents.filter(s => visibleVenueIds.includes(s.venue_id));
+
+        const latestResetAt = Math.max(0, ...filteredAreas.map(a => a.last_reset_at ? new Date(a.last_reset_at).getTime() : 0));
+        const filteredEvents = data.events.filter(e =>
+            visibleVenueIds.includes(e.venue_id) && (!latestResetAt || e.timestamp > latestResetAt)
+        );
+        const filteredScans = data.scanEvents.filter(s =>
+            visibleVenueIds.includes(s.venue_id) && (!latestResetAt || s.timestamp > latestResetAt)
+        );
 
         // SECURITY FIX: Filter Users to only those in the same scope
         const filteredUsers = data.users.filter(u =>
@@ -384,8 +335,6 @@ export async function POST(request: Request) {
                 // ATOMIC UPDATE via RPC
                 try {
                     const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('apply_occupancy_delta', {
-                        p_business_id: finalEventBizId,
-                        p_venue_id: event.venue_id,
                         p_area_id: event.area_id,
                         p_delta: event.delta,
                         p_source: event.event_type === 'SCAN' ? 'scan' : event.event_type === 'AUTO_SCAN' ? 'auto_scan' : 'manual',
@@ -470,25 +419,25 @@ export async function POST(request: Request) {
                         areasToReset = (bizAreas || []).map((a: any) => a.id);
                     }
 
-                    // 2. Zero each area's snapshot (same logic as /api/rpc/reset)
+                    // 2. Zero each area's count (current_occupancy now lives on areas)
                     for (const areaId of areasToReset) {
-                        const { data: snap, error: snapReadErr } = await supabaseAdmin
-                            .from('occupancy_snapshots')
+                        const { data: area, error: areaReadErr } = await supabaseAdmin
+                            .from('areas')
                             .select('current_occupancy, venue_id')
-                            .eq('area_id', areaId)
+                            .eq('id', areaId)
                             .single();
 
-                        if (snapReadErr) {
-                            console.error(`[RESET_COUNTS] Failed to read snapshot for area ${areaId}:`, snapReadErr.message);
+                        if (areaReadErr) {
+                            console.error(`[RESET_COUNTS] Failed to read area ${areaId}:`, areaReadErr.message);
                             continue; // skip this area — don't write a bad audit event
                         }
 
-                        const currentVal = snap?.current_occupancy ?? 0;
+                        const currentVal = area?.current_occupancy ?? 0;
 
                         if (currentVal !== 0) {
                             const { error: auditErr } = await supabaseAdmin.from('occupancy_events').insert({
                                 business_id: resetBizId,
-                                venue_id: snap?.venue_id || null,
+                                venue_id: area?.venue_id || null,
                                 area_id: areaId,
                                 delta: -currentVal,
                                 flow_type: 'OUT',
@@ -498,17 +447,17 @@ export async function POST(request: Request) {
                             });
                             if (auditErr) {
                                 console.error(`[RESET_COUNTS] Audit event insert failed for area ${areaId}:`, auditErr.message);
-                                // Continue — still zero the snapshot; the audit trail is best-effort
+                                // Continue — still zero the area; the audit trail is best-effort
                             }
                         }
 
-                        const { error: snapUpdateErr } = await supabaseAdmin
-                            .from('occupancy_snapshots')
+                        const { error: areaUpdateErr } = await supabaseAdmin
+                            .from('areas')
                             .update({ current_occupancy: 0, last_reset_at: new Date().toISOString() })
-                            .eq('area_id', areaId);
+                            .eq('id', areaId);
 
-                        if (snapUpdateErr) {
-                            console.error(`[RESET_COUNTS] Snapshot update failed for area ${areaId}:`, snapUpdateErr.message);
+                        if (areaUpdateErr) {
+                            console.error(`[RESET_COUNTS] Area update failed for area ${areaId}:`, areaUpdateErr.message);
                             // Continue to remaining areas — partial reset is better than total failure
                         }
                     }
@@ -809,8 +758,14 @@ export async function POST(request: Request) {
                 const filteredAreas = updatedData.areas.filter(a => visibleVenueIds.includes(a.venue_id));
                 const visibleAreaIds = filteredAreas.map(a => a.id);
                 const filteredClicrs = updatedData.clicrs.filter(c => visibleAreaIds.includes(c.area_id));
-                const filteredEvents = updatedData.events.filter(e => visibleVenueIds.includes(e.venue_id));
-                const filteredScans = updatedData.scanEvents.filter(s => visibleVenueIds.includes(s.venue_id));
+
+                const postLatestResetAt = Math.max(0, ...filteredAreas.map(a => a.last_reset_at ? new Date(a.last_reset_at).getTime() : 0));
+                const filteredEvents = updatedData.events.filter(e =>
+                    visibleVenueIds.includes(e.venue_id) && (!postLatestResetAt || e.timestamp > postLatestResetAt)
+                );
+                const filteredScans = updatedData.scanEvents.filter(s =>
+                    visibleVenueIds.includes(s.venue_id) && (!postLatestResetAt || s.timestamp > postLatestResetAt)
+                );
 
                 // SECURITY FIX: Filter Users to only those in the same scope
                 const filteredUsers = updatedData.users.filter(u =>

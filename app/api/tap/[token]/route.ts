@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 async function lookupDevice(token: string) {
     const { data, error } = await supabaseAdmin
         .from('devices')
-        .select('id, name, area_id, business_id, direction_mode, button_config')
+        .select('id, name, area_id, venue_id, business_id, direction_mode, button_config')
         .eq('button_config->>tap_token', token)
         .is('deleted_at', null)
         .single();
@@ -66,22 +66,9 @@ export async function POST(
         return NextResponse.json({ error: 'This device only records OUT' }, { status: 422 });
     }
 
-    // Look up venue_id from the area
-    const { data: area } = await supabaseAdmin
-        .from('areas')
-        .select('venue_id')
-        .eq('id', device.area_id)
-        .single();
-
-    if (!area?.venue_id) {
-        return NextResponse.json({ error: 'Device not assigned to a venue' }, { status: 422 });
-    }
-
     const delta = (direction as 'IN' | 'OUT') === 'IN' ? 1 : -1;
 
     const { error: rpcError } = await supabaseAdmin.rpc('apply_occupancy_delta', {
-        p_business_id: device.business_id,
-        p_venue_id: area.venue_id,
         p_area_id: device.area_id,
         p_delta: delta,
         p_source: 'manual',
@@ -112,7 +99,7 @@ export async function POST(
 
             await supabaseAdmin.from('id_scans').insert({
                 business_id: device.business_id,
-                venue_id: area.venue_id,
+                venue_id: device.venue_id,
                 scan_result: 'ACCEPTED',
                 age: age ?? null,
                 sex: details.gender === 'M' ? 'M' : details.gender === 'F' ? 'F' : 'U',
