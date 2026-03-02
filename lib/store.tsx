@@ -625,11 +625,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         // Optimistic update — applies name/config change immediately
         setState(prev => ({ ...prev, clicrs: prev.clicrs.map(c => c.id === clicr.id ? clicr : c) }));
         try {
-            const res = await fetch('/api/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'UPDATE_CLICR', payload: clicr })
-            });
+            const res = await authFetch({ action: 'UPDATE_CLICR', payload: clicr });
             if (!res.ok) {
                 console.error("UPDATE_CLICR failed (server error)", res.status);
                 // Intentionally NOT reverting — optimistic state is user's intent.
