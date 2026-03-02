@@ -77,7 +77,7 @@ export async function POST(
         p_area_id: device.area_id,
         p_delta: delta,
         p_source: 'manual',
-        p_device_id: null,
+        p_device_id: device.id,
         p_gender: null,
         // null = no deduplication; each tap is a distinct event.
         // Client-side buttons are disabled during the request to prevent double-taps.
@@ -97,8 +97,9 @@ export async function POST(
             const spaceIdx = nameTrimmed.indexOf(' ');
             const firstName = spaceIdx >= 0 ? nameTrimmed.slice(0, spaceIdx) : nameTrimmed || null;
             const lastName = spaceIdx >= 0 ? nameTrimmed.slice(spaceIdx + 1) : null;
-            const age = details.dob
-                ? Math.floor((Date.now() - new Date(details.dob).getTime()) / 3.156e10)
+            const dobMs = details.dob ? new Date(details.dob).getTime() : NaN;
+            const age = !isNaN(dobMs)
+                ? Math.floor((Date.now() - dobMs) / 3.15576e10)
                 : null;
 
             await supabaseAdmin.from('id_scans').insert({
