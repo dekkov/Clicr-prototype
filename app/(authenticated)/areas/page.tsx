@@ -1,125 +1,146 @@
 "use client";
 import React, { useState } from 'react';
 import { useApp } from '@/lib/store';
-import { Layers, Search, Filter, AlertCircle, CheckCircle2 } from 'lucide-react';
-import Link from 'next/link';
+import { Search, RefreshCw, ArrowUp, ArrowDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function AreasPage() {
-    const { areas, clicrs, venues } = useApp();
+    const { areas, clicrs, venues, areaTraffic, activeBusiness } = useApp();
     const [search, setSearch] = useState('');
-    const [filterVenue, setFilterVenue] = useState('ALL');
 
-    // Filtering
-    const filteredAreas = areas.filter(a => {
-        const matchesSearch = a.name.toLowerCase().includes(search.toLowerCase());
-        const matchesVenue = filterVenue === 'ALL' || a.venue_id === filterVenue;
-        return matchesSearch && matchesVenue;
-    });
+    if (!activeBusiness) {
+        return (
+            <div className="space-y-6">
+                <div>
+                    <h1 className="text-3xl font-bold text-white">Areas</h1>
+                    <p className="text-slate-400">All areas across your venues.</p>
+                </div>
+                <div className="glass-card p-10 rounded-xl text-center text-slate-400">
+                    Select a business from the sidebar.
+                </div>
+            </div>
+        );
+    }
+
+    const filteredAreas = areas.filter(a =>
+        a.name.toLowerCase().includes(search.toLowerCase())
+    );
+
+    // Group areas by venue, preserving venue order
+    const venueGroups = venues
+        .map(venue => ({
+            venue,
+            areas: filteredAreas.filter(a => a.venue_id === venue.id),
+        }))
+        .filter(g => g.areas.length > 0);
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-8">
+            {/* Page Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-white">Areas</h1>
-                    <p className="text-slate-400">Manage monitoring zones and assigned clickers</p>
+                    <p className="text-slate-400">All areas across your venues.</p>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                        <input
-                            type="text"
-                            placeholder="Search areas..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-white focus:border-primary outline-none"
-                        />
-                    </div>
-                    <div className="relative">
-                        <select
-                            value={filterVenue}
-                            onChange={(e) => setFilterVenue(e.target.value)}
-                            className="appearance-none bg-slate-900 border border-slate-700 rounded-lg pl-4 pr-10 py-2 text-white focus:border-primary outline-none"
-                        >
-                            <option value="ALL">All Venues</option>
-                            {venues.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-                        </select>
-                        <Filter className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-                    </div>
+                {/* Search */}
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <input
+                        type="text"
+                        placeholder="Search areas..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-white focus:border-primary outline-none"
+                    />
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredAreas.map(area => {
-                    const areaClicrs = clicrs.filter(c => c.area_id === area.id);
-                    const venue = venues.find(v => v.id === area.venue_id);
+            {/* Venue Groups */}
+            {venueGroups.length === 0 ? (
+                <div className="glass-card p-10 rounded-xl text-center text-slate-400">
+                    No areas found.
+                </div>
+            ) : (
+                venueGroups.map(({ venue, areas: venueAreas }) => (
+                    <section key={venue.id} className="space-y-4">
+                        {/* Venue Section Header */}
+                        <h2 className="text-base font-bold text-white">{venue.name}</h2>
 
-                    // Calculate Live Occupancy (Source of Truth: Occupancy Snapshot)
-                    const liveOcc = area.current_occupancy || 0;
+                        {/* Area Cards Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {venueAreas.map(area => {
+                                const scopeKey = `area:${activeBusiness.id}:${area.venue_id}:${area.id}`;
+                                const traffic = areaTraffic[scopeKey] ?? { total_in: 0, total_out: 0 };
 
-                    // Capacity & Percentage
-                    const capacity = area.default_capacity || area.capacity_limit || 0;
-                    const percentage = capacity > 0 ? Math.round((liveOcc / capacity) * 100) : null;
+                                const areaClicrs = clicrs.filter(c => c.area_id === area.id);
+                                const deviceCount = areaClicrs.length;
 
-                    // Status Logic
-                    let statusColor = "bg-emerald-500";
-                    let statusText = "Normal";
+                                const liveOcc = area.current_occupancy ?? 0;
+                                const capacity = area.default_capacity ?? area.capacity_limit ?? 0;
+                                const pct = capacity > 0 ? Math.round((liveOcc / capacity) * 100) : null;
 
-                    if (percentage !== null) {
-                        if (percentage > 95) { statusColor = "bg-red-500"; statusText = "Critical"; }
-                        else if (percentage > 80) { statusColor = "bg-amber-500"; statusText = "Near Cap"; }
-                    } else {
-                        statusColor = "bg-slate-700";
-                        statusText = "No Cap";
-                    }
+                                // Progress bar color
+                                let barColor = 'bg-indigo-500';
+                                if (pct !== null && pct > 90) barColor = 'bg-red-500';
+                                else if (pct !== null && pct > 75) barColor = 'bg-amber-500';
 
-                    return (
-                        <Link key={area.id} href={`/areas/${area.id}`} className="group relative block">
-                            <div className="glass-card p-6 rounded-xl relative overflow-hidden transition-all duration-300 group-hover:bg-slate-800/80 group-hover:border-primary/50 group-hover:shadow-[0_0_20px_rgba(99,102,241,0.15)]">
-                                {/* Capacity Bar */}
-                                <div className="absolute top-0 left-0 h-1 w-full bg-slate-800">
-                                    <div className={cn("h-full transition-all duration-500", statusColor)} style={{ width: `${Math.min(percentage || 0, 100)}%` }} />
-                                </div>
+                                return (
+                                    <div
+                                        key={area.id}
+                                        className="glass-card rounded-xl p-5 flex flex-col gap-3"
+                                    >
+                                        {/* Card Top Row */}
+                                        <div className="flex items-start justify-between">
+                                            <span className="text-sm font-semibold text-white">{area.name}</span>
+                                            <button
+                                                type="button"
+                                                className="text-slate-500 hover:text-slate-300 transition-colors"
+                                                aria-label="Refresh"
+                                            >
+                                                <RefreshCw className="w-4 h-4" />
+                                            </button>
+                                        </div>
 
-                                <div className="flex items-start justify-between mb-4 mt-2">
-                                    <div>
-                                        <span className="text-xs text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                                            {venue?.name}
-                                        </span>
-                                        <h2 className="text-xl font-bold text-white group-hover:text-primary transition-colors">{area.name}</h2>
+                                        {/* Occupancy Number */}
+                                        <div>
+                                            <span className="text-4xl font-bold text-white tabular-nums">{liveOcc}</span>
+                                            {capacity > 0 && pct !== null && (
+                                                <p className="text-xs text-slate-400 mt-0.5">
+                                                    of {capacity} &middot; {pct}% full
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        {/* Progress Bar */}
+                                        <div className="h-1.5 w-full bg-slate-700 rounded-full overflow-hidden">
+                                            <div
+                                                className={cn('h-full rounded-full transition-all duration-500', barColor)}
+                                                style={{ width: `${Math.min(pct ?? 0, 100)}%` }}
+                                            />
+                                        </div>
+
+                                        {/* Bottom Row: traffic + device count */}
+                                        <div className="flex items-center justify-between text-xs text-slate-400">
+                                            <div className="flex items-center gap-3">
+                                                <span className="flex items-center gap-1 text-emerald-400">
+                                                    <ArrowUp className="w-3 h-3" />
+                                                    {traffic.total_in}
+                                                </span>
+                                                <span className="flex items-center gap-1 text-red-400">
+                                                    <ArrowDown className="w-3 h-3" />
+                                                    {traffic.total_out}
+                                                </span>
+                                            </div>
+                                            <span>{deviceCount} device{deviceCount !== 1 ? 's' : ''}</span>
+                                        </div>
                                     </div>
-                                    <div className={cn("px-2 py-1 rounded text-[10px] font-bold uppercase", statusColor.replace('bg-', 'bg-opacity-10 text-'))}>
-                                        {statusText}
-                                    </div>
-                                </div>
-
-                                <div className="flex items-end justify-between mb-6">
-                                    <div>
-                                        <div className="text-4xl font-bold text-white tabular-nums">{liveOcc}</div>
-                                        <div className="text-xs text-slate-400">Live Occupancy</div>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="text-sm font-medium text-slate-300">/ {capacity > 0 ? capacity : '—'} Cap</div>
-                                        <div className={cn("text-xs font-bold", statusColor.replace('bg-', 'text-'))}>{percentage !== null ? `${percentage}% Full` : '—'}</div>
-                                    </div>
-                                </div>
-
-                                <div className="pt-4 border-t border-white/5 flex items-center justify-between text-slate-400 text-sm">
-                                    <div className="flex items-center gap-2">
-                                        <Layers className="w-4 h-4" />
-                                        <span>{areaClicrs.length} Active Clicrs</span>
-                                    </div>
-                                    {area.is_active || area.active ? // handle both fields
-                                        <div className="flex items-center gap-1 text-emerald-400 text-xs"><CheckCircle2 className="w-3 h-3" /> Active</div> :
-                                        <div className="flex items-center gap-1 text-slate-500 text-xs"><AlertCircle className="w-3 h-3" /> Inactive</div>
-                                    }
-                                </div>
-                            </div>
-                        </Link>
-                    )
-                })}
-            </div>
+                                );
+                            })}
+                        </div>
+                    </section>
+                ))
+            )}
         </div>
     );
 }
