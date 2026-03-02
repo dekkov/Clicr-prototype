@@ -80,8 +80,6 @@ export default function VenuesPage() {
         return { areaCount: venueAreas.length, currentOccupancy, deviceCount, totalIn, totalOut };
     };
 
-    const filteredVenues = allVenues;
-
     const formatLastReset = (venue: Venue): string => {
         const raw = (venue as any).last_reset_at;
         if (!raw) return '—';
@@ -147,7 +145,7 @@ export default function VenuesPage() {
                         </div>
                     ))}
                 </div>
-            ) : filteredVenues.length === 0 ? (
+            ) : allVenues.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 text-slate-500">
                     <MapPin className="w-12 h-12 mb-4 opacity-30" />
                     <p className="text-base font-medium text-slate-400 mb-1">No venues yet</p>
@@ -164,7 +162,7 @@ export default function VenuesPage() {
                 </div>
             ) : (
                 <div className="space-y-4">
-                    {filteredVenues.map(venue => {
+                    {allVenues.map(venue => {
                         const stats = getVenueStats(venue.id);
                         const capacity = venue.default_capacity_total ?? venue.total_capacity ?? 0;
                         const pct = capacity

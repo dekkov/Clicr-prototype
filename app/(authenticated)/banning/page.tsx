@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { Search, Shield } from 'lucide-react';
 
 export default function BanningPage() {
-    const { business, isLoading: storeLoading } = useApp();
+    const { activeBusiness, isLoading: storeLoading } = useApp();
     const [bans, setBans] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState('');
@@ -15,28 +15,28 @@ export default function BanningPage() {
     const [totalActiveBans, setTotalActiveBans] = useState(0);
 
     useEffect(() => {
-        if (!business) return;
+        if (!activeBusiness) return;
         fetchBans();
-    }, [business, filter]);
+    }, [activeBusiness, filter]);
 
     useEffect(() => {
-        if (!business) return;
+        if (!activeBusiness) return;
         fetchActiveCount();
-    }, [business?.id]);
+    }, [activeBusiness?.id]);
 
     const fetchActiveCount = async () => {
-        if (!business) return;
+        if (!activeBusiness) return;
         const supabase = createClient();
         const { count } = await supabase
             .from('patron_bans')
             .select('id', { count: 'exact', head: true })
-            .eq('business_id', business.id)
+            .eq('business_id', activeBusiness.id)
             .eq('status', 'ACTIVE');
         setTotalActiveBans(count ?? 0);
     };
 
     const fetchBans = async () => {
-        if (!business) return;
+        if (!activeBusiness) return;
         setLoading(true);
         const supabase = createClient();
 
@@ -44,7 +44,7 @@ export default function BanningPage() {
             let query = supabase
                 .from('patron_bans')
                 .select('*, banned_persons(first_name, last_name, id_number_last4)')
-                .eq('business_id', business.id)
+                .eq('business_id', activeBusiness.id)
                 .order('created_at', { ascending: false });
 
             if (filter === 'ACTIVE') {
