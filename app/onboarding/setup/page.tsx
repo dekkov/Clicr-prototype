@@ -11,7 +11,7 @@ type Step = 'BUSINESS' | 'VENUE' | 'AREAS' | 'CLICRS';
 
 export default function OnboardingSetupPage() {
     const router = useRouter();
-    const { addVenue, addArea, addClicr, business, clearBusiness } = useApp();
+    const { addVenue, addArea, addClicr, businesses, selectBusiness, refreshState } = useApp();
 
     const [step, setStep] = useState<Step>('BUSINESS');
     const [isLoading, setIsLoading] = useState(false);
@@ -19,14 +19,15 @@ export default function OnboardingSetupPage() {
 
     // Business step state
     const [businessName, setBusinessName] = useState('');
+    const [newBusinessId, setNewBusinessId] = useState('');
 
     // Venue step state
     const [venueId, setVenueId] = useState('');
-    const [venueData, setVenueData] = useState({ name: '', city: '', state: '', capacity: 500 });
+    const [venueData, setVenueData] = useState({ name: '', city: '', state: '', capacity: '500' });
 
     // Areas step state
     const [createdAreas, setCreatedAreas] = useState<Area[]>([]);
-    const [areaInput, setAreaInput] = useState({ name: '', capacity: 100 });
+    const [areaInput, setAreaInput] = useState({ name: '', capacity: '100' });
 
     // Clicrs step state
     const [createdClicrs, setCreatedClicrs] = useState<Clicr[]>([]);
@@ -48,6 +49,8 @@ export default function OnboardingSetupPage() {
             setError(result.error);
             return;
         }
+        if (result.businessId) setNewBusinessId(result.businessId);
+        refreshState();
         setStep('VENUE');
     };
 
@@ -56,13 +59,14 @@ export default function OnboardingSetupPage() {
         e.preventDefault();
         setIsLoading(true);
         const newId = crypto.randomUUID();
+        const parsedCapacity = parseInt(venueData.capacity, 10);
         const venue: Venue = {
             id: newId,
-            business_id: business?.id ?? '',
+            business_id: newBusinessId,
             name: venueData.name,
             city: venueData.city,
             state: venueData.state,
-            default_capacity_total: venueData.capacity,
+            default_capacity_total: !isNaN(parsedCapacity) && parsedCapacity > 0 ? parsedCapacity : null,
             capacity_enforcement_mode: 'WARN_ONLY',
             status: 'ACTIVE',
             timezone: 'America/New_York',
@@ -81,11 +85,12 @@ export default function OnboardingSetupPage() {
         if (!areaInput.name) return;
         setIsLoading(true);
         const newAreaId = crypto.randomUUID();
+        const parsedAreaCap = parseInt(areaInput.capacity, 10);
         const area: Area = {
             id: newAreaId,
             venue_id: venueId,
             name: areaInput.name,
-            default_capacity: areaInput.capacity,
+            default_capacity: !isNaN(parsedAreaCap) && parsedAreaCap > 0 ? parsedAreaCap : null,
             area_type: 'MAIN',
             counting_mode: 'BOTH',
             is_active: true,
@@ -95,7 +100,7 @@ export default function OnboardingSetupPage() {
         } as Area;
         await addArea(area);
         setCreatedAreas(prev => [...prev, area]);
-        setAreaInput({ name: '', capacity: 100 });
+        setAreaInput({ name: '', capacity: '100' });
         setIsLoading(false);
     };
 
@@ -119,7 +124,11 @@ export default function OnboardingSetupPage() {
         setIsLoading(false);
     };
 
-    const finish = () => { clearBusiness(); router.push('/dashboard'); };
+    const finish = () => {
+        const newBiz = businesses.find(b => b.id === newBusinessId);
+        if (newBiz) selectBusiness(newBiz);
+        router.push('/dashboard');
+    };
 
     return (
         <div className="min-h-screen bg-slate-950 flex items-start justify-center px-4 py-12">
@@ -183,7 +192,7 @@ export default function OnboardingSetupPage() {
                                 <input type="text" value={venueData.state} onChange={e => setVenueData(p => ({ ...p, state: e.target.value }))} placeholder="State"
                                     className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none" />
                             </div>
-                            <input type="number" value={venueData.capacity} onChange={e => setVenueData(p => ({ ...p, capacity: parseInt(e.target.value, 10) || 0 }))}
+                            <input type="number" value={venueData.capacity} onChange={e => setVenueData(p => ({ ...p, capacity: e.target.value }))}
                                 placeholder="Max capacity"
                                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none" />
                         </div>
@@ -220,7 +229,7 @@ export default function OnboardingSetupPage() {
                             <input type="text" placeholder="Area name (e.g. Main Floor)" value={areaInput.name}
                                 onChange={e => setAreaInput(p => ({ ...p, name: e.target.value }))}
                                 className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none text-sm" />
-                            <input type="number" value={areaInput.capacity} onChange={e => setAreaInput(p => ({ ...p, capacity: parseInt(e.target.value, 10) || 0 }))}
+                            <input type="number" value={areaInput.capacity} onChange={e => setAreaInput(p => ({ ...p, capacity: e.target.value }))}
                                 className="w-24 bg-slate-950 border border-slate-800 rounded-xl px-3 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none text-sm" />
                             <button onClick={handleAddArea} disabled={!areaInput.name || isLoading}
                                 className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-sm font-medium transition-all disabled:opacity-50 flex items-center gap-1">

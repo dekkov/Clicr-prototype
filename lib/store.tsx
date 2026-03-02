@@ -90,6 +90,7 @@ type AppContextType = AppState & {
     activeBusiness: Business | null;
     selectBusiness: (business: Business) => void;
     clearBusiness: () => void;
+    refreshState: () => Promise<void>;
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -947,7 +948,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
 
     return (
-        <AppContext.Provider value={{ ...state, recordEvent, recordScan, resetCounts, addUser, updateUser, removeUser, updateBusiness, addClicr, updateClicr, deleteClicr, addVenue, updateVenue, addArea, updateArea, addDevice, updateDevice, addCapacityOverride, addVenueAuditLog, addBan, revokeBan, createPatronBan, updatePatronBan, recordBanEnforcement, recordTurnaround, refreshTrafficStats, businesses: state.businesses, activeBusiness: state.activeBusiness, selectBusiness, clearBusiness } as AppContextType}>
+        <AppContext.Provider value={{ ...state, recordEvent, recordScan, resetCounts, addUser, updateUser, removeUser, updateBusiness, addClicr, updateClicr, deleteClicr, addVenue, updateVenue, addArea, updateArea, addDevice, updateDevice, addCapacityOverride, addVenueAuditLog, addBan, revokeBan, createPatronBan, updatePatronBan, recordBanEnforcement, recordTurnaround, refreshTrafficStats, businesses: state.businesses, activeBusiness: state.activeBusiness, selectBusiness, clearBusiness, refreshState } as AppContextType}>
             {children}
         </AppContext.Provider>
     );
