@@ -72,7 +72,9 @@ function BusinessSelector() {
     const canToggle = true; // always allow opening to show "Add Business" option
 
     function handleSelect(biz: Business) {
-        selectBusiness(biz);
+        if (biz.id !== activeBusiness?.id) {
+            selectBusiness(biz);
+        }
         setOpen(false);
     }
 
