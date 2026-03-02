@@ -4,6 +4,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { redirect } from 'next/navigation';
+import { resolvePostAuthRoute } from '@/lib/auth-helpers';
 
 async function logError(userId: string | undefined, context: string, error: any) {
     console.error(`[${context}] Error:`, error);
@@ -43,14 +44,15 @@ export async function signup(formData: FormData) {
         return redirect(`/onboarding/signup?error=${encodeURIComponent(error.message)}`);
     }
 
-    // Case 1: Session exists — create profile row and go directly to dashboard
+    // Case 1: Session exists — create profile row and route by membership
     if (data.session) {
         await supabaseAdmin.from('profiles').upsert({
             id: data.user!.id,
             email,
             role: 'OWNER',
         });
-        return redirect('/dashboard');
+        const nextRoute = await resolvePostAuthRoute(data.user!.id);
+        return redirect(nextRoute);
     }
 
     // Case 2: Email confirmation required
