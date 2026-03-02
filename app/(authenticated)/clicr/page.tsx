@@ -111,7 +111,7 @@ function getFlowModeLabel(flowMode: string | undefined): string {
 
 function ClicrCard({ clicr, area }: { clicr: Clicr; area: Area & { clicrs: Clicr[] } }) {
     const flowModeLabel = getFlowModeLabel(clicr.flow_mode);
-    const scanEnabled = (clicr as any).scan_enabled;
+    const scanEnabled = clicr.scan_enabled;
 
     const occupancy = area.current_occupancy ?? 0;
     const capacity = area.default_capacity ?? area.capacity_limit ?? area.capacity_max ?? null;
