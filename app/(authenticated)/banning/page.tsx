@@ -12,11 +12,28 @@ export default function BanningPage() {
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState('');
     const [filter, setFilter] = useState<'ALL' | 'ACTIVE' | 'REVOKED'>('ACTIVE');
+    const [totalActiveBans, setTotalActiveBans] = useState(0);
 
     useEffect(() => {
         if (!business) return;
         fetchBans();
     }, [business, filter]);
+
+    useEffect(() => {
+        if (!business) return;
+        fetchActiveCount();
+    }, [business?.id]);
+
+    const fetchActiveCount = async () => {
+        if (!business) return;
+        const supabase = createClient();
+        const { count } = await supabase
+            .from('patron_bans')
+            .select('id', { count: 'exact', head: true })
+            .eq('business_id', business.id)
+            .eq('status', 'ACTIVE');
+        setTotalActiveBans(count ?? 0);
+    };
 
     const fetchBans = async () => {
         if (!business) return;
@@ -59,8 +76,10 @@ export default function BanningPage() {
             })
             .eq('id', id);
 
-        if (!error) fetchBans();
-        else alert('Error revoking ban (check permissions)');
+        if (!error) {
+            fetchBans();
+            fetchActiveCount();
+        } else alert('Error revoking ban (check permissions)');
     };
 
     const filteredBans = bans.filter(ban => {
@@ -78,8 +97,6 @@ export default function BanningPage() {
         );
     });
 
-    const activeBanCount = bans.filter(b => b.status === 'ACTIVE').length;
-
     return (
         <div className="p-8 space-y-8 animate-in fade-in duration-500">
             {/* Page Header */}
@@ -87,7 +104,7 @@ export default function BanningPage() {
                 <div>
                     <h1 className="text-3xl font-bold text-white">Bans</h1>
                     <p className="text-slate-400 mt-1">
-                        {activeBanCount} active ban{activeBanCount !== 1 ? 's' : ''} across your venues
+                        {totalActiveBans} active ban{totalActiveBans !== 1 ? 's' : ''} across your venues
                     </p>
                 </div>
                 <Link
