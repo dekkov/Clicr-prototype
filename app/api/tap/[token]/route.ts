@@ -41,7 +41,7 @@ export async function POST(
 
     // NOTE: This endpoint is public and has no server-side rate limiting.
     // For production use, configure rate limiting at the CDN/proxy layer (e.g. Vercel, Cloudflare).
-    let body: { direction?: unknown };
+    let body: { direction?: unknown; details?: unknown };
     try {
         body = await req.json();
     } catch {
@@ -87,6 +87,34 @@ export async function POST(
     if (rpcError) {
         console.error('[tap] RPC error:', rpcError);
         return NextResponse.json({ error: 'Failed to record tap' }, { status: 500 });
+    }
+
+    // Optionally create a scan record when client details are provided (IN taps only)
+    if (direction === 'IN') {
+        const details = body.details as { name?: string; dob?: string; gender?: string } | undefined;
+        if (details && (details.name || details.dob || details.gender)) {
+            const nameTrimmed = (details.name || '').trim();
+            const spaceIdx = nameTrimmed.indexOf(' ');
+            const firstName = spaceIdx >= 0 ? nameTrimmed.slice(0, spaceIdx) : nameTrimmed || null;
+            const lastName = spaceIdx >= 0 ? nameTrimmed.slice(spaceIdx + 1) : null;
+            const age = details.dob
+                ? Math.floor((Date.now() - new Date(details.dob).getTime()) / 3.156e10)
+                : null;
+
+            await supabaseAdmin.from('id_scans').insert({
+                business_id: device.business_id,
+                venue_id: area.venue_id,
+                scan_result: 'ACCEPTED',
+                age: age ?? null,
+                sex: details.gender === 'M' ? 'M' : details.gender === 'F' ? 'F' : 'U',
+                zip_code: null,
+                first_name: firstName,
+                last_name: lastName,
+                dob: details.dob || null,
+            }).then(({ error }) => {
+                if (error) console.warn('[tap] scan record insert failed:', error.message);
+            });
+        }
     }
 
     return NextResponse.json({ success: true, delta });
