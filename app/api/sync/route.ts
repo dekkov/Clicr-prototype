@@ -20,7 +20,7 @@ async function hydrateData(data: DBData): Promise<DBData> {
         ] = await Promise.all([
             supabaseAdmin.from('venues').select('*'),
             supabaseAdmin.from('areas').select('*'),
-            supabaseAdmin.from('business_members').select('user_id, business_id')
+            supabaseAdmin.from('business_members').select('user_id, business_id, role, assigned_venue_ids, assigned_area_ids')
         ]);
 
         if (sbVenues) {
@@ -65,17 +65,8 @@ async function hydrateData(data: DBData): Promise<DBData> {
             }));
         }
 
-        // Sync assigned_venue_ids for users already in db.json via business_members
-        if (sbMembers) {
-            sbMembers.forEach((m: any) => {
-                const user = data.users.find(u => u.id === m.user_id);
-                if (user) {
-                    user.assigned_venue_ids = data.venues
-                        .filter(v => v.business_id === m.business_id)
-                        .map(v => v.id);
-                }
-            });
-        }
+        // Note: User role and assignments are set from business_members in the per-user context
+        // section below. We no longer overwrite assigned_venue_ids here.
 
         // 1. Fetch Occupancy Events (for live log)
         // current_occupancy is now on areas directly — no snapshot fetch needed.
@@ -215,24 +206,23 @@ export async function GET(request: Request) {
         let activeBizId: string | null = null;
         let allBizIds: string[] = [];
 
+        const requestedVenueId = url.searchParams.get('venueId');
+
         try {
             const { data: memberships } = await supabaseAdmin
                 .from('business_members')
-                .select('business_id, role')
+                .select('business_id, role, assigned_venue_ids, assigned_area_ids')
                 .eq('user_id', userId);
 
             if (memberships && memberships.length > 0) {
                 allBizIds = memberships.map((m: any) => m.business_id);
 
-                // Only accept the requested businessId if the user is actually a member
                 if (requestedBusinessId && allBizIds.includes(requestedBusinessId)) {
                     activeBizId = requestedBusinessId;
                 } else if (allBizIds.length === 1) {
-                    // Auto-select only when the user belongs to exactly one business.
-                    // For multi-business users with no explicit selection, leave activeBizId null
-                    // so the client picker shows rather than silently defaulting to a random business.
                     activeBizId = allBizIds[0];
                 }
+
                 const { data: bizRows } = await supabaseAdmin
                     .from('businesses')
                     .select('*')
@@ -247,34 +237,61 @@ export async function GET(request: Request) {
                     }));
                 }
 
-                // Set the active business
                 const activeBiz = allBusinesses.find(b => b.id === activeBizId);
                 if (activeBiz) data.business = activeBiz;
 
-                // Scope venue assignment to the active business
-                if (activeBizId && user.assigned_venue_ids.length === 0) {
-                    const { data: bizVenues } = await supabaseAdmin
-                        .from('venues')
-                        .select('id')
-                        .eq('business_id', activeBizId);
-                    if (bizVenues && bizVenues.length > 0) {
-                        user.assigned_venue_ids = bizVenues.map((v: any) => v.id);
-                    }
+                const activeMembership = memberships.find((m: any) => m.business_id === activeBizId) || memberships[0];
+                const memRole = (activeMembership?.role || 'OWNER') as string;
+                const memVenueIds = (activeMembership?.assigned_venue_ids || []) as string[];
+                const memAreaIds = (activeMembership?.assigned_area_ids || []) as string[];
+
+                user.role = memRole as User['role'];
+
+                const bizVenueIds = data.venues.filter(v => v.business_id === (activeBizId || activeMembership?.business_id)).map(v => v.id);
+
+                if (memRole === 'OWNER' || memRole === 'ADMIN' || memRole === 'ANALYST') {
+                    user.assigned_venue_ids = bizVenueIds;
+                    user.assigned_area_ids = data.areas.filter(a => bizVenueIds.includes(a.venue_id)).map(a => a.id);
+                } else if (memRole === 'MANAGER') {
+                    user.assigned_venue_ids = memVenueIds.length > 0
+                        ? memVenueIds.filter((id: string) => bizVenueIds.includes(id))
+                        : bizVenueIds;
+                    user.assigned_area_ids = data.areas.filter(a => user.assigned_venue_ids.includes(a.venue_id)).map(a => a.id);
+                } else {
+                    user.assigned_area_ids = memAreaIds;
+                    user.assigned_venue_ids = memAreaIds.length > 0
+                        ? [...new Set(data.areas.filter(a => memAreaIds.includes(a.id)).map(a => a.venue_id))]
+                        : [];
                 }
             }
         } catch (e) { console.error("Business Context Load Failed", e); }
 
-        // --- FILTERING ---
-        // When a specific business is active, scope directly by business_id.
-        // This bypasses user.assigned_venue_ids, which hydrateData populates from ALL
-        // memberships (overwriting on each iteration), making it unreliable for
-        // multi-business users.
-        const visibleVenueIds = activeBizId
+        // --- ROLE-BASED FILTERING ---
+        let visibleVenueIds: string[];
+        let visibleAreaIds: string[];
+
+        const bizVenuesForActive = activeBizId
             ? data.venues.filter(v => v.business_id === activeBizId).map(v => v.id)
             : data.venues.filter(v => allBizIds.includes(v.business_id)).map(v => v.id);
+
+        if (user.role === 'STAFF') {
+            visibleAreaIds = user.assigned_area_ids || [];
+            visibleVenueIds = visibleAreaIds.length > 0
+                ? [...new Set(data.areas.filter(a => visibleAreaIds.includes(a.id)).map(a => a.venue_id))]
+                : [];
+        } else if (user.role === 'MANAGER' && (user.assigned_venue_ids?.length ?? 0) > 0) {
+            visibleVenueIds = user.assigned_venue_ids.filter((id: string) => bizVenuesForActive.includes(id));
+            if (requestedVenueId && visibleVenueIds.includes(requestedVenueId)) {
+                visibleVenueIds = [requestedVenueId];
+            }
+            visibleAreaIds = data.areas.filter(a => visibleVenueIds.includes(a.venue_id)).map(a => a.id);
+        } else {
+            visibleVenueIds = bizVenuesForActive;
+            visibleAreaIds = data.areas.filter(a => visibleVenueIds.includes(a.venue_id)).map(a => a.id);
+        }
+
         const filteredVenues = data.venues.filter(v => visibleVenueIds.includes(v.id));
-        const filteredAreas = data.areas.filter(a => visibleVenueIds.includes(a.venue_id));
-        const visibleAreaIds = filteredAreas.map(a => a.id);
+        const filteredAreas = data.areas.filter(a => visibleAreaIds.includes(a.id));
         const filteredClicrs = data.clicrs.filter(c => visibleAreaIds.includes(c.area_id));
 
         const latestResetAt = Math.max(0, ...filteredAreas.map(a => a.last_reset_at ? new Date(a.last_reset_at).getTime() : 0));
@@ -285,10 +302,10 @@ export async function GET(request: Request) {
             visibleVenueIds.includes(s.venue_id) && (!latestResetAt || s.timestamp > latestResetAt)
         );
 
-        // SECURITY FIX: Filter Users to only those in the same scope
         const filteredUsers = data.users.filter(u =>
             u.id === user.id ||
-            u.assigned_venue_ids.some(vid => visibleVenueIds.includes(vid))
+            (u.assigned_venue_ids || []).some((vid: string) => visibleVenueIds.includes(vid)) ||
+            (u.assigned_area_ids || []).some((aid: string) => visibleAreaIds.includes(aid))
         );
 
         return NextResponse.json({
@@ -613,10 +630,11 @@ export async function POST(request: Request) {
             case 'UPDATE_AREA':
                 const areaPayload = payload as Area;
                 try {
-                    await supabaseAdmin.from('areas').update({
+                    const updatePayload: Record<string, any> = {
                         name: areaPayload.name,
-                        capacity_max: areaPayload.default_capacity ?? areaPayload.capacity_max
-                    }).eq('id', areaPayload.id);
+                        capacity_max: areaPayload.default_capacity ?? areaPayload.capacity_max,
+                    };
+                    await supabaseAdmin.from('areas').update(updatePayload).eq('id', areaPayload.id);
                 } catch (e) {
                     console.error("Update Area Persistence Failed", e);
                     return NextResponse.json({ error: 'Update Failed' }, { status: 500 });
@@ -635,7 +653,7 @@ export async function POST(request: Request) {
                     return NextResponse.json({ error: 'Could not resolve business_id for ADD_AREA' }, { status: 400 });
                 }
                 try {
-                    const { error } = await supabaseAdmin.from('areas').insert({
+                    const insertPayload: Record<string, any> = {
                         id: newArea.id,
                         venue_id: newArea.venue_id,
                         business_id: areaBizId,
@@ -644,7 +662,8 @@ export async function POST(request: Request) {
                         capacity_max: newArea.default_capacity ?? (newArea as any).capacity_max ?? null,
                         counting_mode: newArea.counting_mode || 'MANUAL',
                         is_active: newArea.is_active ?? true,
-                    });
+                    };
+                    const { error } = await supabaseAdmin.from('areas').insert(insertPayload);
                     if (error) {
                         console.error("ADD_AREA persistence failed", error);
                         return NextResponse.json({ error: `Database Insert Failed: ${error.message} (${error.code})` }, { status: 500 });
@@ -697,13 +716,18 @@ export async function POST(request: Request) {
                 break;
 
             case 'UPDATE_BUSINESS': {
+                const { business_id: _bid, ...updateFields } = payload;
                 if (userId) {
-                    const { data: bizMembership } = await supabaseAdmin.from('business_members').select('business_id').eq('user_id', userId).limit(1).single();
-                    if (bizMembership?.business_id) {
-                        await supabaseAdmin.from('businesses').update(payload).eq('id', bizMembership.business_id);
+                    let businessId = payload.business_id;
+                    if (!businessId) {
+                        const { data: bizMembership } = await supabaseAdmin.from('business_members').select('business_id').eq('user_id', userId).limit(1).single();
+                        businessId = bizMembership?.business_id;
+                    }
+                    if (businessId) {
+                        await supabaseAdmin.from('businesses').update(updateFields).eq('id', businessId);
                     }
                 }
-                updatedData = updateBusiness(payload);
+                updatedData = updateBusiness(updateFields);
                 break;
             }
 

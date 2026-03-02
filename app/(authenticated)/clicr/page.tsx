@@ -4,11 +4,13 @@ import React from 'react';
 import Link from 'next/link';
 import { useApp } from '@/lib/store';
 import { LayoutGrid, MousePointer2, ChevronRight, Plus } from 'lucide-react';
+import { canAddClicr } from '@/lib/permissions';
+import type { Role } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Clicr, Area } from '@/lib/types';
 
 export default function ClicrListPage() {
-    const { clicrs, areas, venues, isLoading, activeBusiness } = useApp();
+    const { clicrs, areas, venues, isLoading, activeBusiness, currentUser } = useApp();
 
     if (!activeBusiness && !isLoading) {
         return (
@@ -22,7 +24,7 @@ export default function ClicrListPage() {
     if (isLoading) {
         return (
             <div className="space-y-10 pb-20">
-                <PageHeader />
+                <PageHeader canAddClicr={canAddClicr(currentUser?.role as Role | undefined)} />
                 <div className="space-y-6 animate-pulse">
                     <div className="flex items-center gap-4">
                         <div className="h-6 bg-slate-800 rounded w-40" />
@@ -57,7 +59,7 @@ export default function ClicrListPage() {
     if (!clicrs || clicrs.length === 0) {
         return (
             <div className="space-y-8 pb-20">
-                <PageHeader />
+                <PageHeader canAddClicr={canAddClicr(currentUser?.role as Role | undefined)} />
                 <div className="p-8 text-slate-400">No Clicrs configured yet.</div>
             </div>
         );
@@ -77,7 +79,7 @@ export default function ClicrListPage() {
 
     return (
         <div className="space-y-10 pb-20">
-            <PageHeader />
+            <PageHeader canAddClicr={canAddClicr(currentUser?.role as Role | undefined)} />
 
             {venuesWithContent.map(venue => (
                 <div key={venue.id} className="space-y-6">
@@ -116,7 +118,7 @@ export default function ClicrListPage() {
     );
 }
 
-function PageHeader() {
+function PageHeader({ canAddClicr }: { canAddClicr: boolean }) {
     return (
         <div className="flex items-center justify-between">
             <div>
@@ -124,17 +126,19 @@ function PageHeader() {
                 <p className="text-slate-400">Your counting and scanning devices.</p>
             </div>
             <div className="flex items-center gap-3">
-                <Link
-                    href="/areas"
-                    className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg font-medium transition-colors text-sm"
-                >
-                    <Plus className="w-4 h-4" />
-                    Add Clicr
-                </Link>
-                <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm text-slate-300 hover:text-white transition-colors">
+                {canAddClicr && (
+                    <Link
+                        href="/areas"
+                        className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg font-medium transition-colors text-sm"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Add Clicr
+                    </Link>
+                )}
+                <Link href="/settings/board-views" className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm text-slate-300 hover:text-white transition-colors">
                     <LayoutGrid className="w-4 h-4" />
                     Board View
-                </button>
+                </Link>
             </div>
         </div>
     );

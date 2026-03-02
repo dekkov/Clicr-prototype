@@ -40,6 +40,7 @@ export type AppState = {
 
     businesses: Business[];
     activeBusiness: Business | null;
+    activeVenueId: string | null;
 
     isLoading: boolean;
 };
@@ -88,7 +89,9 @@ type AppContextType = AppState & {
     // Multi-business
     businesses: Business[];
     activeBusiness: Business | null;
+    activeVenueId: string | null;
     selectBusiness: (business: Business) => void;
+    selectVenue: (venueId: string | null) => void;
     clearBusiness: () => void;
     refreshState: () => Promise<void>;
 };
@@ -121,12 +124,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
         businesses: [],
         activeBusiness: null,
+        activeVenueId: null,
 
         isLoading: true,
     });
 
     const isResettingRef = useRef(false);
     const activeBusinessIdRef = useRef<string | null>(null);
+    const activeVenueIdRef = useRef<string | null>(null);
     const userClearedRef = useRef(false);
     const lastAuthUserIdRef = useRef<string | null>(null);
     // Tracks when the last realtime snapshot update fired. Polls that started
@@ -189,10 +194,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 headers['x-user-email'] = user.email || '';
             }
 
-            const bizParam = activeBusinessIdRef.current
-                ? `?businessId=${activeBusinessIdRef.current}`
-                : '';
-            const res = await fetch(`/api/sync${bizParam}`, {
+            const params = new URLSearchParams();
+            if (activeBusinessIdRef.current) params.set('businessId', activeBusinessIdRef.current);
+            if (activeVenueIdRef.current) params.set('venueId', activeVenueIdRef.current);
+            const query = params.toString() ? `?${params.toString()}` : '';
+            const res = await fetch(`/api/sync${query}`, {
                 cache: 'no-store',
                 headers
             });
@@ -220,6 +226,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                     !!(activeBusinessIdRef.current && data.businesses?.some((b: Business) => b.id === activeBusinessIdRef.current))
                 )) {
                     activeBusinessIdRef.current = data.businesses[0].id;
+                }
+
+                // MANAGER with assigned venues: auto-select first venue when only one
+                const cu = data.currentUser as { role?: string; assigned_venue_ids?: string[] } | undefined;
+                if (cu?.role === 'MANAGER' && (cu.assigned_venue_ids?.length ?? 0) > 0 && (data.venues?.length ?? 0) === 1 && !activeVenueIdRef.current) {
+                    activeVenueIdRef.current = data.venues[0].id;
                 }
 
                 const sortedBusinesses = (data.businesses || []).slice().sort((a: Business, b: Business) =>
@@ -250,6 +262,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                         return polledArea;
                     });
 
+                    const nextActiveVenueId = activeVenueIdRef.current ?? (sortedVenues.length === 1 && cu?.role === 'MANAGER' ? sortedVenues[0].id : prev.activeVenueId);
                     return {
                         ...prev,
                         ...data,
@@ -261,6 +274,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                         businesses: sortedBusinesses.length > 0 ? sortedBusinesses : prev.businesses,
                         activeBusiness: prev.activeBusiness ?? autoSelected,
                         business: prev.activeBusiness ?? autoSelected,
+                        activeVenueId: nextActiveVenueId,
                         isLoading: false
                     };
                 });
@@ -274,6 +288,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const selectBusiness = (business: Business) => {
         userClearedRef.current = false;
         activeBusinessIdRef.current = business.id;
+        activeVenueIdRef.current = null;
         try { localStorage.setItem(LAST_BIZ_KEY, business.id); } catch { /* SSR/incognito safe */ }
         setState(prev => ({
             ...prev,
@@ -284,15 +299,23 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             clicrs: [],
             events: [],
             scanEvents: [],
+            activeVenueId: null,
             isLoading: true,
         }));
+        refreshState();
+    };
+
+    const selectVenue = (venueId: string | null) => {
+        activeVenueIdRef.current = venueId;
+        setState(prev => ({ ...prev, activeVenueId: venueId, isLoading: true }));
         refreshState();
     };
 
     const clearBusiness = () => {
         userClearedRef.current = true;
         activeBusinessIdRef.current = null;
-        setState(prev => ({ ...prev, activeBusiness: null, business: null, isLoading: true }));
+        activeVenueIdRef.current = null;
+        setState(prev => ({ ...prev, activeBusiness: null, business: null, activeVenueId: null, isLoading: true }));
     };
 
     // Initial load, polling, AND Realtime Subscription
@@ -569,11 +592,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const addVenue = async (venue: Venue) => {
         setState(prev => ({ ...prev, venues: [...prev.venues, venue] }));
         try {
-            const res = await authFetch({ action: 'ADD_VENUE', payload: venue });
-            if (res.ok) {
-                const updatedDB = await res.json();
-                setState(prev => ({ ...prev, ...updatedDB }));
-            }
+            await authFetch({ action: 'ADD_VENUE', payload: venue });
         } catch (error) { console.error("Failed to add venue", error); }
     };
 
@@ -595,11 +614,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const addArea = async (area: Area) => {
         setState(prev => ({ ...prev, areas: [...prev.areas, area] }));
         try {
-            const res = await authFetch({ action: 'ADD_AREA', payload: area });
-            if (res.ok) {
-                const updatedDB = await res.json();
-                setState(prev => ({ ...prev, ...updatedDB }));
-            }
+            await authFetch({ action: 'ADD_AREA', payload: area });
         } catch (error) { console.error("Failed to add area", error); }
     };
 
@@ -662,20 +677,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const addClicr = async (clicr: Clicr): Promise<{ success: boolean, error?: string }> => {
-        // Optimistic Update
         const tempId = clicr.id;
         setState(prev => ({ ...prev, clicrs: [...prev.clicrs, clicr] }));
 
         try {
             const res = await authFetch({ action: 'ADD_CLICR', payload: clicr });
             if (res.ok) {
-                const updatedDB = await res.json();
-                setState(prev => ({ ...prev, ...updatedDB }));
                 return { success: true };
             } else {
                 const errData = await res.json().catch(() => ({}));
                 console.error("Failed to add clicr API error", errData);
-                // Revert
                 setState(prev => ({ ...prev, clicrs: prev.clicrs.filter(c => c.id !== tempId) }));
                 return { success: false, error: errData.error || res.statusText };
             }
@@ -939,7 +950,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
 
         try {
-            const res = await authFetch({ action: 'UPDATE_BUSINESS', payload: updates });
+            const payload = state.activeBusiness?.id
+                ? { ...updates, business_id: state.activeBusiness.id }
+                : updates;
+            const res = await authFetch({ action: 'UPDATE_BUSINESS', payload });
             if (res.ok) {
                 const updatedDB = await res.json();
                 setState(prev => ({ ...prev, ...updatedDB }));
@@ -948,7 +962,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
 
     return (
-        <AppContext.Provider value={{ ...state, recordEvent, recordScan, resetCounts, addUser, updateUser, removeUser, updateBusiness, addClicr, updateClicr, deleteClicr, addVenue, updateVenue, addArea, updateArea, addDevice, updateDevice, addCapacityOverride, addVenueAuditLog, addBan, revokeBan, createPatronBan, updatePatronBan, recordBanEnforcement, recordTurnaround, refreshTrafficStats, businesses: state.businesses, activeBusiness: state.activeBusiness, selectBusiness, clearBusiness, refreshState } as AppContextType}>
+        <AppContext.Provider value={{ ...state, recordEvent, recordScan, resetCounts, addUser, updateUser, removeUser, updateBusiness, addClicr, updateClicr, deleteClicr, addVenue, updateVenue, addArea, updateArea, addDevice, updateDevice, addCapacityOverride, addVenueAuditLog, addBan, revokeBan, createPatronBan, updatePatronBan, recordBanEnforcement, recordTurnaround, refreshTrafficStats, businesses: state.businesses, activeBusiness: state.activeBusiness, activeVenueId: state.activeVenueId, selectBusiness, selectVenue, clearBusiness, refreshState } as AppContextType}>
             {children}
         </AppContext.Provider>
     );

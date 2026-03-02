@@ -8,7 +8,7 @@ import Link from 'next/link';
 const DISMISSED_KEY = 'clicr_checklist_dismissed';
 
 export function GettingStartedChecklist() {
-    const { activeBusiness, venues, areas, clicrs } = useApp();
+    const { activeBusiness, venues, areas, clicrs, users } = useApp();
     const [dismissed, setDismissed] = useState(false);
     const [mounted, setMounted] = useState(false);
 
@@ -16,6 +16,8 @@ export function GettingStartedChecklist() {
         setMounted(true);
         setDismissed(localStorage.getItem(DISMISSED_KEY) === 'true');
     }, []);
+
+    const settings = activeBusiness?.settings;
 
     const items = [
         {
@@ -46,6 +48,27 @@ export function GettingStartedChecklist() {
             completed: clicrs.length > 0,
             href: '/areas',
         },
+        {
+            id: 'invite',
+            label: 'Invite your team',
+            description: 'Add staff to help manage your venue',
+            completed: users.length > 1,
+            href: '/settings/team',
+        },
+        {
+            id: 'scan',
+            label: 'Configure scanning',
+            description: 'Set up ID scanning for your devices',
+            completed: !!settings?.scan_method,
+            href: '/settings/scanning',
+        },
+        {
+            id: 'ban',
+            label: 'Set ban policies',
+            description: 'Configure who can ban and default scope',
+            completed: !!settings?.ban_permissions,
+            href: '/settings/ban-policies',
+        },
     ];
 
     const completedCount = items.filter(i => i.completed).length;
@@ -63,7 +86,7 @@ export function GettingStartedChecklist() {
         <div className="glass-panel border border-primary/20 rounded-2xl p-6 animate-in fade-in slide-in-from-top-2 duration-300">
             <div className="flex items-start justify-between mb-5">
                 <div>
-                    <h3 className="text-lg font-bold text-white">Getting Started</h3>
+                    <h3 className="text-lg font-bold text-white">Ready for First Night</h3>
                     <p className="text-slate-400 text-sm mt-0.5">
                         {completedCount} of {items.length} steps complete
                     </p>

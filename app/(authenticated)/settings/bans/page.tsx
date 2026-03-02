@@ -45,10 +45,15 @@ export default function BansPage() {
                 <Link href="/settings" className="p-2 bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors">
                     <ArrowLeft className="w-5 h-5" />
                 </Link>
-                <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                    <History className="w-8 h-8 text-primary" />
-                    Ban History
-                </h1>
+                <div className="flex-1">
+                    <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                        <History className="w-8 h-8 text-primary" />
+                        Ban History
+                    </h1>
+                    <Link href="/settings/ban-policies" className="text-sm text-primary hover:text-primary/80 mt-1 inline-block">
+                        Configure ban policies →
+                    </Link>
+                </div>
             </div>
 
             {/* Filters */}

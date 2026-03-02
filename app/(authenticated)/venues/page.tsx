@@ -5,10 +5,13 @@ import Link from 'next/link';
 import { useApp } from '@/lib/store';
 import { Venue } from '@/lib/types';
 import { MapPin, Plus, RefreshCw, ChevronRight } from 'lucide-react';
+import { canAddVenue } from '@/lib/permissions';
+import type { Role } from '@/lib/types';
 import { createClient } from '@/utils/supabase/client';
 
 export default function VenuesPage() {
-    const { activeBusiness, areas, clicrs, devices, isLoading: storeLoading, areaTraffic } = useApp();
+    const { activeBusiness, areas, clicrs, devices, isLoading: storeLoading, areaTraffic, currentUser } = useApp();
+    const showAddVenue = canAddVenue(currentUser?.role as Role | undefined);
     const [allVenues, setAllVenues] = useState<Venue[]>([]);
     const [loadingVenues, setLoadingVenues] = useState(true);
 
@@ -110,7 +113,7 @@ export default function VenuesPage() {
                     <h1 className="text-3xl font-bold text-white">Venues</h1>
                     <p className="text-slate-400 mt-1 text-sm">Manage your venues and track live occupancy.</p>
                 </div>
-                {activeBusiness && (
+                {activeBusiness && showAddVenue && (
                     <Link
                         href={`/venues/new?businessId=${activeBusiness.id}`}
                         className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-medium text-sm transition-all"
@@ -150,7 +153,7 @@ export default function VenuesPage() {
                     <MapPin className="w-12 h-12 mb-4 opacity-30" />
                     <p className="text-base font-medium text-slate-400 mb-1">No venues yet</p>
                     <p className="text-sm mb-6">Add your first venue to get started.</p>
-                    {activeBusiness && (
+                    {activeBusiness && showAddVenue && (
                         <Link
                             href={`/venues/new?businessId=${activeBusiness.id}`}
                             className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-medium text-sm transition-all"
