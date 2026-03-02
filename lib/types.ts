@@ -132,6 +132,7 @@ export type Clicr = {
     };
     command?: string; // Hardware mapping/pairing code
     direction_mode?: 'in_only' | 'out_only' | 'bidirectional';
+    scan_enabled?: boolean;
 };
 
 export type DeviceType = 'COUNTER' | 'SCANNER' | 'COMBO';

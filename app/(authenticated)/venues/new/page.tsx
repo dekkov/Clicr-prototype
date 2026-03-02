@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/store';
 import { Venue, Area, Clicr } from '@/lib/types';
 import { ArrowLeft, Check, Plus, MapPin, Building2, Users, ChevronDown } from 'lucide-react';
@@ -10,16 +10,13 @@ type Step = 'VENUE' | 'AREAS' | 'CLICRS';
 
 export default function NewVenuePage() {
     const router = useRouter();
-    const searchParams = useSearchParams();
-    const { addVenue, addArea, addClicr, business, businesses } = useApp();
+    const { addVenue, addArea, addClicr, activeBusiness, businesses } = useApp();
     const [step, setStep] = useState<Step>('VENUE');
     const [isLoading, setIsLoading] = useState(false);
 
     // Data State
     const [venueId, setVenueId] = useState<string>('');
-    const [selectedBizId, setSelectedBizId] = useState<string>(
-        searchParams.get('businessId') ?? business?.id ?? businesses[0]?.id ?? ''
-    );
+    const [selectedBizId, setSelectedBizId] = useState<string>(activeBusiness?.id ?? businesses[0]?.id ?? '');
     const [venueData, setVenueData] = useState({
         name: '',
         city: '',

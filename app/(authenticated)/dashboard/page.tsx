@@ -1,332 +1,422 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { useApp } from '@/lib/store';
-import { Building2, MapPin, ArrowRight, Plus } from 'lucide-react';
-import Link from 'next/link';
+import {
+    Users, TrendingUp, ScanLine, ShieldBan,
+    Calendar, RefreshCw, Download, ChevronDown
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { METRICS } from '@/lib/core/metrics';
-import { getTodayWindow } from '@/lib/core/time';
-import { Business, Venue, Area, CountEvent } from '@/lib/types';
 import { GettingStartedChecklist } from './_components/GettingStartedChecklist';
-import { createClient } from '@/utils/supabase/client';
 
-// Sub-component for individual venue stats
-const VenueCard = ({ venue, areas, events }: { venue: Venue, areas: Area[], events: CountEvent[] }) => {
-    const [stats, setStats] = useState({ total_in: 0, total_out: 0 });
-    const [loading, setLoading] = useState(true);
+// --- Inline sub-components ---
 
-    // Calculate Live Occupancy from SNAPSHOTS (Source of Truth)
-    const occupancy = areas.reduce((sum, a) => sum + (a.current_occupancy || 0), 0);
-    const capacity = areas.reduce((sum, a) => sum + ((a as any).capacity || a.default_capacity || 0), 0);
-
-    // Fetch Traffic Stats (In/Out)
-    useEffect(() => {
-        const fetchStats = async () => {
-            if (!venue.business_id) return;
-            try {
-                const data = await METRICS.getTotals(venue.business_id, { venueId: venue.id }, getTodayWindow());
-                setStats(data);
-                setLoading(false);
-            } catch (e) {
-                console.error("Venue stats error", e);
-                setLoading(false);
-            }
-        };
-        fetchStats();
-    }, [venue.id, venue.business_id, events]);
-
-    return (
-        <div className="glass-panel p-6 rounded-2xl border border-slate-800 hover:border-slate-700 transition-colors">
-            {/* Venue Header */}
-            <div className="flex justify-between items-start mb-6">
-                <div className="flex items-start gap-4">
-                    <div className="p-3 bg-slate-800 rounded-xl">
-                        <Building2 className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                        <h3 className="text-lg font-bold text-white">{venue.name}</h3>
-                        <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-1">
-                            <MapPin className="w-3 h-3" />
-                            {venue.city ? `${venue.city}, ${venue.state}` : 'Location Unset'}
-                        </div>
-                    </div>
-                </div>
-                <Link
-                    href={`/venues/${venue.id}`}
-                    className="text-xs font-bold text-white bg-primary px-4 py-2 rounded-full hover:bg-indigo-500 shadow-lg shadow-primary/25 transition-all flex items-center gap-2 group"
-                >
-                    Manage
-                    <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
-                </Link>
-            </div>
-
-            {/* Venue Mini KPIs */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
-                <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-800">
-                    <div className="text-xs text-slate-500 mb-1">Occupancy</div>
-                    <div className="text-xl font-bold font-mono text-white">{occupancy}</div>
-                </div>
-                <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-800">
-                    <div className="text-xs text-slate-500 mb-1">In</div>
-                    <div className="text-xl font-bold font-mono text-emerald-400">+{stats.total_in}</div>
-                </div>
-                <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-800">
-                    <div className="text-xs text-slate-500 mb-1">Out</div>
-                    <div className="text-xl font-bold font-mono text-amber-400">-{stats.total_out}</div>
-                </div>
-            </div>
-
-            {/* Areas List */}
-            <div className="space-y-3">
-                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Area Status</h4>
-                {areas.length === 0 && <p className="text-xs text-slate-600 italic">No areas configured.</p>}
-                {areas.map(area => {
-                    const cap = (area as any).capacity || area.default_capacity || 0;
-                    const occ = area.current_occupancy || 0;
-                    const pct = cap > 0 ? (occ / cap) * 100 : 0;
-                    const isHigh = pct > 90;
-
-                    return (
-                        <div key={area.id} className="relative">
-                            <div className="flex justify-between items-center text-sm mb-1">
-                                <span className="font-medium text-slate-300">{area.name}</span>
-                                <span className={cn("font-mono", isHigh ? "text-red-400 font-bold" : "text-slate-400")}>
-                                    {occ} <span className="text-slate-600 text-xs">/ {cap > 0 ? cap : '∞'}</span>
-                                </span>
-                            </div>
-                            {cap > 0 ? (
-                                <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                                    <div
-                                        className={cn(
-                                            "h-full rounded-full transition-all",
-                                            isHigh ? "bg-red-500" : pct > 75 ? "bg-amber-500" : "bg-primary"
-                                        )}
-                                        style={{ width: `${Math.min(pct, 100)}%` }}
-                                    />
-                                </div>
-                            ) : null}
-                        </div>
-                    );
-                })}
+const KpiCard = ({
+    label,
+    value,
+    detail,
+    icon: Icon,
+    iconBg,
+    detailColor,
+}: {
+    label: string;
+    value: string | number;
+    detail: string;
+    icon: React.ElementType;
+    iconBg: string;
+    detailColor?: string;
+}) => (
+    <div className="glass-panel p-5 rounded-2xl border border-slate-800">
+        <div className="flex items-start justify-between mb-3">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">{label}</span>
+            <div className={cn("p-2 rounded-xl", iconBg)}>
+                <Icon className="w-4 h-4" />
             </div>
         </div>
-    );
-};
+        <div className="text-4xl font-bold font-mono text-white mb-1">{value}</div>
+        <div className={cn("text-sm font-medium", detailColor ?? "text-slate-400")}>{detail}</div>
+    </div>
+);
+
+const AgeBand = ({ band, count, max }: { band: string; count: number; max: number }) => (
+    <div className="flex items-center gap-3">
+        <span className="text-xs text-slate-400 w-12 shrink-0">{band}</span>
+        <div className="flex-1 h-5 bg-slate-800/60 rounded overflow-hidden">
+            <div
+                className="h-full bg-primary/80 rounded transition-all"
+                style={{ width: `${max > 0 ? (count / max) * 100 : 0}%` }}
+            />
+        </div>
+        <span className="text-sm font-bold text-slate-300 w-6 text-right">{count}</span>
+    </div>
+);
+
+// --- Helpers ---
+
+function getTodayStart(): number {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+}
+
+function formatTime(ts: number): string {
+    return new Date(ts).toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+    });
+}
+
+// --- Main Page ---
 
 export default function DashboardPage() {
-    const { businesses, isLoading, currentUser, resetCounts } = useApp();
+    const {
+        activeBusiness,
+        businesses,
+        areas,
+        venues,
+        events,
+        scanEvents,
+        bans,
+        isLoading,
+        resetCounts,
+    } = useApp();
+
     const router = useRouter();
 
-    // dashBiz is local — resets to null on every mount so the picker always shows for multi-biz users
-    const [dashBiz, setDashBiz] = useState<Business | null>(null);
-    const [dashVenues, setDashVenues] = useState<Venue[]>([]);
-    const [dashAreas, setDashAreas] = useState<Area[]>([]);
-    const [dashEvents, setDashEvents] = useState<CountEvent[]>([]);
-    const [loadingDash, setLoadingDash] = useState(false);
-
-    // Auto-redirect new users with no business to onboarding.
-    // Guard on currentUser.id to avoid false redirects when the first sync fails (network error).
+    // Auto-redirect if no businesses exist after load
     useEffect(() => {
-        if (!isLoading && currentUser.id && businesses.length === 0) {
+        if (!isLoading && businesses.length === 0) {
             router.push('/onboarding/setup');
         }
-    }, [isLoading, currentUser.id, businesses.length]);
+    }, [isLoading, businesses.length, router]);
 
-    // For single-business users, auto-select so they never see the picker
-    useEffect(() => {
-        if (!dashBiz && businesses.length === 1) {
-            setDashBiz(businesses[0]);
-        }
-    }, [businesses, dashBiz]);
+    // --- Derived metrics (memoized) ---
+    const [todayStart, setTodayStart] = useState(() => getTodayStart());
 
-    // Fetch dashboard data whenever dashBiz changes
     useEffect(() => {
-        if (!dashBiz) return;
-        setLoadingDash(true);
-        const load = async () => {
-            const supabase = createClient();
-            const { data: { user } } = await supabase.auth.getUser();
-            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-            if (user) {
-                headers['x-user-id'] = user.id;
-                headers['x-user-email'] = user.email || '';
-            }
-            const res = await fetch(`/api/sync?businessId=${dashBiz.id}`, { cache: 'no-store', headers });
-            if (res.ok) {
-                const data = await res.json();
-                setDashVenues(data.venues || []);
-                setDashAreas(data.areas || []);
-                setDashEvents(data.events || []);
-            }
-            setLoadingDash(false);
+        const now = new Date();
+        const msUntilMidnight = new Date(now).setHours(24, 0, 0, 0) - now.getTime();
+        const timer = setTimeout(() => {
+            const d = new Date(); d.setHours(0, 0, 0, 0);
+            setTodayStart(d.getTime());
+        }, msUntilMidnight);
+        return () => clearTimeout(timer);
+    }, [todayStart]);
+
+    const todayEvents = useMemo(
+        () => events.filter((e) => e.timestamp >= todayStart),
+        [events, todayStart]
+    );
+
+    const todayScanEvents = useMemo(
+        () => scanEvents.filter((s) => s.timestamp >= todayStart),
+        [scanEvents, todayStart]
+    );
+
+    const liveOccupancy = useMemo(
+        () => areas.reduce((sum, a) => sum + (a.current_occupancy ?? 0), 0),
+        [areas]
+    );
+
+    const peakOccupancy = useMemo(() => {
+        // We don't have historical peak in current data model — derive from current as best proxy
+        return liveOccupancy;
+    }, [liveOccupancy]);
+
+    const totalEntries = useMemo(
+        () => todayEvents.filter((e) => e.delta > 0).reduce((sum, e) => sum + e.delta, 0),
+        [todayEvents]
+    );
+
+    const totalExits = useMemo(
+        () => todayEvents.filter((e) => e.delta < 0).reduce((sum, e) => sum + Math.abs(e.delta), 0),
+        [todayEvents]
+    );
+
+    const totalScans = useMemo(() => todayScanEvents.length, [todayScanEvents]);
+
+    const deniedCount = useMemo(
+        () => todayScanEvents.filter((s) => s.scan_result === 'DENIED').length,
+        [todayScanEvents]
+    );
+
+    const deniedPct = useMemo(
+        () => (totalScans > 0 ? Math.round((deniedCount / totalScans) * 100) : 0),
+        [deniedCount, totalScans]
+    );
+
+    const activeBansCount = useMemo(
+        () => bans.filter((b) => b.status === 'ACTIVE').length,
+        [bans]
+    );
+
+    // Age distribution from accepted scans
+    const ageDistribution = useMemo(() => {
+        const bands: Record<string, number> = {
+            '18-20': 0,
+            '21-25': 0,
+            '26-30': 0,
+            '31-40': 0,
+            '40+': 0,
         };
-        load();
-    }, [dashBiz?.id]);
+        todayScanEvents
+            .filter((s) => s.scan_result === 'ACCEPTED')
+            .forEach((s) => {
+                const age = s.age;
+                if (age == null) return;
+                if (age >= 18 && age <= 20) bands['18-20']++;
+                else if (age >= 21 && age <= 25) bands['21-25']++;
+                else if (age >= 26 && age <= 30) bands['26-30']++;
+                else if (age >= 31 && age <= 40) bands['31-40']++;
+                else if (age > 40) bands['40+']++;
+            });
+        return bands;
+    }, [todayScanEvents]);
 
+    const maxAgeBandCount = useMemo(
+        () => Math.max(1, ...Object.values(ageDistribution)),
+        [ageDistribution]
+    );
+
+    // Live Event Log — count events only (ENTRY/EXIT), newest first, last 20
+    const liveEventLog = useMemo(() => {
+        type LogEntry = {
+            id: string;
+            ts: number;
+            kind: 'ENTRY' | 'EXIT';
+            areaId?: string;
+            venueId?: string;
+        };
+
+        return todayEvents
+            .map((e): LogEntry => ({
+                id: `c-${e.id}`,
+                ts: e.timestamp,
+                kind: e.delta > 0 ? 'ENTRY' : 'EXIT',
+                areaId: e.area_id,
+                venueId: e.venue_id,
+            }))
+            .sort((a, b) => b.ts - a.ts)
+            .slice(0, 20);
+    }, [todayEvents]);
+
+    const areaMap = useMemo(() => {
+        const m: Record<string, string> = {};
+        areas.forEach((a) => { m[a.id] = a.name; });
+        return m;
+    }, [areas]);
+
+    const venueNameMap = useMemo(() => {
+        const m: Record<string, string> = {};
+        venues.forEach((v) => { m[v.id] = v.name; });
+        return m;
+    }, [venues]);
+
+    const venueGroups = useMemo(() => {
+        const groups: { venueId: string | undefined; label: string; entries: typeof liveEventLog }[] = [];
+        const seen = new Set<string>();
+
+        liveEventLog.forEach(entry => {
+            const key = entry.venueId ?? '__scan__';
+            if (!seen.has(key)) {
+                seen.add(key);
+                groups.push({
+                    venueId: entry.venueId,
+                    label: entry.venueId ? (venueNameMap[entry.venueId] ?? 'Unknown Venue') : 'ID Scans',
+                    entries: [],
+                });
+            }
+            const group = groups.find(g => (g.venueId ?? '__scan__') === key);
+            group?.entries.push(entry);
+        });
+
+        return groups;
+    }, [liveEventLog, venueNameMap]);
+
+    // --- Render: Loading ---
     if (isLoading) {
         return (
             <div className="space-y-8 animate-pulse">
-                <div className="h-10 w-48 bg-slate-800 rounded-xl" />
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                    {[1, 2].map(i => (
-                        <div key={i} className="glass-panel p-6 rounded-2xl border border-slate-800">
-                            <div className="flex gap-4 mb-6">
-                                <div className="w-12 h-12 bg-slate-800 rounded-xl" />
-                                <div className="flex-1 space-y-2">
-                                    <div className="h-5 bg-slate-800 rounded w-1/2" />
-                                    <div className="h-3 bg-slate-800 rounded w-1/3" />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-3 gap-4 mb-6">
-                                {[1, 2, 3].map(j => <div key={j} className="h-16 bg-slate-800 rounded-xl" />)}
-                            </div>
-                            <div className="space-y-3">
-                                <div className="h-3 bg-slate-800 rounded w-1/4" />
-                                <div className="h-6 bg-slate-800 rounded" />
-                                <div className="h-6 bg-slate-800 rounded" />
-                            </div>
-                        </div>
+                <div className="h-10 w-64 bg-slate-800 rounded-xl" />
+                <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+                    {[1, 2, 3, 4].map((i) => (
+                        <div key={i} className="glass-panel p-5 rounded-2xl border border-slate-800 h-32" />
                     ))}
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="glass-panel p-6 rounded-2xl border border-slate-800 h-64" />
+                    <div className="glass-panel p-6 rounded-2xl border border-slate-800 h-64" />
                 </div>
             </div>
         );
     }
 
-    // Show picker when multiple businesses exist and none is selected
-    if (businesses.length > 1 && !dashBiz) {
+    // --- Render: No business selected ---
+    if (activeBusiness === null && businesses.length > 0) {
         return (
-            <div className="space-y-6 animate-[fade-in_0.5s_ease-out]">
-                <div>
-                    <h1 className="text-3xl font-bold text-white">Select a Business</h1>
-                    <p className="text-slate-400 mt-1">Choose which business to manage.</p>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {businesses.map(biz => (
-                        <button
-                            key={biz.id}
-                            onClick={() => setDashBiz(biz)}
-                            className="text-left p-6 rounded-2xl border transition-all hover:border-primary/50 hover:bg-slate-900/60 border-slate-800 bg-slate-900/40"
-                        >
-                            <Building2 className="w-8 h-8 text-primary mb-3" />
-                            <div className="font-bold text-white text-lg">{biz.name}</div>
-                        </button>
-                    ))}
-                    <Link
-                        href="/onboarding/setup"
-                        className="text-left p-6 rounded-2xl border border-dashed border-slate-700 hover:border-primary/50 transition-all flex flex-col items-start gap-3"
-                    >
-                        <Plus className="w-8 h-8 text-slate-500" />
-                        <div className="font-bold text-slate-400">Add New Business</div>
-                    </Link>
-                </div>
+            <div className="flex items-center justify-center h-64">
+                <p className="text-slate-400 text-lg">Select a business from the sidebar to view insights</p>
             </div>
         );
     }
 
-    if (loadingDash || !dashBiz) {
-        return (
-            <div className="space-y-8 animate-pulse">
-                <div className="h-10 w-48 bg-slate-800 rounded-xl" />
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                    {[1, 2].map(i => (
-                        <div key={i} className="glass-panel p-6 rounded-2xl border border-slate-800">
-                            <div className="flex gap-4 mb-6">
-                                <div className="w-12 h-12 bg-slate-800 rounded-xl" />
-                                <div className="flex-1 space-y-2">
-                                    <div className="h-5 bg-slate-800 rounded w-1/2" />
-                                    <div className="h-3 bg-slate-800 rounded w-1/3" />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-3 gap-4 mb-6">
-                                {[1, 2, 3].map(j => <div key={j} className="h-16 bg-slate-800 rounded-xl" />)}
-                            </div>
-                            <div className="space-y-3">
-                                <div className="h-3 bg-slate-800 rounded w-1/4" />
-                                <div className="h-6 bg-slate-800 rounded" />
-                                <div className="h-6 bg-slate-800 rounded" />
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        );
-    }
+    // Badge styling helpers
+    const badgeClass: Record<string, string> = {
+        ENTRY: 'bg-slate-700 text-slate-200',
+        EXIT: 'bg-amber-900/60 text-amber-300',
+        ID_ACCEPTED: 'bg-emerald-900/60 text-emerald-300',
+        ID_DENIED: 'bg-red-900/60 text-red-300',
+    };
+
+    const badgeLabel: Record<string, string> = {
+        ENTRY: 'ENTRY',
+        EXIT: 'EXIT',
+        ID_ACCEPTED: 'ID ACCEPTED',
+        ID_DENIED: 'ID DENIED',
+    };
 
     return (
         <div className="space-y-8 animate-[fade-in_0.5s_ease-out]">
-            {/* Header */}
+            {/* Page Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-white">Dashboard</h1>
-                    <p className="text-slate-400 mt-1">Real-time overview for <span className="text-primary font-semibold">{dashBiz.name}</span></p>
-                    <div className="flex items-center gap-3 mt-1">
-                        {businesses.length > 1 && (
-                            <button
-                                onClick={() => setDashBiz(null)}
-                                className="text-xs text-slate-500 hover:text-primary transition-colors"
-                            >
-                                ← Switch Business
-                            </button>
-                        )}
-                        <Link
-                            href="/onboarding/setup"
-                            className="text-xs text-slate-500 hover:text-primary transition-colors flex items-center gap-1"
-                        >
-                            <Plus className="w-3 h-3" /> Add Business
-                        </Link>
-                    </div>
+                    <h1 className="text-3xl font-bold text-white">Live Insights</h1>
+                    <p className="text-slate-400 mt-1">Real-time data from all connected devices.</p>
                 </div>
                 <div className="flex items-center gap-3">
+                    {/* Tonight pill */}
+                    <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-full text-sm font-medium transition-colors">
+                        <Calendar className="w-4 h-4" />
+                        Tonight
+                        <ChevronDown className="w-3 h-3" />
+                    </button>
+                    {/* Reset Data */}
                     <button
                         onClick={async () => {
-                            if (window.confirm("⚠️ ARE YOU SURE? \n\nThis will reset ALL occupancy counts to 0 for the entire business. This action cannot be undone.")) {
-                                await resetCounts(dashBiz.id);
+                            if (
+                                activeBusiness &&
+                                window.confirm(
+                                    'Are you sure you want to reset all occupancy counts to 0?'
+                                )
+                            ) {
+                                await resetCounts();
                             }
                         }}
-                        className="px-4 py-2 bg-red-900/50 hover:bg-red-900 text-red-200 border border-red-800/50 rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-sm font-medium transition-colors"
                     >
-                        Reset All Counts
+                        <RefreshCw className="w-4 h-4" />
+                        Reset Data
                     </button>
-
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 rounded-full text-xs font-medium border border-emerald-500/20">
-                        <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                        </span>
-                        System Operational
-                    </div>
+                    {/* Export */}
+                    <button className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-primary/25">
+                        <Download className="w-4 h-4" />
+                        Export
+                    </button>
                 </div>
             </div>
 
-            {/* Getting Started checklist — shown after setup while optional items remain */}
+            {/* Getting Started Checklist */}
             <GettingStartedChecklist />
 
-            {/* Venue cards */}
-            {dashVenues.length > 0 ? (
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                    {dashVenues.map(venue => {
-                        const venueAreas = dashAreas.filter(a => a.venue_id === venue.id);
-                        return <VenueCard key={venue.id} venue={venue} areas={venueAreas} events={dashEvents} />;
-                    })}
-                </div>
-            ) : (
-                <div className="glass-panel border border-dashed border-slate-700 rounded-2xl p-12 flex flex-col items-center justify-center gap-4 text-center">
-                    <Building2 className="w-10 h-10 text-slate-600" />
-                    <div>
-                        <p className="text-slate-300 font-medium">No venues yet</p>
-                        <p className="text-slate-500 text-sm mt-1">Add a venue to start tracking occupancy.</p>
+            {/* KPI Cards */}
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+                <KpiCard
+                    label="Live Occupancy"
+                    value={liveOccupancy}
+                    detail={`Peak: ${peakOccupancy}`}
+                    icon={Users}
+                    iconBg="bg-primary/20 text-primary"
+                />
+                <KpiCard
+                    label="Total Entries"
+                    value={totalEntries}
+                    detail={`Exits: -${totalExits}`}
+                    icon={TrendingUp}
+                    iconBg="bg-amber-500/20 text-amber-400"
+                    detailColor="text-amber-400"
+                />
+                <KpiCard
+                    label="Scans Processed"
+                    value={totalScans}
+                    detail={`${deniedPct}% Denied`}
+                    icon={ScanLine}
+                    iconBg="bg-blue-500/20 text-blue-400"
+                />
+                <KpiCard
+                    label="Banned Hits"
+                    value={activeBansCount}
+                    detail="Flagged instantly"
+                    icon={ShieldBan}
+                    iconBg="bg-red-500/20 text-red-400"
+                />
+            </div>
+
+            {/* Age Distribution + Live Event Log */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Age Distribution */}
+                <div className="glass-panel p-6 rounded-2xl border border-slate-800">
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" />
+                        <h2 className="text-base font-bold text-white">Age Distribution</h2>
                     </div>
-                    <Link
-                        href={`/venues/new?businessId=${dashBiz.id}`}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-medium transition-all shadow-lg hover:shadow-primary/20"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Add Venue
-                    </Link>
+                    <p className="text-xs text-slate-500 mb-5">ID scans accepted · Tonight</p>
+                    <div className="space-y-3">
+                        {Object.entries(ageDistribution).map(([band, count]) => (
+                            <AgeBand
+                                key={band}
+                                band={band}
+                                count={count}
+                                max={maxAgeBandCount}
+                            />
+                        ))}
+                    </div>
                 </div>
-            )}
+
+                {/* Live Event Log */}
+                <div className="glass-panel p-6 rounded-2xl border border-slate-800">
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="relative flex h-2 w-2 shrink-0">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                        </span>
+                        <h2 className="text-base font-bold text-white">Live Event Log</h2>
+                    </div>
+                    {/* Live Event Log — grouped by venue */}
+                    <div className="mt-4 max-h-72 overflow-y-auto pr-1">
+                        {liveEventLog.length === 0 && (
+                            <p className="text-xs text-slate-600 italic">No events recorded tonight.</p>
+                        )}
+                        {venueGroups.map(group => (
+                                <div key={group.venueId ?? '__scan__'} className="mb-3 last:mb-0">
+                                    {/* Venue label */}
+                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">
+                                        {group.label}
+                                    </p>
+                                    <div className="space-y-2">
+                                        {group.entries.map(entry => (
+                                            <div
+                                                key={entry.id}
+                                                className="flex items-center justify-between gap-3 py-1.5 border-b border-slate-800/60 last:border-0"
+                                            >
+                                                <span className={cn('text-xs font-bold px-2 py-0.5 rounded-md shrink-0', badgeClass[entry.kind])}>
+                                                    {badgeLabel[entry.kind]}
+                                                </span>
+                                                <span className="text-sm text-slate-400 flex-1 truncate">
+                                                    {entry.areaId ? areaMap[entry.areaId] ?? 'Unknown Area' : '—'}
+                                                </span>
+                                                <span className="text-xs text-slate-500 shrink-0">
+                                                    {formatTime(entry.ts)}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }

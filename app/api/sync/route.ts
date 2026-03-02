@@ -75,16 +75,25 @@ async function hydrateData(data: DBData): Promise<DBData> {
         }
 
         // 1. Fetch Occupancy Events first (needed as fallback inside snapshot mapping below)
-        const { data: occEvents } = await supabaseAdmin
+        // Try created_at first (migration schema), fall back to timestamp (manual_rpc_install.sql schema)
+        let { data: occEvents, error: evError } = await supabaseAdmin
             .from('occupancy_events')
             .select('*')
             .order('created_at', { ascending: false })
             .limit(100);
+        if (evError) {
+            ({ data: occEvents } = await supabaseAdmin
+                .from('occupancy_events')
+                .select('*')
+                .order('timestamp', { ascending: false })
+                .limit(100));
+        }
 
         // 2. Fetch Occupancy Snapshots (Source of Truth for Counts)
         const { data: snapshots, error: snapError } = await supabaseAdmin
             .from('occupancy_snapshots')
             .select('*');
+        if (snapError) console.error('[sync] occupancy_snapshots query failed:', snapError.message);
 
         if (!snapError && snapshots) {
             data.areas = data.areas.map(a => {
@@ -141,7 +150,7 @@ async function hydrateData(data: DBData): Promise<DBData> {
                 clicr_id: e.device_id || '',
                 user_id: 'system',
                 business_id: e.business_id,
-                timestamp: new Date(e.created_at).getTime(),
+                timestamp: new Date(e.created_at ?? e.timestamp).getTime(),
                 delta: e.delta,
                 flow_type: e.flow_type as any,
                 event_type: e.event_type as any,
@@ -428,26 +437,88 @@ export async function POST(request: Request) {
                 updatedData = addScan(scan);
                 break;
 
-            case 'RESET_COUNTS':
-                if (body.venue_id) {
-                    // D2: Use reset_counts RPC to zero snapshots; events are audit records and must not be hard-deleted
-                    let resetBizId: string | null = null;
-                    if (userId) {
-                        const { data: resetMember } = await supabaseAdmin.from('business_members').select('business_id').eq('user_id', userId).limit(1).single();
-                        if (resetMember) resetBizId = resetMember.business_id;
-                    }
-                    if (resetBizId) {
-                        await supabaseAdmin.rpc('reset_counts', {
-                            p_scope: 'VENUE',
-                            p_business_id: resetBizId,
-                            p_venue_id: body.venue_id
-                        });
-                    } else {
-                        console.warn('[RESET_COUNTS] Could not resolve business_id — Supabase snapshots not zeroed. Local state reset only.');
-                    }
+            case 'RESET_COUNTS': {
+                // Resolve business_id from user session
+                let resetBizId: string | null = null;
+                if (userId) {
+                    const { data: resetMember } = await supabaseAdmin
+                        .from('business_members')
+                        .select('business_id')
+                        .eq('user_id', userId)
+                        .limit(1)
+                        .single();
+                    if (resetMember) resetBizId = resetMember.business_id;
                 }
+
+                if (resetBizId) {
+                    // 1. Resolve which areas to reset
+                    let areasToReset: string[] = [];
+                    if (body.venue_id) {
+                        // VENUE scope — reset only areas in this venue
+                        const { data: venueAreas } = await supabaseAdmin
+                            .from('areas')
+                            .select('id')
+                            .eq('venue_id', body.venue_id)
+                            .eq('business_id', resetBizId);
+                        areasToReset = (venueAreas || []).map((a: any) => a.id);
+                    } else {
+                        // BUSINESS scope — reset all areas for this business (used by dashboard "Reset Data" button)
+                        const { data: bizAreas } = await supabaseAdmin
+                            .from('areas')
+                            .select('id')
+                            .eq('business_id', resetBizId);
+                        areasToReset = (bizAreas || []).map((a: any) => a.id);
+                    }
+
+                    // 2. Zero each area's snapshot (same logic as /api/rpc/reset)
+                    for (const areaId of areasToReset) {
+                        const { data: snap, error: snapReadErr } = await supabaseAdmin
+                            .from('occupancy_snapshots')
+                            .select('current_occupancy, venue_id')
+                            .eq('area_id', areaId)
+                            .single();
+
+                        if (snapReadErr) {
+                            console.error(`[RESET_COUNTS] Failed to read snapshot for area ${areaId}:`, snapReadErr.message);
+                            continue; // skip this area — don't write a bad audit event
+                        }
+
+                        const currentVal = snap?.current_occupancy ?? 0;
+
+                        if (currentVal !== 0) {
+                            const { error: auditErr } = await supabaseAdmin.from('occupancy_events').insert({
+                                business_id: resetBizId,
+                                venue_id: snap?.venue_id || null,
+                                area_id: areaId,
+                                delta: -currentVal,
+                                flow_type: 'OUT',
+                                event_type: 'RESET',
+                                source: 'reset',
+                                user_id: userId || null,
+                            });
+                            if (auditErr) {
+                                console.error(`[RESET_COUNTS] Audit event insert failed for area ${areaId}:`, auditErr.message);
+                                // Continue — still zero the snapshot; the audit trail is best-effort
+                            }
+                        }
+
+                        const { error: snapUpdateErr } = await supabaseAdmin
+                            .from('occupancy_snapshots')
+                            .update({ current_occupancy: 0, last_reset_at: new Date().toISOString() })
+                            .eq('area_id', areaId);
+
+                        if (snapUpdateErr) {
+                            console.error(`[RESET_COUNTS] Snapshot update failed for area ${areaId}:`, snapUpdateErr.message);
+                            // Continue to remaining areas — partial reset is better than total failure
+                        }
+                    }
+                } else {
+                    console.warn('[RESET_COUNTS] Could not resolve business_id — Supabase snapshots not zeroed.');
+                }
+
                 updatedData = resetAllCounts(body.venue_id);
                 break;
+            }
 
             case 'RECORD_TURNAROUND': {
                 const turnaround = payload as TurnaroundEvent;

@@ -127,12 +127,28 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const isResettingRef = useRef(false);
     const activeBusinessIdRef = useRef<string | null>(null);
     const userClearedRef = useRef(false);
+    // Tracks when the last realtime snapshot update fired. Polls that started
+    // before this timestamp carry stale area counts and must not overwrite
+    // the realtime value (classic in-flight race for tap-link events).
+    const lastRealtimeTsRef = useRef<number>(0);
+
+    const LAST_BIZ_KEY = 'clicr_last_biz_id';
+
+    // Synchronous init from localStorage — must run before effects so first poll includes ?businessId=
+    if (typeof window !== 'undefined' && !activeBusinessIdRef.current) {
+        try {
+            const saved = localStorage.getItem(LAST_BIZ_KEY);
+            if (saved) activeBusinessIdRef.current = saved;
+        } catch { /* SSR/incognito safe */ }
+    }
 
     const refreshState = async () => {
         if (isResettingRef.current) {
             console.log("Skipping poll due to pending reset");
             return;
         }
+
+        const pollStartTs = Date.now();
 
         try {
             // Get current Supabase Session
@@ -174,7 +190,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 }
 
                 // Sync ref before setState so next poll includes ?businessId=
-                if (!activeBusinessIdRef.current && !userClearedRef.current && data.businesses?.length === 1) {
+                if (!activeBusinessIdRef.current && !userClearedRef.current && (
+                    data.businesses?.length === 1 ||
+                    !!(activeBusinessIdRef.current && data.businesses?.some((b: Business) => b.id === activeBusinessIdRef.current))
+                )) {
                     activeBusinessIdRef.current = data.businesses[0].id;
                 }
 
@@ -186,13 +205,31 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 );
 
                 setState(prev => {
-                    const shouldAutoSelect = !prev.activeBusiness && !userClearedRef.current && data.businesses?.length === 1;
-                    const autoSelected = shouldAutoSelect ? data.businesses[0] : null;
+                    const shouldAutoSelect = !prev.activeBusiness && !userClearedRef.current && (
+                        data.businesses?.length === 1 ||
+                        // Restore persisted selection if found in this user's businesses
+                        !!(activeBusinessIdRef.current && data.businesses?.some((b: Business) => b.id === activeBusinessIdRef.current))
+                    );
+                    const autoSelected = shouldAutoSelect
+                        ? (data.businesses?.find((b: Business) => b.id === activeBusinessIdRef.current) ?? data.businesses?.[0] ?? null)
+                        : null;
+
+                    // If realtime fired after this poll started reading from the DB, its
+                    // snapshot values are newer — don't let this stale poll overwrite them.
+                    const realtimeIsNewer = lastRealtimeTsRef.current >= pollStartTs;
+                    const mergedAreas = (data.areas || []).map((polledArea: Area) => {
+                        if (realtimeIsNewer) {
+                            const live = prev.areas.find(a => a.id === polledArea.id);
+                            if (live) return { ...polledArea, current_occupancy: live.current_occupancy };
+                        }
+                        return polledArea;
+                    });
+
                     return {
                         ...prev,
                         ...data,
                         venues: sortedVenues,
-                        areas: data.areas || [],
+                        areas: mergedAreas,
                         clicrs: data.clicrs || [],
                         events: data.events || [],
                         scanEvents: data.scanEvents || [],
@@ -212,6 +249,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const selectBusiness = (business: Business) => {
         userClearedRef.current = false;
         activeBusinessIdRef.current = business.id;
+        try { localStorage.setItem(LAST_BIZ_KEY, business.id); } catch { /* SSR/incognito safe */ }
         setState(prev => ({
             ...prev,
             activeBusiness: business,
@@ -263,6 +301,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
                         if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
                             const newSnap = payload.new as any;
+                            // Mark that realtime fired NOW so any in-flight poll (which read
+                            // a stale snapshot before this event) won't overwrite this value.
+                            lastRealtimeTsRef.current = Date.now();
                             setState(prev => ({
                                 ...prev,
                                 areas: prev.areas.map(a => {
@@ -417,12 +458,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setState(optimisticState);
 
         try {
-            const res = await fetch('/api/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'RESET_COUNTS', venue_id: venueId }),
-                cache: 'no-store'
-            });
+            // authFetch attaches x-user-id so the server can resolve business_id
+            const res = await authFetch({ action: 'RESET_COUNTS', venue_id: venueId });
 
             if (res.ok) {
                 const updatedDB = await res.json();
@@ -622,17 +659,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const updateClicr = async (clicr: Clicr) => {
+        // Optimistic update — applies name/config change immediately
         setState(prev => ({ ...prev, clicrs: prev.clicrs.map(c => c.id === clicr.id ? clicr : c) }));
         try {
-            const res = await fetch('/api/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'UPDATE_CLICR', payload: clicr })
-            });
-            if (res.ok) {
-                const updatedDB = await res.json();
-                setState(prev => ({ ...prev, ...updatedDB }));
+            const res = await authFetch({ action: 'UPDATE_CLICR', payload: clicr });
+            if (!res.ok) {
+                console.error("UPDATE_CLICR failed (server error)", res.status);
+                // Intentionally NOT reverting — optimistic state is user's intent.
+                // The 2-second polling interval will reconcile if needed.
             }
+            // Intentionally NOT spreading updatedDB — the optimistic update is correct
+            // and the 2-second polling interval will confirm server truth.
         } catch (error) { console.error("Failed to update clicr", error); }
     };
 
