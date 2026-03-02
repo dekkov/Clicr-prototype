@@ -198,6 +198,8 @@ export default function DashboardPage() {
             venueId: e.venue_id,
         }));
 
+        // venueId intentionally omitted — scan events are grouped under a generic
+        // "ID Scans" section header regardless of originating venue.
         const scanRows: LogEntry[] = todayScanEvents.map((s) => ({
             id: `s-${s.id}`,
             ts: s.timestamp,
@@ -220,6 +222,27 @@ export default function DashboardPage() {
         venues.forEach((v) => { m[v.id] = v.name; });
         return m;
     }, [venues]);
+
+    const venueGroups = useMemo(() => {
+        const groups: { venueId: string | undefined; label: string; entries: typeof liveEventLog }[] = [];
+        const seen = new Set<string>();
+
+        liveEventLog.forEach(entry => {
+            const key = entry.venueId ?? '__scan__';
+            if (!seen.has(key)) {
+                seen.add(key);
+                groups.push({
+                    venueId: entry.venueId,
+                    label: entry.venueId ? (venueNameMap[entry.venueId] ?? 'Unknown Venue') : 'ID Scans',
+                    entries: [],
+                });
+            }
+            const group = groups.find(g => (g.venueId ?? '__scan__') === key);
+            group?.entries.push(entry);
+        });
+
+        return groups;
+    }, [liveEventLog, venueNameMap]);
 
     // --- Render: Loading ---
     if (isLoading) {
@@ -374,26 +397,7 @@ export default function DashboardPage() {
                         {liveEventLog.length === 0 && (
                             <p className="text-xs text-slate-600 italic">No events recorded tonight.</p>
                         )}
-                        {(() => {
-                            // Group entries by venueId, preserving insertion order (newest-first sort already applied)
-                            const groups: { venueId: string | undefined; label: string; entries: typeof liveEventLog }[] = [];
-                            const seen = new Set<string>();
-
-                            liveEventLog.forEach(entry => {
-                                const key = entry.venueId ?? '__scan__';
-                                if (!seen.has(key)) {
-                                    seen.add(key);
-                                    groups.push({
-                                        venueId: entry.venueId,
-                                        label: entry.venueId ? (venueNameMap[entry.venueId] ?? 'Unknown Venue') : 'ID Scans',
-                                        entries: [],
-                                    });
-                                }
-                                const group = groups.find(g => (g.venueId ?? '__scan__') === key);
-                                group?.entries.push(entry);
-                            });
-
-                            return groups.map(group => (
+                        {venueGroups.map(group => (
                                 <div key={group.venueId ?? '__scan__'} className="mb-3 last:mb-0">
                                     {/* Venue label */}
                                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">
@@ -418,8 +422,7 @@ export default function DashboardPage() {
                                         ))}
                                     </div>
                                 </div>
-                            ));
-                        })()}
+                            ))}
                     </div>
                 </div>
             </div>
