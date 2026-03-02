@@ -1,14 +1,81 @@
 "use client";
 import React, { useState } from 'react';
 import { useApp } from '@/lib/store';
-import { Search, RefreshCw, ArrowUp, ArrowDown } from 'lucide-react';
+import { Area, AreaType, CountingMode, FlowMode } from '@/lib/types';
+import { Search, RefreshCw, ArrowUp, ArrowDown, Plus, ChevronDown, MousePointer2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function AreasPage() {
-    const { areas, clicrs, venues, areaTraffic, activeBusiness } = useApp();
+    const { areas, clicrs, venues, areaTraffic, activeBusiness, addArea, addClicr, isLoading } = useApp();
     const [search, setSearch] = useState('');
+    const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [isAddingArea, setIsAddingArea] = useState(false);
+    const [newArea, setNewArea] = useState<Partial<Area> & { venue_id: string }>({
+        venue_id: '',
+        name: '',
+        area_type: 'MAIN',
+        default_capacity: 0,
+        counting_mode: 'BOTH',
+        is_active: true,
+    });
 
-    if (!activeBusiness) {
+    // Add Clicr modal state
+    const [addClicrAreaId, setAddClicrAreaId] = useState<string | null>(null);
+    const [newClicrName, setNewClicrName] = useState('');
+    const [newClicrFlow, setNewClicrFlow] = useState<FlowMode>('BIDIRECTIONAL');
+    const [isAddingClicr, setIsAddingClicr] = useState(false);
+
+    const handleAddClicr = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!addClicrAreaId || !newClicrName.trim()) return;
+        setIsAddingClicr(true);
+        await addClicr({
+            id: crypto.randomUUID(),
+            area_id: addClicrAreaId,
+            name: newClicrName.trim(),
+            flow_mode: newClicrFlow,
+            current_count: 0,
+            active: true,
+        });
+        setIsAddingClicr(false);
+        setAddClicrAreaId(null);
+        setNewClicrName('');
+        setNewClicrFlow('BIDIRECTIONAL');
+    };
+
+    const handleCreateArea = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newArea.name || !newArea.venue_id) return;
+
+        setIsAddingArea(true);
+        const area: Area = {
+            id: crypto.randomUUID(),
+            venue_id: newArea.venue_id,
+            name: newArea.name,
+            area_type: newArea.area_type || 'MAIN',
+            default_capacity: newArea.default_capacity || 0,
+            capacity_max: newArea.default_capacity || 0,
+            counting_mode: newArea.counting_mode || 'BOTH',
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+        } as Area;
+
+        await addArea(area);
+        setIsAddingArea(false);
+        setIsCreateOpen(false);
+        setNewArea({
+            venue_id: '',
+            name: '',
+            area_type: 'MAIN',
+            default_capacity: 0,
+            counting_mode: 'BOTH',
+            is_active: true,
+        });
+    };
+
+    if (!activeBusiness && !isLoading) {
         return (
             <div className="space-y-6">
                 <div>
@@ -17,6 +84,32 @@ export default function AreasPage() {
                 </div>
                 <div className="glass-card p-10 rounded-xl text-center text-slate-400">
                     Select a business from the sidebar.
+                </div>
+            </div>
+        );
+    }
+
+    if (isLoading) {
+        return (
+            <div className="space-y-8">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h1 className="text-3xl font-bold text-white">Areas</h1>
+                        <p className="text-slate-400">All areas across your venues.</p>
+                    </div>
+                </div>
+                <div className="space-y-4 animate-pulse">
+                    <div className="h-5 bg-slate-800 rounded w-32" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {[1, 2, 3].map(i => (
+                            <div key={i} className="glass-card rounded-xl p-5 space-y-3">
+                                <div className="h-4 bg-slate-800 rounded w-24" />
+                                <div className="h-10 bg-slate-800 rounded w-16" />
+                                <div className="h-1.5 bg-slate-800 rounded-full" />
+                                <div className="h-3 bg-slate-800 rounded w-full" />
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
         );
@@ -43,16 +136,25 @@ export default function AreasPage() {
                     <p className="text-slate-400">All areas across your venues.</p>
                 </div>
 
-                {/* Search */}
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input
-                        type="text"
-                        placeholder="Search areas..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-white focus:border-primary outline-none"
-                    />
+                <div className="flex items-center gap-3">
+                    {/* Search */}
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                        <input
+                            type="text"
+                            placeholder="Search areas..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-white focus:border-primary outline-none"
+                        />
+                    </div>
+                    <button
+                        onClick={() => setIsCreateOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg font-medium transition-colors whitespace-nowrap"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Add Area
+                    </button>
                 </div>
             </div>
 
@@ -120,7 +222,7 @@ export default function AreasPage() {
                                             />
                                         </div>
 
-                                        {/* Bottom Row: traffic + device count */}
+                                        {/* Bottom Row: traffic + device count + add clicr */}
                                         <div className="flex items-center justify-between text-xs text-slate-400">
                                             <div className="flex items-center gap-3">
                                                 <span className="flex items-center gap-1 text-emerald-400">
@@ -132,7 +234,17 @@ export default function AreasPage() {
                                                     {traffic.total_out}
                                                 </span>
                                             </div>
-                                            <span>{deviceCount} device{deviceCount !== 1 ? 's' : ''}</span>
+                                            <div className="flex items-center gap-2">
+                                                <span>{deviceCount} device{deviceCount !== 1 ? 's' : ''}</span>
+                                                <button
+                                                    onClick={() => setAddClicrAreaId(area.id)}
+                                                    className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                                                    title="Add Clicr to this area"
+                                                >
+                                                    <Plus className="w-3 h-3" />
+                                                    <MousePointer2 className="w-3 h-3" />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 );
@@ -141,6 +253,201 @@ export default function AreasPage() {
                     </section>
                 ))
             )}
+
+            {/* Create Area Modal */}
+            <AnimatePresence>
+                {isCreateOpen && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+                        onClick={() => setIsCreateOpen(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-lg shadow-xl"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <h2 className="text-xl font-bold mb-4">Create Area</h2>
+                            <form onSubmit={handleCreateArea} className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-slate-400">Venue</label>
+                                    <div className="relative">
+                                        <select
+                                            value={newArea.venue_id}
+                                            onChange={e => setNewArea(prev => ({ ...prev, venue_id: e.target.value }))}
+                                            required
+                                            className="w-full appearance-none bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary/50 pr-10"
+                                        >
+                                            <option value="">Select a venue…</option>
+                                            {venues.map(v => (
+                                                <option key={v.id} value={v.id}>{v.name}</option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-slate-400">Area Name</label>
+                                    <input
+                                        type="text"
+                                        value={newArea.name}
+                                        onChange={e => setNewArea(prev => ({ ...prev, name: e.target.value }))}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                        placeholder="e.g. Main Floor"
+                                        required
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-slate-400">Type</label>
+                                        <select
+                                            value={newArea.area_type}
+                                            onChange={e => setNewArea(prev => ({ ...prev, area_type: e.target.value as AreaType }))}
+                                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                        >
+                                            <option value="MAIN">Main</option>
+                                            <option value="ENTRY">Entry</option>
+                                            <option value="VIP">VIP</option>
+                                            <option value="PATIO">Patio</option>
+                                            <option value="BAR">Bar</option>
+                                            <option value="EVENT_SPACE">Event Space</option>
+                                            <option value="OTHER">Other</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-slate-400">Capacity</label>
+                                        <input
+                                            type="number"
+                                            value={newArea.default_capacity || ''}
+                                            onChange={e => setNewArea(prev => ({ ...prev, default_capacity: parseInt(e.target.value) || 0 }))}
+                                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                            placeholder="0 for unlimited"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-slate-400">Counting Mode</label>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {(['MANUAL', 'AUTO_FROM_SCANS', 'BOTH'] as CountingMode[]).map(mode => (
+                                            <button
+                                                key={mode}
+                                                type="button"
+                                                onClick={() => setNewArea(prev => ({ ...prev, counting_mode: mode }))}
+                                                className={cn(
+                                                    "px-2 py-2 rounded-lg text-xs font-medium border transition-colors",
+                                                    newArea.counting_mode === mode
+                                                        ? "bg-primary/20 text-primary border-primary/50"
+                                                        : "bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-900"
+                                                )}
+                                            >
+                                                {mode.replace(/_/g, ' ')}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-800">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsCreateOpen(false)}
+                                        className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={isAddingArea}
+                                        className="px-6 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg font-bold shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center gap-2"
+                                    >
+                                        {isAddingArea && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                                        {isAddingArea ? 'Adding...' : 'Create Area'}
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Add Clicr Modal */}
+            <AnimatePresence>
+                {addClicrAreaId && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+                        onClick={() => { setAddClicrAreaId(null); setNewClicrName(''); setNewClicrFlow('BIDIRECTIONAL'); }}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-xl"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <h2 className="text-xl font-bold mb-1">Add Clicr</h2>
+                            <p className="text-sm text-slate-400 mb-4">
+                                Adding to <span className="text-white font-medium">{areas.find(a => a.id === addClicrAreaId)?.name}</span>
+                            </p>
+                            <form onSubmit={handleAddClicr} className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-slate-400">Clicr Name</label>
+                                    <input
+                                        type="text"
+                                        value={newClicrName}
+                                        onChange={e => setNewClicrName(e.target.value)}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                        placeholder="e.g. Front Door"
+                                        required
+                                        autoFocus
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-slate-400">Flow Mode</label>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {(['BIDIRECTIONAL', 'IN_ONLY', 'OUT_ONLY'] as FlowMode[]).map(mode => (
+                                            <button
+                                                key={mode}
+                                                type="button"
+                                                onClick={() => setNewClicrFlow(mode)}
+                                                className={cn(
+                                                    "px-2 py-2 rounded-lg text-xs font-medium border transition-colors",
+                                                    newClicrFlow === mode
+                                                        ? "bg-primary/20 text-primary border-primary/50"
+                                                        : "bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-900"
+                                                )}
+                                            >
+                                                {mode === 'BIDIRECTIONAL' ? 'Both' : mode === 'IN_ONLY' ? 'In Only' : 'Out Only'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-800">
+                                    <button
+                                        type="button"
+                                        onClick={() => { setAddClicrAreaId(null); setNewClicrName(''); setNewClicrFlow('BIDIRECTIONAL'); }}
+                                        className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={isAddingClicr}
+                                        className="px-6 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg font-bold shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center gap-2"
+                                    >
+                                        {isAddingClicr && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                                        {isAddingClicr ? 'Adding...' : 'Add Clicr'}
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

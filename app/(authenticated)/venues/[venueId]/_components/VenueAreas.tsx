@@ -36,6 +36,7 @@ export default function VenueAreas({ venueId }: { venueId: string }) {
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editingArea, setEditingArea] = useState<Partial<Area> | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
 
     const handleCreate = () => {
         setEditingArea({
@@ -66,10 +67,10 @@ export default function VenueAreas({ venueId }: { venueId: string }) {
         e.preventDefault();
         if (!editingArea || !editingArea.name) return;
 
-        // Sync legacy field for compatibility
+        setIsSaving(true);
         const areaToSave = {
             ...editingArea,
-            capacity_max: editingArea.default_capacity, // UI binds to default_capacity
+            capacity_max: editingArea.default_capacity,
         } as Area;
 
         if (editingArea.id) {
@@ -77,13 +78,14 @@ export default function VenueAreas({ venueId }: { venueId: string }) {
         } else {
             const newArea: Area = {
                 ...areaToSave,
-                id: Math.random().toString(36).substring(7), // Temp ID until refresh
+                id: crypto.randomUUID(),
                 venue_id: venueId,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
             } as Area;
             await addArea(newArea);
         }
+        setIsSaving(false);
         setIsEditModalOpen(false);
         setEditingArea(null);
     };
@@ -260,9 +262,11 @@ export default function VenueAreas({ venueId }: { venueId: string }) {
                                     </button>
                                     <button
                                         type="submit"
-                                        className="px-6 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg font-bold shadow-lg shadow-primary/20"
+                                        disabled={isSaving}
+                                        className="px-6 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg font-bold shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center gap-2"
                                     >
-                                        Save Area
+                                        {isSaving && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                                        {isSaving ? 'Adding...' : 'Save Area'}
                                     </button>
                                 </div>
                             </form>

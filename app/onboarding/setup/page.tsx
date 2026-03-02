@@ -11,7 +11,7 @@ type Step = 'BUSINESS' | 'VENUE' | 'AREAS' | 'CLICRS';
 
 export default function OnboardingSetupPage() {
     const router = useRouter();
-    const { addVenue, addArea, addClicr, businesses, selectBusiness, refreshState } = useApp();
+    const { addVenue, addArea, addClicr, selectBusiness, refreshState } = useApp();
 
     const [step, setStep] = useState<Step>('BUSINESS');
     const [isLoading, setIsLoading] = useState(false);
@@ -125,8 +125,14 @@ export default function OnboardingSetupPage() {
     };
 
     const finish = () => {
-        const newBiz = businesses.find(b => b.id === newBusinessId);
-        if (newBiz) selectBusiness(newBiz);
+        if (newBusinessId) {
+            selectBusiness({
+                id: newBusinessId,
+                name: businessName,
+                timezone: 'America/New_York',
+                settings: { refresh_interval_sec: 2, capacity_thresholds: [80, 90, 100], reset_rule: 'MANUAL' },
+            });
+        }
         router.push('/dashboard');
     };
 

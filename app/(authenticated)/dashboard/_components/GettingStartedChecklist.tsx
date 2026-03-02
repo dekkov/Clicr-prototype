@@ -37,14 +37,14 @@ export function GettingStartedChecklist() {
             label: 'Define areas in your venue',
             description: 'Create zones like Main Floor, VIP, etc.',
             completed: areas.length > 0,
-            href: venues[0]?.id ? `/venues/${venues[0].id}` : '/venues',
+            href: '/areas',
         },
         {
             id: 'devices',
             label: 'Connect a Clicr device',
             description: 'Register a counter to start tracking',
             completed: clicrs.length > 0,
-            href: venues[0]?.id ? `/venues/${venues[0].id}` : '/venues',
+            href: '/areas',
         },
     ];
 

@@ -3,23 +3,55 @@
 import React from 'react';
 import Link from 'next/link';
 import { useApp } from '@/lib/store';
-import { LayoutGrid, MousePointer2, ChevronRight } from 'lucide-react';
+import { LayoutGrid, MousePointer2, ChevronRight, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Clicr, Area } from '@/lib/types';
 
 export default function ClicrListPage() {
     const { clicrs, areas, venues, isLoading, activeBusiness } = useApp();
 
-    if (!activeBusiness) {
+    if (!activeBusiness && !isLoading) {
         return (
-            <div className="p-8 text-slate-400">
-                Select a business from the sidebar.
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-slate-500">
+                <MousePointer2 className="w-12 h-12 mb-4 opacity-30" />
+                <p className="text-base">Select a business from the sidebar to view Clicrs.</p>
             </div>
         );
     }
 
     if (isLoading) {
-        return <div className="p-8 text-white">Loading Clicrs...</div>;
+        return (
+            <div className="space-y-10 pb-20">
+                <PageHeader />
+                <div className="space-y-6 animate-pulse">
+                    <div className="flex items-center gap-4">
+                        <div className="h-6 bg-slate-800 rounded w-40" />
+                        <div className="flex-1 h-px bg-slate-800" />
+                    </div>
+                    <div className="space-y-3">
+                        <div className="h-4 bg-slate-800 rounded w-24" />
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {[1, 2, 3].map(i => (
+                                <div key={i} className="glass-card p-5 rounded-xl space-y-3">
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-10 h-10 bg-slate-800 rounded-full" />
+                                        <div className="flex-1 space-y-1.5">
+                                            <div className="h-4 bg-slate-800 rounded w-28" />
+                                            <div className="h-3 bg-slate-800 rounded w-20" />
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <div className="h-5 bg-slate-800 rounded-full w-16" />
+                                        <div className="h-5 bg-slate-800 rounded-full w-20" />
+                                    </div>
+                                    <div className="h-8 bg-slate-800 rounded w-16" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     if (!clicrs || clicrs.length === 0) {
@@ -91,10 +123,19 @@ function PageHeader() {
                 <h1 className="text-3xl font-bold text-white">Clicrs</h1>
                 <p className="text-slate-400">Your counting and scanning devices.</p>
             </div>
-            <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm text-slate-300 hover:text-white transition-colors">
-                <LayoutGrid className="w-4 h-4" />
-                Board View
-            </button>
+            <div className="flex items-center gap-3">
+                <Link
+                    href="/areas"
+                    className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg font-medium transition-colors text-sm"
+                >
+                    <Plus className="w-4 h-4" />
+                    Add Clicr
+                </Link>
+                <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm text-slate-300 hover:text-white transition-colors">
+                    <LayoutGrid className="w-4 h-4" />
+                    Board View
+                </button>
+            </div>
         </div>
     );
 }

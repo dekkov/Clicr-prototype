@@ -4,19 +4,18 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/store';
 import { Venue, Area, Clicr } from '@/lib/types';
-import { ArrowLeft, Check, Plus, MapPin, Building2, Users, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Check, Plus, MapPin, Building2, Users } from 'lucide-react';
 
 type Step = 'VENUE' | 'AREAS' | 'CLICRS';
 
 export default function NewVenuePage() {
     const router = useRouter();
-    const { addVenue, addArea, addClicr, activeBusiness, businesses } = useApp();
+    const { addVenue, addArea, addClicr, activeBusiness } = useApp();
     const [step, setStep] = useState<Step>('VENUE');
     const [isLoading, setIsLoading] = useState(false);
 
     // Data State
     const [venueId, setVenueId] = useState<string>('');
-    const [selectedBizId, setSelectedBizId] = useState<string>(activeBusiness?.id ?? businesses[0]?.id ?? '');
     const [venueData, setVenueData] = useState({
         name: '',
         city: '',
@@ -35,8 +34,8 @@ export default function NewVenuePage() {
     // --- STEP 1: CREATE VENUE ---
     const handleCreateVenue = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedBizId) {
-            alert('Please select a business for this venue.');
+        if (!activeBusiness?.id) {
+            alert('Please select a business from the sidebar first.');
             return;
         }
         setIsLoading(true);
@@ -44,7 +43,7 @@ export default function NewVenuePage() {
         const newId = crypto.randomUUID();
         const venue: Venue = {
             id: newId,
-            business_id: selectedBizId,
+            business_id: activeBusiness.id,
             name: venueData.name,
             city: venueData.city,
             state: venueData.state,
@@ -86,13 +85,7 @@ export default function NewVenuePage() {
         setIsLoading(false);
     };
 
-    const nextToClicrs = () => {
-        if (createdAreas.length === 0) {
-            alert("Please add at least one area (e.g. Main Floor).");
-            return;
-        }
-        setStep('CLICRS');
-    };
+    const nextToClicrs = () => setStep('CLICRS');
 
     // --- STEP 3: ADD CLICRS ---
     const handleAddClicr = async (areaId: string) => {
@@ -127,25 +120,10 @@ export default function NewVenuePage() {
                 <Building2 className="text-primary" /> Step 1: New Venue
             </h2>
 
-            {/* Business selector — only shown when user has multiple businesses */}
-            {businesses.length > 1 && (
-                <div className="space-y-2 border-b border-slate-800 pb-6 mb-6">
-                    <label className="text-sm font-medium text-slate-300">Business</label>
-                    <div className="relative">
-                        <select
-                            value={selectedBizId}
-                            onChange={e => setSelectedBizId(e.target.value)}
-                            required
-                            className="w-full appearance-none bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none pr-10"
-                        >
-                            <option value="">Select a business…</option>
-                            {businesses.map(biz => (
-                                <option key={biz.id} value={biz.id}>{biz.name}</option>
-                            ))}
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-                    </div>
-                    <p className="text-xs text-slate-500">This venue will be added to the selected business.</p>
+            {activeBusiness && (
+                <div className="flex items-center gap-2 text-sm text-slate-400 border-b border-slate-800 pb-4 mb-2">
+                    <Building2 className="w-4 h-4" />
+                    <span>Adding to <span className="font-medium text-white">{activeBusiness.name}</span></span>
                 </div>
             )}
 
@@ -162,10 +140,9 @@ export default function NewVenuePage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-300">City</label>
+                    <label className="text-sm font-medium text-slate-300">City <span className="text-slate-600">(optional)</span></label>
                     <input
                         type="text"
-                        required
                         value={venueData.city}
                         onChange={e => setVenueData({ ...venueData, city: e.target.value })}
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none"
@@ -173,10 +150,9 @@ export default function NewVenuePage() {
                     />
                 </div>
                 <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-300">State</label>
+                    <label className="text-sm font-medium text-slate-300">State <span className="text-slate-600">(optional)</span></label>
                     <input
                         type="text"
-                        required
                         value={venueData.state}
                         onChange={e => setVenueData({ ...venueData, state: e.target.value })}
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none"
@@ -185,13 +161,13 @@ export default function NewVenuePage() {
                 </div>
             </div>
             <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-300">Total Capacity Limit</label>
+                <label className="text-sm font-medium text-slate-300">Total Capacity Limit <span className="text-slate-600">(optional)</span></label>
                 <input
                     type="number"
-                    required
                     value={venueData.capacity}
                     onChange={e => setVenueData({ ...venueData, capacity: parseInt(e.target.value) })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none"
+                    placeholder="0 for unlimited"
                 />
             </div>
             <button
@@ -259,7 +235,13 @@ export default function NewVenuePage() {
                     </button>
                 </div>
 
-                <div className="pt-4 border-t border-slate-800 flex justify-end">
+                <div className="pt-4 border-t border-slate-800 flex justify-between">
+                    <button
+                        onClick={handleFinish}
+                        className="px-6 py-3 text-slate-400 hover:text-white transition-colors text-sm font-medium"
+                    >
+                        Skip for now
+                    </button>
                     <button
                         onClick={nextToClicrs}
                         className="px-8 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl shadow-lg shadow-primary/25 transition-all"
@@ -320,7 +302,13 @@ export default function NewVenuePage() {
                     })}
                 </div>
 
-                <div className="pt-4 border-t border-slate-800 flex justify-end">
+                <div className="pt-4 border-t border-slate-800 flex justify-between">
+                    <button
+                        onClick={handleFinish}
+                        className="px-6 py-3 text-slate-400 hover:text-white transition-colors text-sm font-medium"
+                    >
+                        Skip for now
+                    </button>
                     <button
                         onClick={handleFinish}
                         className="px-8 py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl shadow-lg shadow-green-500/20 transition-all flex items-center gap-2"
