@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { useApp } from '@/lib/store';
 import {
     Users, TrendingUp, ScanLine, ShieldBan,
@@ -92,7 +92,17 @@ export default function DashboardPage() {
     }, [isLoading, businesses.length, router]);
 
     // --- Derived metrics (memoized) ---
-    const todayStart = useMemo(() => getTodayStart(), []);
+    const [todayStart, setTodayStart] = useState(() => getTodayStart());
+
+    useEffect(() => {
+        const now = new Date();
+        const msUntilMidnight = new Date(now).setHours(24, 0, 0, 0) - now.getTime();
+        const timer = setTimeout(() => {
+            const d = new Date(); d.setHours(0, 0, 0, 0);
+            setTodayStart(d.getTime());
+        }, msUntilMidnight);
+        return () => clearTimeout(timer);
+    }, [todayStart]);
 
     const todayEvents = useMemo(
         () => events.filter((e) => e.timestamp >= todayStart),
@@ -268,7 +278,7 @@ export default function DashboardPage() {
                                     'Are you sure you want to reset all occupancy counts to 0?'
                                 )
                             ) {
-                                await resetCounts(activeBusiness.id);
+                                await resetCounts();
                             }
                         }}
                         className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-sm font-medium transition-colors"
