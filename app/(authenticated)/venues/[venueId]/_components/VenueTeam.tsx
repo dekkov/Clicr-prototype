@@ -4,12 +4,20 @@ import React, { useState } from 'react';
 import { useApp } from '@/lib/store';
 import { User, Role } from '@/lib/types';
 import { Users, Plus, Trash2, Mail, Shield, User as UserIcon, Check } from 'lucide-react';
-import { cn } from '@/lib/utils'; // Assuming this exists
+import { cn } from '@/lib/utils';
+
+const ROLE_LABELS: Record<Role, string> = {
+    OWNER: 'Org Owner', ADMIN: 'GM / Ops Admin', MANAGER: 'Door Manager',
+    STAFF: 'Door Staff', ANALYST: 'Analyst',
+};
+const ROLE_DEFINITIONS = Object.fromEntries(
+    Object.entries(ROLE_LABELS).map(([k, v]) => [k, { label: v }])
+) as Record<Role, { label: string }>;
 
 export default function VenueTeam({ venueId }: { venueId: string }) {
     const { users, addUser, updateUser, removeUser, business } = useApp(); // Assuming updateUser/removeUser will be added
     const [isInviting, setIsInviting] = useState(false);
-    const [newItem, setNewItem] = useState({ name: '', email: '', role: 'USER' as Role });
+    const [newItem, setNewItem] = useState({ name: '', email: '', role: 'STAFF' as Role });
 
     const venueUsers = users.filter(u =>
         (u.assigned_venue_ids && u.assigned_venue_ids.includes(venueId)) ||
@@ -36,7 +44,7 @@ export default function VenueTeam({ venueId }: { venueId: string }) {
         }
 
         setIsInviting(false);
-        setNewItem({ name: '', email: '', role: 'USER' });
+        setNewItem({ name: '', email: '', role: 'STAFF' });
     };
 
     const handleRemove = async (userId: string) => {
@@ -95,9 +103,10 @@ export default function VenueTeam({ venueId }: { venueId: string }) {
                             value={newItem.role}
                             onChange={e => setNewItem({ ...newItem, role: e.target.value as Role })}
                         >
-                            <option value="USER">Door Staff</option>
-                            <option value="SUPERVISOR">Supervisor</option>
-                            <option value="ADMIN">Manager</option>
+                            <option value="STAFF">Door Staff</option>
+                            <option value="MANAGER">Door Manager</option>
+                            <option value="ADMIN">GM / Ops Admin</option>
+                            <option value="ANALYST">Analyst</option>
                         </select>
                     </div>
                     <button
@@ -137,7 +146,7 @@ export default function VenueTeam({ venueId }: { venueId: string }) {
 
                             <div className="flex items-center gap-6">
                                 <div className="text-sm text-slate-400 hidden md:block">
-                                    {user.role === 'USER' ? 'Door Staff' : user.role}
+                                    {ROLE_DEFINITIONS[user.role as Role]?.label ?? user.role}
                                 </div>
                                 {user.role !== 'OWNER' && (
                                     <button

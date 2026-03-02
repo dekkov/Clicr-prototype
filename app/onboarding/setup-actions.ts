@@ -14,10 +14,17 @@ export async function createInitialBusiness(formData: FormData): Promise<SetupRe
     const businessName = (formData.get('businessName') as string)?.trim();
     if (!businessName) return { success: false, error: 'Business name is required' };
 
+    const timezone = (formData.get('timezone') as string)?.trim() || 'America/New_York';
+    const logoUrl = (formData.get('logoUrl') as string)?.trim() || null;
+
     try {
         const { data: business, error: busError } = await supabaseAdmin
             .from('businesses')
-            .insert({ name: businessName })
+            .insert({
+                name: businessName,
+                timezone,
+                ...(logoUrl ? { logo_url: logoUrl } : {}),
+            })
             .select()
             .single();
         if (busError) throw busError;
@@ -74,5 +81,35 @@ export async function createInitialVenue(formData: FormData): Promise<SetupResul
     } catch (e: any) {
         console.error('[setup] createInitialVenue error:', e);
         return { success: false, error: e.message || 'Failed to create venue' };
+    }
+}
+
+export async function updateBusinessSettings(
+    businessId: string,
+    newSettings: Record<string, unknown>
+): Promise<SetupResult> {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'Not authenticated' };
+
+    try {
+        const { data: existing } = await supabaseAdmin
+            .from('businesses')
+            .select('settings')
+            .eq('id', businessId)
+            .single();
+
+        const merged = { ...(existing?.settings || {}), ...newSettings };
+
+        const { error } = await supabaseAdmin
+            .from('businesses')
+            .update({ settings: merged })
+            .eq('id', businessId);
+
+        if (error) throw error;
+        return { success: true };
+    } catch (e: any) {
+        console.error('[setup] updateBusinessSettings error:', e);
+        return { success: false, error: e.message || 'Failed to update settings' };
     }
 }

@@ -1,4 +1,4 @@
-export type Role = 'OWNER' | 'ADMIN' | 'SUPERVISOR' | 'USER';
+export type Role = 'OWNER' | 'ADMIN' | 'MANAGER' | 'STAFF' | 'ANALYST';
 
 export type BanScope = 'BUSINESS' | 'VENUE';
 export type BanStatus = 'SCHEDULED' | 'ACTIVE' | 'EXPIRED' | 'REVOKED';
@@ -50,10 +50,16 @@ export type Business = {
     id: string;
     name: string;
     timezone: string;
+    logo_url?: string;
     settings: {
         refresh_interval_sec: number;
         capacity_thresholds: [number, number, number]; // e.g. [80, 90, 100]
         reset_rule: 'MANUAL' | 'SCHEDULED';
+        scan_method?: 'CAMERA' | 'BLUETOOTH';
+        scan_enabled_default?: boolean;
+        ban_permissions?: { manager: boolean; staff: boolean };
+        ban_scope_default?: 'VENUE' | 'BUSINESS';
+        ban_reason_required?: boolean;
     };
 };
 
@@ -86,25 +92,32 @@ export type Venue = {
 export type AreaType = 'ENTRY' | 'MAIN' | 'PATIO' | 'VIP' | 'BAR' | 'EVENT_SPACE' | 'OTHER';
 export type CountingMode = 'MANUAL' | 'AUTO_FROM_SCANS' | 'BOTH';
 
+export type ShiftMode = 'AUTO' | 'MANUAL';
+
 export type Area = {
     id: string;
     venue_id: string;
-    business_id?: string; // Added to match DB
+    business_id?: string;
     name: string;
     area_type: AreaType;
-    capacity_max?: number; // Match DB
-    default_capacity?: number | null; // UI legacy
+    capacity_max?: number;
+    default_capacity?: number | null;
     last_reset_at?: string; // ISO
     counting_mode: CountingMode;
-    is_active: boolean; // default true
+    is_active: boolean;
     sort_order?: number;
     created_at: string;
     updated_at: string;
 
+    // Shift management
+    shift_mode?: ShiftMode;
+    auto_reset_time?: string;      // e.g. '09:00'
+    auto_reset_timezone?: string;  // e.g. 'America/New_York'
+
     // Legacy fields
-    capacity_limit?: number; // map to default_capacity
-    active?: boolean; // map to is_active
-    current_occupancy?: number; // Server-side calculated true occupancy
+    capacity_limit?: number;
+    active?: boolean;
+    current_occupancy?: number;
 
     // Traffic Stats (Realtime Sync)
     current_traffic_in?: number;
@@ -334,4 +347,14 @@ export type ReportSummary = {
     scans_accepted: number;
     scans_denied: number;
     effective_start_ts: string;
+};
+
+export type BoardView = {
+    id: string;
+    business_id: string;
+    name: string;
+    device_ids: string[];
+    labels: Record<string, string>;
+    created_by: string;
+    created_at: string;
 };

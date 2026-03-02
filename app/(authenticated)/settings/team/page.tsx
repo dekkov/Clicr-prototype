@@ -1,143 +1,291 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Shield, Plus, Mail, MoreHorizontal, CheckCircle2, XCircle, Trash2 } from 'lucide-react';
+import Link from 'next/link';
+import {
+    ArrowLeft,
+    Plus,
+    CheckCircle2,
+    Clock,
+    XCircle,
+    Loader2,
+    MoreVertical,
+    Crown,
+    User,
+    Shield,
+    BarChart3,
+    Trash2,
+    Pencil,
+    MapPin,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useApp } from '@/lib/store';
+import { Role } from '@/lib/types';
+import { inviteTeamMember, removeTeamMember, getTeamMembers, updateMemberRole, updateMemberAssignments } from '../team-actions';
 
-// Mock Roles for Simulation (Schema matches Supabase 'user_role')
-type UserRole = 'OWNER' | 'MANAGER' | 'STAFF' | 'VIEWER';
-
-const ROLE_DEFINITIONS: Record<UserRole, { label: string; description: string; color: string }> = {
-    OWNER: { label: 'Owner', description: 'Full access to billing, business settings, and data.', color: 'text-purple-400 bg-purple-400/10 border-purple-400/20' },
-    MANAGER: { label: 'Manager', description: 'Can manage venues, staff, bans, and overrides.', color: 'text-blue-400 bg-blue-400/10 border-blue-400/20' },
-    STAFF: { label: 'Door Staff', description: 'Can run scans, counts, and view simple stats.', color: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' },
-    VIEWER: { label: 'Viewer', description: 'Read-only access to reports and dashboards.', color: 'text-slate-400 bg-slate-400/10 border-slate-400/20' }
+const ROLE_DEFINITIONS: Record<Role, { label: string; icon: React.ElementType; color: string }> = {
+    OWNER: { label: 'Owner', icon: Crown, color: 'text-amber-400 bg-amber-400/10 border-amber-400/30' },
+    ADMIN: { label: 'GM / Ops Admin', icon: Shield, color: 'text-blue-400 bg-blue-400/10 border-blue-400/30' },
+    MANAGER: { label: 'Door Manager', icon: User, color: 'text-amber-400 bg-amber-400/10 border-amber-400/30' },
+    STAFF: { label: 'Door Staff', icon: User, color: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/30' },
+    ANALYST: { label: 'Analyst', icon: BarChart3, color: 'text-slate-400 bg-slate-400/10 border-slate-400/30' },
 };
 
-export default function TeamSettingsPage() {
-    const { users, addUser, removeUser } = useApp();
+type TeamMember = {
+    id: string;
+    email: string;
+    name: string;
+    role: Role;
+    joinedAt: string;
+    isConfirmed: boolean;
+    assignedVenueIds?: string[];
+    assignedAreaIds?: string[];
+};
 
+function getInitials(name: string, email: string): string {
+    if (name?.trim()) {
+        const parts = name.trim().split(/\s+/);
+        if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+        return parts[0][0].toUpperCase();
+    }
+    if (email?.trim()) return email[0].toUpperCase();
+    return '??';
+}
+
+export default function TeamSettingsPage() {
+    const { activeBusiness, venues, areas } = useApp();
+
+    const [members, setMembers] = useState<TeamMember[]>([]);
+    const [isLoadingMembers, setIsLoadingMembers] = useState(true);
     const [showInviteModal, setShowInviteModal] = useState(false);
     const [inviteEmail, setInviteEmail] = useState('');
-    const [inviteRole, setInviteRole] = useState<UserRole>('STAFF');
+    const [inviteRole, setInviteRole] = useState<Role>('STAFF');
+    const [inviteVenueIds, setInviteVenueIds] = useState<string[]>([]);
+    const [inviteAreaIds, setInviteAreaIds] = useState<string[]>([]);
+    const [isInviting, setIsInviting] = useState(false);
+    const [inviteError, setInviteError] = useState<string | null>(null);
+    const [openKebabId, setOpenKebabId] = useState<string | null>(null);
+    const [editRoleMember, setEditRoleMember] = useState<TeamMember | null>(null);
+    const [editAssignmentsMember, setEditAssignmentsMember] = useState<TeamMember | null>(null);
+    const [isUpdatingRole, setIsUpdatingRole] = useState(false);
+    const [isUpdatingAssignments, setIsUpdatingAssignments] = useState(false);
 
-    const handleInvite = (e: React.FormEvent) => {
+    const loadMembers = useCallback(async () => {
+        if (!activeBusiness) return;
+        setIsLoadingMembers(true);
+        const data = await getTeamMembers(activeBusiness.id);
+        setMembers(data);
+        setIsLoadingMembers(false);
+    }, [activeBusiness]);
+
+    useEffect(() => {
+        loadMembers();
+    }, [loadMembers]);
+
+    const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault();
-        const newUser = {
-            id: `usr_${Date.now()}`,
-            name: '',
-            email: inviteEmail,
-            role: inviteRole as UserRole,
-            assigned_venue_ids: [],
-            assigned_area_ids: [],
-            assigned_clicr_ids: [],
-        };
-        addUser(newUser);
+        if (!activeBusiness) return;
+        setIsInviting(true);
+        setInviteError(null);
+
+        const options =
+            inviteRole === 'MANAGER' && inviteVenueIds.length > 0
+                ? { assignedVenueIds: inviteVenueIds }
+                : inviteRole === 'STAFF' && inviteAreaIds.length > 0
+                  ? { assignedAreaIds: inviteAreaIds }
+                  : undefined;
+
+        const result = await inviteTeamMember(inviteEmail, inviteRole, activeBusiness.id, options);
+
+        if (!result.success) {
+            setInviteError(result.error);
+            setIsInviting(false);
+            return;
+        }
+
         setShowInviteModal(false);
         setInviteEmail('');
+        setInviteRole('STAFF');
+        setInviteVenueIds([]);
+        setInviteAreaIds([]);
+        setIsInviting(false);
+        loadMembers();
     };
 
-    const handleRemoveUser = (userId: string) => {
-        if (confirm('Are you sure you want to remove this user?')) {
-            removeUser(userId);
+    const handleRemoveUser = async (userId: string) => {
+        if (!activeBusiness) return;
+        if (!confirm('Are you sure you want to remove this member?')) return;
+
+        const result = await removeTeamMember(userId, activeBusiness.id);
+        if (result.success) {
+            setMembers(prev => prev.filter(m => m.id !== userId));
         }
+        setOpenKebabId(null);
     };
+
+    if (!activeBusiness) {
+        return (
+            <div className="p-6 text-center text-slate-400">
+                Select a business to manage team members.
+            </div>
+        );
+    }
 
     return (
-        <div className="p-6 space-y-6 max-w-5xl mx-auto">
-
+        <div className="max-w-3xl mx-auto space-y-6">
             {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
-                        <Users className="w-8 h-8 text-primary" />
-                        Team & Permissions
-                    </h1>
-                    <p className="text-slate-400 max-w-2xl">
-                        Manage who has access to your business. Assign roles to control viewing sensitive data, banning guests, and changing venue capacity.
-                    </p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex items-center gap-4">
+                    <Link
+                        href="/settings"
+                        className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors"
+                        aria-label="Back to settings"
+                    >
+                        <ArrowLeft className="w-5 h-5" />
+                    </Link>
+                    <div>
+                        <h1 className="text-2xl font-bold text-white">Team</h1>
+                        <p className="text-sm text-slate-400 mt-0.5">Manage team members and access roles.</p>
+                    </div>
                 </div>
                 <button
                     onClick={() => setShowInviteModal(true)}
-                    className="flex items-center gap-2 px-6 py-3 bg-primary text-black font-bold rounded-xl hover:bg-emerald-400 transition-colors shadow-lg shadow-primary/20"
+                    className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-opacity shrink-0"
                 >
-                    <Plus className="w-5 h-5" />
-                    Invite Member
+                    <Plus className="w-4 h-4" />
+                    Add Member
                 </button>
             </div>
 
-            {/* Roles Explanation (Optional / Collapsible) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {Object.entries(ROLE_DEFINITIONS).map(([key, def]) => (
-                    <div key={key} className={cn("p-4 rounded-xl border flex flex-col gap-2", def.color.replace('text-', 'border-opacity-30 border-'))}>
-                        <span className={cn("text-xs font-bold uppercase tracking-widest px-2 py-1 rounded inline-block w-fit", def.color)}>
-                            {def.label}
-                        </span>
-                        <p className="text-xs text-slate-400 leading-relaxed">
-                            {def.description}
-                        </p>
+            {/* Member cards */}
+            <div className="space-y-3">
+                {isLoadingMembers ? (
+                    <div className="flex items-center justify-center py-16">
+                        <Loader2 className="w-6 h-6 text-primary animate-spin" />
                     </div>
-                ))}
-            </div>
+                ) : members.length === 0 ? (
+                    <div className="p-12 text-center text-slate-500 text-sm rounded-xl border border-border/50 bg-card/30">
+                        No team members yet. Invite someone to get started.
+                    </div>
+                ) : (
+                    members.map(member => {
+                        const def = ROLE_DEFINITIONS[member.role];
+                        const Icon = def?.icon ?? User;
+                        const isKebabOpen = openKebabId === member.id;
 
-            {/* Users List */}
-            <div className="bg-[#1e2330]/50 border border-white/5 rounded-3xl overflow-hidden shadow-2xl backdrop-blur-sm">
-                <div className="grid grid-cols-[2fr,1.5fr,1fr,0.5fr] gap-4 p-4 border-b border-white/5 text-xs font-bold text-slate-500 uppercase tracking-widest">
-                    <div>User</div>
-                    <div>Role</div>
-                    <div>Status</div>
-                    <div></div>
-                </div>
-
-                <div className="divide-y divide-white/5">
-                    {users.map(user => (
-                        <div key={user.id} className="grid grid-cols-[2fr,1.5fr,1fr,0.5fr] gap-4 p-4 items-center hover:bg-white/5 transition-colors group">
-
-                            {/* User Info */}
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-700 to-slate-800 border border-white/10 flex items-center justify-center font-bold text-white">
-                                    {user.name ? user.name.charAt(0) : user.email.charAt(0).toUpperCase()}
+                        return (
+                            <motion.div
+                                key={member.id}
+                                layout
+                                className="flex items-center gap-4 p-4 rounded-xl border border-border/50 bg-card/30 hover:bg-card/50 transition-colors"
+                            >
+                                {/* Avatar */}
+                                <div className="w-12 h-12 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center shrink-0">
+                                    <span className="text-sm font-bold text-primary">
+                                        {getInitials(member.name, member.email)}
+                                    </span>
                                 </div>
-                                <div className="flex flex-col">
-                                    {user.name && <span className="font-bold text-white">{user.name}</span>}
-                                    <span className="text-sm text-slate-400 font-mono">{user.email}</span>
+
+                                {/* Name + email */}
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-white truncate">
+                                        {member.name || member.email.split('@')[0]}
+                                    </p>
+                                    <p className="text-sm text-slate-400 truncate">{member.email}</p>
                                 </div>
-                            </div>
 
-                            {/* Role Badge */}
-                            <div>
-                                <span className={cn(
-                                    "px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide",
-                                    ROLE_DEFINITIONS[user.role as UserRole]?.color ?? 'text-slate-400'
-                                )}>
-                                    {ROLE_DEFINITIONS[user.role as UserRole]?.label ?? user.role}
-                                </span>
-                            </div>
-
-                            {/* Status */}
-                            <div>
-                                <span className="flex items-center gap-2 text-emerald-500 text-xs font-bold uppercase tracking-widest">
-                                    <CheckCircle2 className="w-4 h-4" /> Active
-                                </span>
-                            </div>
-
-                            {/* Actions */}
-                            <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button
-                                    onClick={() => handleRemoveUser(user.id)}
-                                    className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                                {/* Role badge */}
+                                <span
+                                    className={cn(
+                                        "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border shrink-0",
+                                        def?.color ?? 'text-slate-400 bg-slate-400/10'
+                                    )}
                                 >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
+                                    <Icon className="w-3.5 h-3.5" />
+                                    {def?.label ?? member.role}
+                                </span>
+
+                                {/* Status (compact) */}
+                                <span className="shrink-0 text-xs text-slate-500">
+                                    {member.isConfirmed ? (
+                                        <span className="flex items-center gap-1 text-emerald-500">
+                                            <CheckCircle2 className="w-3.5 h-3.5" /> Active
+                                        </span>
+                                    ) : (
+                                        <span className="flex items-center gap-1 text-amber-500">
+                                            <Clock className="w-3.5 h-3.5" /> Pending
+                                        </span>
+                                    )}
+                                </span>
+
+                                {/* Kebab menu (non-owners only) */}
+                                {member.role !== 'OWNER' && (
+                                    <div className="relative shrink-0">
+                                        <button
+                                            onClick={() => setOpenKebabId(isKebabOpen ? null : member.id)}
+                                            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors"
+                                            aria-label="Options"
+                                        >
+                                            <MoreVertical className="w-4 h-4" />
+                                        </button>
+                                        <AnimatePresence>
+                                            {isKebabOpen && (
+                                                <>
+                                                    <div
+                                                        className="fixed inset-0 z-40"
+                                                        onClick={() => setOpenKebabId(null)}
+                                                        aria-hidden="true"
+                                                    />
+                                                    <motion.div
+                                                        initial={{ opacity: 0, scale: 0.95 }}
+                                                        animate={{ opacity: 1, scale: 1 }}
+                                                        exit={{ opacity: 0, scale: 0.95 }}
+                                                        className="absolute right-0 top-full mt-1 z-50 w-48 py-1 rounded-lg bg-card border border-border shadow-xl"
+                                                    >
+                                                        <button
+                                                            onClick={() => {
+                                                                setOpenKebabId(null);
+                                                                setEditRoleMember(member);
+                                                            }}
+                                                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800/60 hover:text-white"
+                                                        >
+                                                            <Pencil className="w-4 h-4" />
+                                                            Edit role
+                                                        </button>
+                                                        {(member.role === 'MANAGER' || member.role === 'STAFF') && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    setOpenKebabId(null);
+                                                                    setEditAssignmentsMember(member);
+                                                                }}
+                                                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800/60 hover:text-white"
+                                                            >
+                                                                <MapPin className="w-4 h-4" />
+                                                                Edit assignments
+                                                            </button>
+                                                        )}
+                                                        <div className="border-t border-border/50 my-1" />
+                                                        <button
+                                                            onClick={() => handleRemoveUser(member.id)}
+                                                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                            Remove
+                                                        </button>
+                                                    </motion.div>
+                                                </>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
+                                )}
+                            </motion.div>
+                        );
+                    })
+                )}
             </div>
 
-            {/* INVITE MODAL */}
+            {/* Invite modal */}
             <AnimatePresence>
                 {showInviteModal && (
                     <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-6">
@@ -145,20 +293,26 @@ export default function TeamSettingsPage() {
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.95, opacity: 0 }}
-                            className="bg-[#1e2330] border border-slate-700 rounded-3xl w-full max-w-md p-8 shadow-2xl relative"
+                            className="bg-card border border-border rounded-2xl w-full max-w-md p-8 shadow-2xl relative"
                         >
                             <button
-                                onClick={() => setShowInviteModal(false)}
+                                onClick={() => { setShowInviteModal(false); setInviteError(null); }}
                                 className="absolute top-6 right-6 text-slate-500 hover:text-white"
                             >
                                 <XCircle className="w-6 h-6" />
                             </button>
 
-                            <h2 className="text-2xl font-bold text-white mb-6">Invite Team Member</h2>
+                            <h2 className="text-xl font-bold text-white mb-6">Invite Team Member</h2>
+
+                            {inviteError && (
+                                <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
+                                    {inviteError}
+                                </div>
+                            )}
 
                             <form onSubmit={handleInvite} className="space-y-6">
                                 <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Email Address</label>
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Email</label>
                                     <input
                                         autoFocus
                                         type="email"
@@ -166,44 +320,258 @@ export default function TeamSettingsPage() {
                                         value={inviteEmail}
                                         onChange={(e) => setInviteEmail(e.target.value)}
                                         placeholder="colleague@example.com"
-                                        className="w-full bg-black/50 border border-slate-700 rounded-xl p-4 text-white placeholder:text-slate-600 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary mt-2"
+                                        className="w-full bg-background/50 border border-border rounded-xl p-3 text-white placeholder:text-slate-600 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary mt-2"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Assign Role</label>
-                                    <div className="grid grid-cols-1 gap-3 mt-2">
-                                        {(['MANAGER', 'STAFF', 'VIEWER'] as UserRole[]).map(role => (
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Role</label>
+                                    <div className="grid grid-cols-1 gap-2 mt-2">
+                                        {(['ADMIN', 'MANAGER', 'STAFF', 'ANALYST'] as Role[]).map(role => (
                                             <button
                                                 key={role}
                                                 type="button"
-                                                onClick={() => setInviteRole(role)}
+                                                onClick={() => {
+                                                    setInviteRole(role);
+                                                    if (role !== 'MANAGER') setInviteVenueIds([]);
+                                                    if (role !== 'STAFF') setInviteAreaIds([]);
+                                                }}
                                                 className={cn(
-                                                    "flex items-center justify-between p-4 rounded-xl border text-left transition-all",
+                                                    "flex items-center justify-between p-3 rounded-xl border text-left transition-all",
                                                     inviteRole === role
                                                         ? "bg-primary/10 border-primary"
-                                                        : "bg-slate-800 border-white/5 hover:bg-slate-700"
+                                                        : "bg-background/30 border-border hover:bg-slate-800/60"
                                                 )}
                                             >
-                                                <div>
-                                                    <div className={cn("font-bold text-sm", inviteRole === role ? "text-primary" : "text-white")}>
-                                                        {ROLE_DEFINITIONS[role].label}
-                                                    </div>
-                                                    <div className="text-xs text-slate-500 mt-1">{ROLE_DEFINITIONS[role].description}</div>
-                                                </div>
-                                                {inviteRole === role && <CheckCircle2 className="w-5 h-5 text-primary" />}
+                                                <span className={cn("font-medium text-sm", inviteRole === role ? "text-primary" : "text-white")}>
+                                                    {ROLE_DEFINITIONS[role].label}
+                                                </span>
+                                                {inviteRole === role && <CheckCircle2 className="w-4 h-4 text-primary" />}
                                             </button>
                                         ))}
                                     </div>
                                 </div>
 
+                                {inviteRole === 'MANAGER' && (
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Assign Venues</label>
+                                        <p className="text-xs text-slate-500 mt-1 mb-2">Select which venues this manager can access.</p>
+                                        <div className="max-h-40 overflow-y-auto space-y-2 mt-2">
+                                            {venues.filter(v => v.business_id === activeBusiness.id).map(venue => (
+                                                <label
+                                                    key={venue.id}
+                                                    className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-slate-800/40 cursor-pointer"
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={inviteVenueIds.includes(venue.id)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) setInviteVenueIds(prev => [...prev, venue.id]);
+                                                            else setInviteVenueIds(prev => prev.filter(id => id !== venue.id));
+                                                        }}
+                                                        className="rounded border-border"
+                                                    />
+                                                    <span className="text-sm text-white">{venue.name}</span>
+                                                </label>
+                                            ))}
+                                            {venues.filter(v => v.business_id === activeBusiness.id).length === 0 && (
+                                                <p className="text-xs text-slate-500">No venues yet. Add venues in Venues settings first.</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {inviteRole === 'STAFF' && (
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Assign Areas</label>
+                                        <p className="text-xs text-slate-500 mt-1 mb-2">Select which areas this staff member can access.</p>
+                                        <div className="max-h-40 overflow-y-auto space-y-2 mt-2">
+                                            {areas.filter(a => venues.some(v => v.id === a.venue_id && v.business_id === activeBusiness.id)).map(area => (
+                                                <label
+                                                    key={area.id}
+                                                    className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-slate-800/40 cursor-pointer"
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={inviteAreaIds.includes(area.id)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) setInviteAreaIds(prev => [...prev, area.id]);
+                                                            else setInviteAreaIds(prev => prev.filter(id => id !== area.id));
+                                                        }}
+                                                        className="rounded border-border"
+                                                    />
+                                                    <span className="text-sm text-white">{area.name}</span>
+                                                </label>
+                                            ))}
+                                            {areas.filter(a => venues.some(v => v.id === a.venue_id && v.business_id === activeBusiness.id)).length === 0 && (
+                                                <p className="text-xs text-slate-500">No areas yet. Add venues and areas first.</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
                                 <button
                                     type="submit"
-                                    className="w-full py-4 bg-primary text-black font-bold rounded-xl hover:bg-emerald-400 transition-colors shadow-lg shadow-primary/20"
+                                    disabled={isInviting}
+                                    className="w-full py-3 bg-primary text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
                                 >
-                                    Send Invite
+                                    {isInviting ? (
+                                        <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</>
+                                    ) : (
+                                        'Send Invite'
+                                    )}
                                 </button>
                             </form>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Edit role modal */}
+            <AnimatePresence>
+                {editRoleMember && activeBusiness && (
+                    <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-card border border-border rounded-2xl w-full max-w-md p-8 shadow-2xl relative"
+                        >
+                            <button
+                                onClick={() => setEditRoleMember(null)}
+                                className="absolute top-6 right-6 text-slate-500 hover:text-white"
+                            >
+                                <XCircle className="w-6 h-6" />
+                            </button>
+                            <h2 className="text-xl font-bold text-white mb-2">Edit role</h2>
+                            <p className="text-sm text-slate-400 mb-6">{editRoleMember.name || editRoleMember.email}</p>
+                            <div className="space-y-2 mb-6">
+                                {(['ADMIN', 'MANAGER', 'STAFF', 'ANALYST'] as Role[]).map(role => (
+                                    <button
+                                        key={role}
+                                        type="button"
+                                        onClick={async () => {
+                                            if (role === editRoleMember.role) return;
+                                            setIsUpdatingRole(true);
+                                            const result = await updateMemberRole(editRoleMember.id, activeBusiness.id, role);
+                                            setIsUpdatingRole(false);
+                                            if (result.success) {
+                                                setMembers(prev => prev.map(m => m.id === editRoleMember.id ? { ...m, role } : m));
+                                                setEditRoleMember(null);
+                                            }
+                                        }}
+                                        disabled={isUpdatingRole || role === editRoleMember.role}
+                                        className={cn(
+                                            "w-full flex items-center justify-between p-3 rounded-xl border text-left transition-all",
+                                            editRoleMember.role === role
+                                                ? "bg-primary/10 border-primary"
+                                                : "bg-background/30 border-border hover:bg-slate-800/60"
+                                        )}
+                                    >
+                                        <span className={cn("font-medium text-sm", editRoleMember.role === role ? "text-primary" : "text-white")}>
+                                            {ROLE_DEFINITIONS[role].label}
+                                        </span>
+                                        {editRoleMember.role === role && <CheckCircle2 className="w-4 h-4 text-primary" />}
+                                    </button>
+                                ))}
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Edit assignments modal */}
+            <AnimatePresence>
+                {editAssignmentsMember && activeBusiness && (editAssignmentsMember.role === 'MANAGER' || editAssignmentsMember.role === 'STAFF') && (
+                    <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-card border border-border rounded-2xl w-full max-w-md p-8 shadow-2xl relative"
+                        >
+                            <button
+                                onClick={() => setEditAssignmentsMember(null)}
+                                className="absolute top-6 right-6 text-slate-500 hover:text-white"
+                            >
+                                <XCircle className="w-6 h-6" />
+                            </button>
+                            <h2 className="text-xl font-bold text-white mb-2">Edit assignments</h2>
+                            <p className="text-sm text-slate-400 mb-6">{editAssignmentsMember.name || editAssignmentsMember.email}</p>
+
+                            {editAssignmentsMember.role === 'MANAGER' && (
+                                <div className="mb-6">
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Venues</label>
+                                    <div className="max-h-48 overflow-y-auto space-y-2 mt-2">
+                                        {venues.filter(v => v.business_id === activeBusiness.id).map(venue => (
+                                            <label
+                                                key={venue.id}
+                                                className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-slate-800/40 cursor-pointer"
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={(editAssignmentsMember.assignedVenueIds ?? []).includes(venue.id)}
+                                                    onChange={async (e) => {
+                                                        const next = e.target.checked
+                                                            ? [...(editAssignmentsMember.assignedVenueIds ?? []), venue.id]
+                                                            : (editAssignmentsMember.assignedVenueIds ?? []).filter(id => id !== venue.id);
+                                                        setIsUpdatingAssignments(true);
+                                                        const result = await updateMemberAssignments(editAssignmentsMember.id, activeBusiness.id, { assignedVenueIds: next });
+                                                        setIsUpdatingAssignments(false);
+                                                        if (result.success) {
+                                                            setMembers(prev => prev.map(m => m.id === editAssignmentsMember.id ? { ...m, assignedVenueIds: next } : m));
+                                                            setEditAssignmentsMember(prev => prev ? { ...prev, assignedVenueIds: next } : null);
+                                                        }
+                                                    }}
+                                                    disabled={isUpdatingAssignments}
+                                                    className="rounded border-border"
+                                                />
+                                                <span className="text-sm text-white">{venue.name}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {editAssignmentsMember.role === 'STAFF' && (
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Areas</label>
+                                    <div className="max-h-48 overflow-y-auto space-y-2 mt-2">
+                                        {areas.filter(a => venues.some(v => v.id === a.venue_id && v.business_id === activeBusiness.id)).map(area => (
+                                            <label
+                                                key={area.id}
+                                                className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-slate-800/40 cursor-pointer"
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={(editAssignmentsMember.assignedAreaIds ?? []).includes(area.id)}
+                                                    onChange={async (e) => {
+                                                        const next = e.target.checked
+                                                            ? [...(editAssignmentsMember.assignedAreaIds ?? []), area.id]
+                                                            : (editAssignmentsMember.assignedAreaIds ?? []).filter(id => id !== area.id);
+                                                        setIsUpdatingAssignments(true);
+                                                        const result = await updateMemberAssignments(editAssignmentsMember.id, activeBusiness.id, { assignedAreaIds: next });
+                                                        setIsUpdatingAssignments(false);
+                                                        if (result.success) {
+                                                            setMembers(prev => prev.map(m => m.id === editAssignmentsMember.id ? { ...m, assignedAreaIds: next } : m));
+                                                            setEditAssignmentsMember(prev => prev ? { ...prev, assignedAreaIds: next } : null);
+                                                        }
+                                                    }}
+                                                    disabled={isUpdatingAssignments}
+                                                    className="rounded border-border"
+                                                />
+                                                <span className="text-sm text-white">{area.name}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            <p className="text-xs text-slate-500 mt-4">
+                                {editAssignmentsMember.role === 'MANAGER'
+                                    ? 'Managers see only the venues you assign. Leave empty for no access.'
+                                    : 'Staff see only the areas you assign. Leave empty for no access.'}
+                            </p>
                         </motion.div>
                     </div>
                 )}

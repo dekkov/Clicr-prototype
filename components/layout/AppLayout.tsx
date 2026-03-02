@@ -21,9 +21,11 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useApp } from '@/lib/store';
-import { Business } from '@/lib/types';
+import { Business, Role } from '@/lib/types';
+import { getScopeSelectorType, getVisibleNavItems, hasMinRole } from '@/lib/permissions';
+import type { NavItemDef } from '@/lib/permissions';
 
-const NAV_ITEMS = [
+const NAV_ITEMS: NavItemDef[] = [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { label: 'Venues',    href: '/venues',    icon: MapPin },
     { label: 'Areas',     href: '/areas',     icon: Layers },
@@ -50,8 +52,100 @@ function getUserInitials(name: string, email: string): string {
     return '??';
 }
 
+function VenueSelector() {
+    const { venues, activeVenueId, selectVenue } = useApp();
+    const [open, setOpen] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        function handleMouseDown(e: MouseEvent) {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                setOpen(false);
+            }
+        }
+        document.addEventListener('mousedown', handleMouseDown);
+        return () => document.removeEventListener('mousedown', handleMouseDown);
+    }, []);
+
+    const selectedVenue = venues.find(v => v.id === activeVenueId);
+
+    function handleSelect(venueId: string) {
+        selectVenue(venueId);
+        setOpen(false);
+    }
+
+    if (venues.length === 0) return null;
+    if (venues.length === 1) {
+        return (
+            <div className="px-3 py-3 border-b border-border/50">
+                <div className="flex items-center gap-2.5 rounded-lg p-2">
+                    <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
+                        <span className="text-xs font-bold text-primary-foreground">
+                            {(venues[0].name.charAt(0) || '?').toUpperCase()}
+                        </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-foreground truncate">{venues[0].name}</p>
+                        <p className="text-xs text-slate-400">Venue</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div ref={containerRef} className="relative px-3 py-3 border-b border-border/50">
+            <button
+                onClick={() => setOpen(prev => !prev)}
+                className="w-full flex items-center gap-2.5 rounded-lg p-2 transition-colors text-left hover:bg-slate-800/50 cursor-pointer"
+            >
+                <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
+                    <span className="text-xs font-bold text-primary-foreground">
+                        {selectedVenue ? (selectedVenue.name.charAt(0) || '?').toUpperCase() : '?'}
+                    </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-foreground truncate leading-tight">
+                        {selectedVenue ? selectedVenue.name : 'Select Venue'}
+                    </p>
+                    <p className="text-xs text-slate-400 leading-tight">
+                        {venues.length} venues
+                    </p>
+                </div>
+                <ChevronDown className={cn("w-4 h-4 text-slate-400 shrink-0 transition-transform", open && "rotate-180")} />
+            </button>
+            {open && (
+                <div className="absolute left-3 right-3 top-full mt-1 z-50 bg-card border border-border rounded-lg shadow-xl overflow-hidden">
+                    {venues.map(venue => {
+                        const isSelected = venue.id === activeVenueId;
+                        return (
+                            <button
+                                key={venue.id}
+                                onClick={() => handleSelect(venue.id)}
+                                className={cn(
+                                    "w-full flex items-center gap-2.5 px-3 py-2.5 transition-colors text-left",
+                                    isSelected ? "bg-primary/10 text-primary" : "text-slate-300 hover:bg-slate-800/60"
+                                )}
+                            >
+                                <div className={cn(
+                                    "w-7 h-7 rounded-md flex items-center justify-center shrink-0 text-xs font-bold",
+                                    isSelected ? "bg-primary text-primary-foreground" : "bg-slate-700 text-slate-200"
+                                )}>
+                                    {(venue.name.charAt(0) || '?').toUpperCase()}
+                                </div>
+                                <span className="flex-1 text-sm truncate">{venue.name}</span>
+                                {isSelected && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+}
+
 function BusinessSelector() {
-    const { businesses, activeBusiness, venues, selectBusiness } = useApp();
+    const { businesses, activeBusiness, venues, selectBusiness, currentUser } = useApp();
     const [open, setOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -136,21 +230,41 @@ function BusinessSelector() {
                             </button>
                         );
                     })}
-                    <div className="border-t border-border/60" />
-                    <Link
-                        href="/onboarding/setup"
-                        onClick={() => setOpen(false)}
-                        className="w-full flex items-center gap-2.5 px-3 py-2.5 transition-colors text-left text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
-                    >
-                        <div className="w-7 h-7 rounded-md flex items-center justify-center shrink-0 bg-slate-800 border border-dashed border-slate-600">
-                            <Plus className="w-3.5 h-3.5" />
-                        </div>
-                        <span className="text-sm">Add New Business</span>
-                    </Link>
+                    {hasMinRole(currentUser?.role as Role | undefined, 'ADMIN') && (
+                        <>
+                            <div className="border-t border-border/60" />
+                            <Link
+                                href="/onboarding/setup"
+                                onClick={() => setOpen(false)}
+                                className="w-full flex items-center gap-2.5 px-3 py-2.5 transition-colors text-left text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+                            >
+                                <div className="w-7 h-7 rounded-md flex items-center justify-center shrink-0 bg-slate-800 border border-dashed border-slate-600">
+                                    <Plus className="w-3.5 h-3.5" />
+                                </div>
+                                <span className="text-sm">Add New Business</span>
+                            </Link>
+                        </>
+                    )}
                 </div>
             )}
         </div>
     );
+}
+
+function ScopeSelector() {
+    const { currentUser, venues } = useApp();
+    const role = currentUser?.role as Role | undefined;
+    const assignedVenueIds = (currentUser as { assigned_venue_ids?: string[] })?.assigned_venue_ids ?? [];
+    const assignedVenueCount = assignedVenueIds.length;
+    const scopeType = getScopeSelectorType(role, assignedVenueCount);
+
+    if (scopeType === 'venue') {
+        return <VenueSelector />;
+    }
+    if (scopeType === 'business') {
+        return <BusinessSelector />;
+    }
+    return null;
 }
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
@@ -167,6 +281,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     }, [supabase, router]);
 
     const userInitials = getUserInitials(currentUser?.name ?? '', currentUser?.email ?? '');
+    const userRole = currentUser?.role as Role | undefined;
+    const visibleNavItems = getVisibleNavItems(userRole, NAV_ITEMS);
+    const visibleMobileItems = visibleNavItems.filter(i => MOBILE_NAV_LABELS.includes(i.label));
 
     return (
         <div className="fixed inset-0 bg-background text-foreground flex flex-col overflow-hidden">
@@ -198,9 +315,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
                 {/* Sidebar (Desktop) */}
                 <aside className="w-44 border-r border-border bg-card/50 hidden md:flex flex-col glass-panel z-20 shrink-0">
-                    <BusinessSelector />
+                    <ScopeSelector />
                     <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
-                        {NAV_ITEMS.map((item) => {
+                        {visibleNavItems.map((item) => {
                             const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
                             return (
                                 <Link
@@ -246,7 +363,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 {/* Mobile Bottom Nav */}
                 <nav className="md:hidden flex-none bg-[#0f1116] border-t border-white/10 pb-[env(safe-area-inset-bottom)] z-50">
                     <div className="flex justify-around items-center p-2">
-                        {MOBILE_NAV_ITEMS.map((item) => {
+                        {visibleMobileItems.map((item) => {
                             const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
                             return (
                                 <Link

@@ -1,19 +1,59 @@
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 import { resolvePostAuthRoute } from '@/lib/auth-helpers'
 
 export async function GET(request: Request) {
     const { searchParams, origin } = new URL(request.url)
     const code = searchParams.get('code')
     const next = searchParams.get('next')
+    const token_hash = searchParams.get('token_hash')
+    const type = searchParams.get('type')
+
+    const supabase = await createClient()
 
     if (code) {
-        const supabase = await createClient()
         const { error } = await supabase.auth.exchangeCodeForSession(code)
         if (!error) {
             const { data: { user } } = await supabase.auth.getUser()
-            const destination = next ?? (user ? await resolvePostAuthRoute(user.id) : '/dashboard')
+
+            if (user) {
+                await linkInvitedMemberships(user.id, user.email);
+            }
+
+            const isInviteAcceptance = user?.user_metadata?.invited_business_id
+                && !user?.user_metadata?.password_set;
+
+            const destination = isInviteAcceptance
+                ? '/auth/set-password'
+                : (next ?? (user ? await resolvePostAuthRoute(user.id) : '/dashboard'));
+
+            const forwardedHost = request.headers.get('x-forwarded-host')
+            const isLocalEnv = process.env.NODE_ENV === 'development'
+            if (isLocalEnv) {
+                return NextResponse.redirect(`${origin}${destination}`)
+            } else if (forwardedHost) {
+                return NextResponse.redirect(`https://${forwardedHost}${destination}`)
+            } else {
+                return NextResponse.redirect(`${origin}${destination}`)
+            }
+        }
+    } else if (token_hash && type) {
+        const { error } = await supabase.auth.verifyOtp({ token_hash, type: type as any })
+        if (!error) {
+            const { data: { user } } = await supabase.auth.getUser()
+
+            if (user) {
+                await linkInvitedMemberships(user.id, user.email);
+            }
+
+            const isInviteAcceptance = user?.user_metadata?.invited_business_id
+                && !user?.user_metadata?.password_set;
+
+            const destination = isInviteAcceptance
+                ? '/auth/set-password'
+                : (next ?? (user ? await resolvePostAuthRoute(user.id) : '/dashboard'));
 
             const forwardedHost = request.headers.get('x-forwarded-host')
             const isLocalEnv = process.env.NODE_ENV === 'development'
@@ -28,4 +68,26 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.redirect(`${origin}/auth/auth-code-error`)
+}
+
+async function linkInvitedMemberships(userId: string, email: string | undefined) {
+    if (!email) return;
+    try {
+        const { data: pending } = await supabaseAdmin
+            .from('business_members')
+            .select('id, business_id')
+            .eq('invited_email', email)
+            .neq('user_id', userId);
+
+        if (pending && pending.length > 0) {
+            for (const row of pending) {
+                await supabaseAdmin
+                    .from('business_members')
+                    .update({ user_id: userId })
+                    .eq('id', row.id);
+            }
+        }
+    } catch (e) {
+        console.error('[auth/callback] linkInvitedMemberships error:', e);
+    }
 }

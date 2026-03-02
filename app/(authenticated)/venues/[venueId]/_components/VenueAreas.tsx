@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useApp } from '@/lib/store';
-import { Area, AreaType, CountingMode } from '@/lib/types';
+import { Area, AreaType, CountingMode, ShiftMode } from '@/lib/types';
 import {
     Plus,
     Edit2,
@@ -11,6 +11,16 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+
+const TIMEZONES = [
+    { value: 'America/New_York', label: 'Eastern (ET)' },
+    { value: 'America/Chicago', label: 'Central (CT)' },
+    { value: 'America/Denver', label: 'Mountain (MT)' },
+    { value: 'America/Los_Angeles', label: 'Pacific (PT)' },
+    { value: 'America/Anchorage', label: 'Alaska (AKT)' },
+    { value: 'Pacific/Honolulu', label: 'Hawaii (HT)' },
+    { value: 'UTC', label: 'UTC' },
+];
 
 export default function VenueAreas({ venueId }: { venueId: string }) {
     const { areas, venues, addArea, updateArea } = useApp();
@@ -44,9 +54,12 @@ export default function VenueAreas({ venueId }: { venueId: string }) {
             name: '',
             area_type: 'MAIN',
             capacity_max: 0,
-            default_capacity: 0, // Legacy support
+            default_capacity: 0,
             counting_mode: 'BOTH',
-            is_active: true
+            is_active: true,
+            shift_mode: 'MANUAL',
+            auto_reset_time: '09:00',
+            auto_reset_timezone: (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return 'UTC'; } })(),
         });
         setIsEditModalOpen(true);
     };
@@ -71,6 +84,9 @@ export default function VenueAreas({ venueId }: { venueId: string }) {
         const areaToSave = {
             ...editingArea,
             capacity_max: editingArea.default_capacity,
+            shift_mode: editingArea.shift_mode ?? 'MANUAL',
+            auto_reset_time: editingArea.shift_mode === 'AUTO' ? editingArea.auto_reset_time : undefined,
+            auto_reset_timezone: editingArea.shift_mode === 'AUTO' ? editingArea.auto_reset_timezone : undefined,
         } as Area;
 
         if (editingArea.id) {
@@ -250,6 +266,52 @@ export default function VenueAreas({ venueId }: { venueId: string }) {
                                             </button>
                                         ))}
                                     </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-slate-400">Shift Mode</label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {(['MANUAL', 'AUTO'] as ShiftMode[]).map(mode => (
+                                            <button
+                                                key={mode}
+                                                type="button"
+                                                onClick={() => setEditingArea(prev => prev ? ({ ...prev, shift_mode: mode }) : prev)}
+                                                className={cn(
+                                                    "px-3 py-2 rounded-lg text-xs font-medium border transition-colors",
+                                                    editingArea?.shift_mode === mode
+                                                        ? "bg-primary/20 text-primary border-primary/50"
+                                                        : "bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-900"
+                                                )}
+                                            >
+                                                {mode === 'MANUAL' ? 'Manual Start' : 'Auto (Scheduled)'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    {editingArea?.shift_mode === 'AUTO' && (
+                                        <div className="grid grid-cols-2 gap-2 mt-2">
+                                            <div className="space-y-1">
+                                                <label className="text-[11px] font-bold text-amber-400 uppercase tracking-widest">Time</label>
+                                                <input
+                                                    type="time"
+                                                    value={editingArea?.auto_reset_time ?? '09:00'}
+                                                    onChange={e => setEditingArea(prev => prev ? ({ ...prev, auto_reset_time: e.target.value }) : prev)}
+                                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[11px] font-bold text-amber-400 uppercase tracking-widest">Timezone</label>
+                                                <select
+                                                    value={editingArea?.auto_reset_timezone ?? 'UTC'}
+                                                    onChange={e => setEditingArea(prev => prev ? ({ ...prev, auto_reset_timezone: e.target.value }) : prev)}
+                                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 appearance-none"
+                                                >
+                                                    {TIMEZONES.map(tz => (
+                                                        <option key={tz.value} value={tz.value}>{tz.label}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-800">

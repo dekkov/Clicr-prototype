@@ -63,11 +63,12 @@ export async function updateSession(request: NextRequest) {
     }
 
     // Redirect away from auth/login/signup pages (already logged in)
+    // Exception: /auth/set-password must remain accessible for invited users
     const isAuthRoute =
         path === '/' ||
         path === '/login' ||
         path === '/signup' ||
-        path.startsWith('/auth');
+        (path.startsWith('/auth') && path !== '/auth/set-password' && path !== '/auth/accept-invite');
 
     // Redirect away from the old onboarding wizard root.
     // /onboarding/signup and /onboarding/verify-email remain accessible.

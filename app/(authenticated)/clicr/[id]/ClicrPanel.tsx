@@ -16,6 +16,7 @@ import { MetricCard, ActionButton, OccupancyDisplay } from '@/lib/ui/components/
 import { ScannerResult, ScanStatus } from '@/lib/ui/components/ScannerResult';
 import { METRICS } from '@/lib/core/metrics';
 import { getTodayWindow } from '@/lib/core/time';
+import { useAreaShift } from '@/lib/useAreaShift';
 
 // Mock data generator for simulation
 const generateMockID = () => {
@@ -214,45 +215,8 @@ export default function ClicrPanel({
         { value: 'UTC', label: 'UTC' },
     ];
 
-    const [autoReset, setAutoReset] = useState<{ enabled: boolean; time: string; timezone: string }>({
-        enabled: false,
-        time: '09:00',
-        timezone: (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return 'UTC'; } })(),
-    });
-
-    // Auto-reset: check if the scheduled reset time has passed and we haven't reset yet today.
-    // Uses the server-authoritative last_reset_at from the area (survives page refresh),
-    // falling back to trafficSessionStart for backwards compatibility.
-    const checkAutoReset = useCallback(() => {
-        if (!autoReset.enabled || !venueId || !clicr?.area_id) return;
-
-        const now = new Date();
-        const currentTimeInTZ = now.toLocaleTimeString('en-US', {
-            timeZone: autoReset.timezone, hour: '2-digit', minute: '2-digit', hour12: false
-        }).replace(/^24:/, '00:');
-
-        if (currentTimeInTZ < autoReset.time) return;
-
-        const todayInTZ = now.toLocaleDateString('en-CA', { timeZone: autoReset.timezone });
-
-        const lastResetSource = currentArea?.last_reset_at
-            ? new Date(currentArea.last_reset_at).getTime()
-            : trafficSessionStart;
-        const lastResetDate = new Date(lastResetSource).toLocaleDateString('en-CA', { timeZone: autoReset.timezone });
-        const lastResetTime = new Date(lastResetSource).toLocaleTimeString('en-US', {
-            timeZone: autoReset.timezone, hour: '2-digit', minute: '2-digit', hour12: false
-        }).replace(/^24:/, '00:');
-
-        if (lastResetDate === todayInTZ && lastResetTime >= autoReset.time) return;
-
-        handleReset(true);
-    }, [autoReset, venueId, clicr?.area_id, currentArea?.last_reset_at, trafficSessionStart]);
-
-    useEffect(() => {
-        checkAutoReset();
-        const interval = setInterval(checkAutoReset, 60_000); // check every minute
-        return () => clearInterval(interval);
-    }, [checkAutoReset]);
+    // Area-level shift management (auto-reset moved from device to area)
+    useAreaShift(currentArea);
 
     // Load from local storage or Server on mount/update
     useEffect(() => {
@@ -262,11 +226,6 @@ export default function ClicrPanel({
             setClassifyMode(true);
         }
 
-        // Load Auto-Reset config — skip while settings modal is open so polling
-        // doesn't overwrite the operator's in-progress edits.
-        if (!showConfigModal && clicr?.button_config?.auto_reset) {
-            setAutoReset(clicr.button_config.auto_reset);
-        }
     }, [id, clicr, showConfigModal]);
 
     const saveConfig = async (name: string) => {
@@ -274,7 +233,7 @@ export default function ClicrPanel({
             await updateClicr({
                 ...clicr,
                 name: name,
-                button_config: { ...(clicr.button_config ?? {}), auto_reset: autoReset }
+                button_config: { ...(clicr.button_config ?? {}) }
             });
         }
         setShowConfigModal(false);
@@ -1010,52 +969,7 @@ export default function ClicrPanel({
                                 </button>
                             </div>
 
-                            {/* Auto-Reset */}
-                            <div className="space-y-3">
-                                <div className="flex items-center justify-between bg-slate-900/50 p-3 rounded-xl border border-white/5">
-                                    <div>
-                                        <span className="text-sm font-bold text-white">Auto-Reset Daily</span>
-                                        <p className="text-[11px] text-slate-500 mt-0.5">Resets all counts at a set time</p>
-                                    </div>
-                                    <button
-                                        onClick={() => setAutoReset(prev => ({ ...prev, enabled: !prev.enabled }))}
-                                        className={cn("w-12 h-7 rounded-full relative transition-colors shrink-0",
-                                            autoReset.enabled ? "bg-amber-500" : "bg-slate-700"
-                                        )}
-                                    >
-                                        <div className="absolute left-1 top-1 w-5 h-5 bg-white rounded-full shadow-md transition-transform"
-                                            style={{ transform: autoReset.enabled ? "translateX(20px)" : "translateX(0px)" }} />
-                                    </button>
-                                </div>
-
-                                {autoReset.enabled && (
-                                    <div className="space-y-2 pl-1" onClick={(e) => e.stopPropagation()}>
-                                        <div className="flex gap-2">
-                                            <div className="flex-1 space-y-1">
-                                                <label className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Time</label>
-                                                <input
-                                                    type="time"
-                                                    value={autoReset.time}
-                                                    onChange={(e) => setAutoReset(prev => ({ ...prev, time: e.target.value }))}
-                                                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-bold text-sm focus:outline-none focus:border-amber-500 transition-colors"
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Timezone</label>
-                                            <select
-                                                value={autoReset.timezone}
-                                                onChange={(e) => setAutoReset(prev => ({ ...prev, timezone: e.target.value }))}
-                                                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-bold text-sm focus:outline-none focus:border-amber-500 transition-colors appearance-none"
-                                            >
-                                                {TIMEZONES.map(tz => (
-                                                    <option key={tz.value} value={tz.value}>{tz.label}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
+                            {/* Shift config is now at the area level (Settings > Areas) */}
 
                             {/* Remote Tap Link */}
                             <div className="space-y-2">

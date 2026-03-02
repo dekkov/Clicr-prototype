@@ -71,6 +71,7 @@ function formatTime(ts: number): string {
 // --- Main Page ---
 
 export default function DashboardPage() {
+    const router = useRouter();
     const {
         activeBusiness,
         businesses,
@@ -78,13 +79,20 @@ export default function DashboardPage() {
         venues,
         events,
         scanEvents,
+        currentUser,
         bans,
         isLoading,
         resetCounts,
     } = useApp();
 
-    const router = useRouter();
     const [isResetting, setIsResetting] = useState(false);
+
+    // Analyst sees only Reports — redirect from Dashboard
+    useEffect(() => {
+        if (!isLoading && (currentUser?.role as string) === 'ANALYST') {
+            router.push('/reports');
+        }
+    }, [isLoading, currentUser?.role, router]);
 
     // Auto-redirect if no businesses exist after load
     useEffect(() => {
