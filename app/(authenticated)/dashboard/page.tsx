@@ -238,7 +238,11 @@ export default function DashboardPage() {
 
     // --- Render: No businesses (new user / redirecting to onboarding) ---
     if (!isLoading && businesses.length === 0) {
-        return null;
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
     }
 
     // --- Render: Loading ---

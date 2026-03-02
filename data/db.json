@@ -381,6 +381,15 @@
       "assigned_venue_ids": [],
       "assigned_area_ids": [],
       "assigned_clicr_ids": []
+    },
+    {
+      "id": "4ca176d5-f836-4df1-bc45-b966546771e8",
+      "name": "fjdalfjds",
+      "email": "fjdalfjds@gmail.com",
+      "role": "OWNER",
+      "assigned_venue_ids": [],
+      "assigned_area_ids": [],
+      "assigned_clicr_ids": []
     }
   ],
   "bans": [],
