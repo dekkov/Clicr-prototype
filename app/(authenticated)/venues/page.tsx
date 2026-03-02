@@ -19,6 +19,8 @@ export default function VenuesPage() {
             return;
         }
 
+        const controller = new AbortController();
+
         const load = async () => {
             setLoadingVenues(true);
             const supabase = createClient();
@@ -28,20 +30,27 @@ export default function VenuesPage() {
                 headers['x-user-id'] = user.id;
                 headers['x-user-email'] = user.email || '';
             }
-            const res = await fetch(`/api/sync?businessId=${activeBusiness.id}`, {
-                cache: 'no-store',
-                headers,
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setAllVenues(
-                    (data.venues || []).sort((a: Venue, b: Venue) => a.name.localeCompare(b.name))
-                );
+            try {
+                const res = await fetch(`/api/sync?businessId=${activeBusiness.id}`, {
+                    cache: 'no-store',
+                    headers,
+                    signal: controller.signal,
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setAllVenues(
+                        (data.venues || []).sort((a: Venue, b: Venue) => a.name.localeCompare(b.name))
+                    );
+                }
+            } catch (err: unknown) {
+                if (err instanceof Error && err.name === 'AbortError') return;
+                console.error('Failed to load venues', err);
             }
             setLoadingVenues(false);
         };
 
         load();
+        return () => controller.abort();
     }, [activeBusiness?.id]);
 
     const getVenueStats = (venueId: string) => {
@@ -59,8 +68,9 @@ export default function VenuesPage() {
         // Traffic totals from areaTraffic store
         let totalIn = 0;
         let totalOut = 0;
-        for (const areaId of areaIds) {
-            const traffic = areaTraffic?.[areaId];
+        for (const area of venueAreas) {
+            const scopeKey = `area:${activeBusiness!.id}:${area.venue_id}:${area.id}`;
+            const traffic = areaTraffic?.[scopeKey];
             if (traffic) {
                 totalIn += traffic.total_in || 0;
                 totalOut += traffic.total_out || 0;
@@ -70,10 +80,10 @@ export default function VenuesPage() {
         return { areaCount: venueAreas.length, currentOccupancy, deviceCount, totalIn, totalOut };
     };
 
-    const filteredVenues = allVenues.filter(v => v.business_id === activeBusiness?.id);
+    const filteredVenues = allVenues;
 
     const formatLastReset = (venue: Venue): string => {
-        const raw = (venue as any).last_reset_at ?? venue.last_reset_at;
+        const raw = (venue as any).last_reset_at;
         if (!raw) return '—';
         try {
             return new Date(raw).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
