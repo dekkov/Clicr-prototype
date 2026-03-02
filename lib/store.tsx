@@ -128,6 +128,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const activeBusinessIdRef = useRef<string | null>(null);
     const userClearedRef = useRef(false);
 
+    const LAST_BIZ_KEY = 'clicr_last_biz_id';
+
+    // Synchronous init from localStorage — must run before effects so first poll includes ?businessId=
+    if (typeof window !== 'undefined' && !activeBusinessIdRef.current) {
+        try {
+            const saved = localStorage.getItem(LAST_BIZ_KEY);
+            if (saved) activeBusinessIdRef.current = saved;
+        } catch { /* SSR/incognito safe */ }
+    }
+
     const refreshState = async () => {
         if (isResettingRef.current) {
             console.log("Skipping poll due to pending reset");
@@ -174,7 +184,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 }
 
                 // Sync ref before setState so next poll includes ?businessId=
-                if (!activeBusinessIdRef.current && !userClearedRef.current && data.businesses?.length === 1) {
+                if (!activeBusinessIdRef.current && !userClearedRef.current && (
+                    data.businesses?.length === 1 ||
+                    !!(activeBusinessIdRef.current && data.businesses?.some((b: Business) => b.id === activeBusinessIdRef.current))
+                )) {
                     activeBusinessIdRef.current = data.businesses[0].id;
                 }
 
@@ -186,8 +199,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 );
 
                 setState(prev => {
-                    const shouldAutoSelect = !prev.activeBusiness && !userClearedRef.current && data.businesses?.length === 1;
-                    const autoSelected = shouldAutoSelect ? data.businesses[0] : null;
+                    const shouldAutoSelect = !prev.activeBusiness && !userClearedRef.current && (
+                        data.businesses?.length === 1 ||
+                        // Restore persisted selection if found in this user's businesses
+                        !!(activeBusinessIdRef.current && data.businesses?.some((b: Business) => b.id === activeBusinessIdRef.current))
+                    );
+                    const autoSelected = shouldAutoSelect
+                        ? (data.businesses?.find((b: Business) => b.id === activeBusinessIdRef.current) ?? data.businesses?.[0] ?? null)
+                        : null;
                     return {
                         ...prev,
                         ...data,
@@ -212,6 +231,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const selectBusiness = (business: Business) => {
         userClearedRef.current = false;
         activeBusinessIdRef.current = business.id;
+        try { localStorage.setItem(LAST_BIZ_KEY, business.id); } catch { /* SSR/incognito safe */ }
         setState(prev => ({
             ...prev,
             activeBusiness: business,

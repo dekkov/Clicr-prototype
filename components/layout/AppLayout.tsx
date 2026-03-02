@@ -17,6 +17,7 @@ import {
     Bell,
     ChevronDown,
     Check,
+    Plus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useApp } from '@/lib/store';
@@ -68,7 +69,7 @@ function BusinessSelector() {
         return () => document.removeEventListener('mousedown', handleMouseDown);
     }, []);
 
-    const canToggle = businesses.length > 1;
+    const canToggle = true; // always allow opening to show "Add Business" option
 
     function handleSelect(biz: Business) {
         selectBusiness(biz);
@@ -133,6 +134,17 @@ function BusinessSelector() {
                             </button>
                         );
                     })}
+                    <div className="border-t border-border/60" />
+                    <Link
+                        href="/onboarding/setup"
+                        onClick={() => setOpen(false)}
+                        className="w-full flex items-center gap-2.5 px-3 py-2.5 transition-colors text-left text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+                    >
+                        <div className="w-7 h-7 rounded-md flex items-center justify-center shrink-0 bg-slate-800 border border-dashed border-slate-600">
+                            <Plus className="w-3.5 h-3.5" />
+                        </div>
+                        <span className="text-sm">Add New Business</span>
+                    </Link>
                 </div>
             )}
         </div>
