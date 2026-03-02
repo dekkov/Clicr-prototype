@@ -304,12 +304,29 @@ export default function DashboardPage() {
             <GettingStartedChecklist />
 
             {/* Venue cards */}
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                {dashVenues.map(venue => {
-                    const venueAreas = dashAreas.filter(a => a.venue_id === venue.id);
-                    return <VenueCard key={venue.id} venue={venue} areas={venueAreas} events={dashEvents} />;
-                })}
-            </div>
+            {dashVenues.length > 0 ? (
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                    {dashVenues.map(venue => {
+                        const venueAreas = dashAreas.filter(a => a.venue_id === venue.id);
+                        return <VenueCard key={venue.id} venue={venue} areas={venueAreas} events={dashEvents} />;
+                    })}
+                </div>
+            ) : (
+                <div className="glass-panel border border-dashed border-slate-700 rounded-2xl p-12 flex flex-col items-center justify-center gap-4 text-center">
+                    <Building2 className="w-10 h-10 text-slate-600" />
+                    <div>
+                        <p className="text-slate-300 font-medium">No venues yet</p>
+                        <p className="text-slate-500 text-sm mt-1">Add a venue to start tracking occupancy.</p>
+                    </div>
+                    <Link
+                        href={`/venues/new?businessId=${dashBiz.id}`}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-medium transition-all shadow-lg hover:shadow-primary/20"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Add Venue
+                    </Link>
+                </div>
+            )}
         </div>
     );
 }

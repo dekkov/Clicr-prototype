@@ -8,7 +8,7 @@ import Link from 'next/link';
 const DISMISSED_KEY = 'clicr_checklist_dismissed';
 
 export function GettingStartedChecklist() {
-    const { business, venues, areas, clicrs } = useApp();
+    const { businesses, venues, areas, clicrs } = useApp();
     const [dismissed, setDismissed] = useState(false);
     const [mounted, setMounted] = useState(false);
 
@@ -22,7 +22,7 @@ export function GettingStartedChecklist() {
             id: 'business',
             label: 'Set up your business',
             description: 'Name your organization',
-            completed: business !== null,
+            completed: businesses.length > 0,
             href: null,
         },
         {
