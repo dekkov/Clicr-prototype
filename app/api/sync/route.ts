@@ -428,26 +428,77 @@ export async function POST(request: Request) {
                 updatedData = addScan(scan);
                 break;
 
-            case 'RESET_COUNTS':
-                if (body.venue_id) {
-                    // D2: Use reset_counts RPC to zero snapshots; events are audit records and must not be hard-deleted
-                    let resetBizId: string | null = null;
-                    if (userId) {
-                        const { data: resetMember } = await supabaseAdmin.from('business_members').select('business_id').eq('user_id', userId).limit(1).single();
-                        if (resetMember) resetBizId = resetMember.business_id;
-                    }
-                    if (resetBizId) {
-                        await supabaseAdmin.rpc('reset_counts', {
-                            p_scope: 'VENUE',
-                            p_business_id: resetBizId,
-                            p_venue_id: body.venue_id
-                        });
-                    } else {
-                        console.warn('[RESET_COUNTS] Could not resolve business_id — Supabase snapshots not zeroed. Local state reset only.');
-                    }
+            case 'RESET_COUNTS': {
+                // Resolve business_id from user session
+                let resetBizId: string | null = null;
+                if (userId) {
+                    const { data: resetMember } = await supabaseAdmin
+                        .from('business_members')
+                        .select('business_id')
+                        .eq('user_id', userId)
+                        .limit(1)
+                        .single();
+                    if (resetMember) resetBizId = resetMember.business_id;
                 }
+
+                if (resetBizId) {
+                    // 1. Resolve which areas to reset
+                    let areasToReset: string[] = [];
+                    if (body.venue_id) {
+                        // VENUE scope — reset only areas in this venue
+                        const { data: venueAreas } = await supabaseAdmin
+                            .from('areas')
+                            .select('id')
+                            .eq('venue_id', body.venue_id)
+                            .eq('business_id', resetBizId);
+                        areasToReset = (venueAreas || []).map((a: any) => a.id);
+                    } else {
+                        // BUSINESS scope — reset all areas for this business
+                        const { data: bizAreas } = await supabaseAdmin
+                            .from('areas')
+                            .select('id')
+                            .eq('business_id', resetBizId);
+                        areasToReset = (bizAreas || []).map((a: any) => a.id);
+                    }
+
+                    // 2. Zero each area's snapshot (same logic as /api/rpc/reset)
+                    for (const areaId of areasToReset) {
+                        const { data: snap } = await supabaseAdmin
+                            .from('occupancy_snapshots')
+                            .select('current_occupancy, venue_id')
+                            .eq('area_id', areaId)
+                            .single();
+
+                        const currentVal = snap?.current_occupancy || 0;
+
+                        if (currentVal !== 0) {
+                            // Write audit event
+                            await supabaseAdmin.from('occupancy_events').insert({
+                                business_id: resetBizId,
+                                venue_id: snap?.venue_id || null,
+                                area_id: areaId,
+                                delta: -currentVal,
+                                occupancy_new: 0,
+                                event_type: 'RESET',
+                                source: 'reset',
+                                user_id: userId || null,
+                                timestamp: new Date().toISOString(),
+                            });
+                        }
+
+                        // Zero the snapshot (source of truth)
+                        await supabaseAdmin
+                            .from('occupancy_snapshots')
+                            .update({ current_occupancy: 0, last_activity: new Date().toISOString() })
+                            .eq('area_id', areaId);
+                    }
+                } else {
+                    console.warn('[RESET_COUNTS] Could not resolve business_id — Supabase snapshots not zeroed.');
+                }
+
                 updatedData = resetAllCounts(body.venue_id);
                 break;
+            }
 
             case 'RECORD_TURNAROUND': {
                 const turnaround = payload as TurnaroundEvent;
