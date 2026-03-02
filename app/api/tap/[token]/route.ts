@@ -58,6 +58,14 @@ export async function POST(
         return NextResponse.json({ error: 'Invalid or expired link' }, { status: 404 });
     }
 
+    const mode = device.direction_mode ?? 'bidirectional';
+    if (mode === 'in_only' && direction === 'OUT') {
+        return NextResponse.json({ error: 'This device only records IN' }, { status: 422 });
+    }
+    if (mode === 'out_only' && direction === 'IN') {
+        return NextResponse.json({ error: 'This device only records OUT' }, { status: 422 });
+    }
+
     // Look up venue_id from the area
     const { data: area } = await supabaseAdmin
         .from('areas')
@@ -71,6 +79,13 @@ export async function POST(
 
     const delta = (direction as 'IN' | 'OUT') === 'IN' ? 1 : -1;
 
+    const detailsForGender = direction === 'IN'
+        ? (body.details as { gender?: string } | undefined)
+        : undefined;
+    const genderForRpc = detailsForGender?.gender === 'M' ? 'M'
+        : detailsForGender?.gender === 'F' ? 'F'
+        : null;
+
     const { error: rpcError } = await supabaseAdmin.rpc('apply_occupancy_delta', {
         p_business_id: device.business_id,
         p_venue_id: area.venue_id,
@@ -78,7 +93,7 @@ export async function POST(
         p_delta: delta,
         p_source: 'manual',
         p_device_id: device.id,
-        p_gender: null,
+        p_gender: genderForRpc,
         // null = no deduplication; each tap is a distinct event.
         // Client-side buttons are disabled during the request to prevent double-taps.
         p_idempotency_key: null,
