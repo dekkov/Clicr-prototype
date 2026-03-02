@@ -1,34 +1,143 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import {
     LayoutDashboard,
-    Building2,
     MapPin,
     Layers,
     MousePointer2,
-    ScanFace,
     BarChart3,
     Settings,
     LogOut,
-    Ban
+    Ban,
+    Moon,
+    Bell,
+    ChevronDown,
+    Check,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useApp } from '@/lib/store';
+import { Business } from '@/lib/types';
 
 const NAV_ITEMS = [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { label: 'Venues', href: '/venues', icon: MapPin },
-    { label: 'Areas', href: '/areas', icon: Layers },
-    { label: 'Clicr', href: '/clicr', icon: MousePointer2 },
-    { label: 'Guests', href: '/guests', icon: ScanFace },
-    { label: 'Banning', href: '/banning', icon: Ban },
-    { label: 'Reports', href: '/reports', icon: BarChart3 },
-    { label: 'Support', href: '/support', icon: Building2 },
+    { label: 'Venues',    href: '/venues',    icon: MapPin },
+    { label: 'Areas',     href: '/areas',     icon: Layers },
+    { label: 'Clicrs',   href: '/clicr',     icon: MousePointer2 },
+    { label: 'Bans',     href: '/banning',   icon: Ban },
+    { label: 'Reports',  href: '/reports',   icon: BarChart3 },
+    { label: 'Settings', href: '/settings',  icon: Settings },
 ];
+
+const MOBILE_NAV_LABELS = ['Dashboard', 'Venues', 'Clicrs', 'Bans', 'Reports'];
+const MOBILE_NAV_ITEMS = NAV_ITEMS.filter(i => MOBILE_NAV_LABELS.includes(i.label));
+
+function getUserInitials(name: string, email: string): string {
+    if (name && name.trim()) {
+        const parts = name.trim().split(/\s+/);
+        if (parts.length >= 2) {
+            return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+        }
+        return parts[0][0].toUpperCase();
+    }
+    if (email && email.trim()) {
+        return email[0].toUpperCase();
+    }
+    return '??';
+}
+
+function BusinessSelector() {
+    const { businesses, activeBusiness, venues, selectBusiness } = useApp();
+    const [open, setOpen] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    const venueCount = activeBusiness
+        ? venues.filter(v => v.business_id === activeBusiness.id).length
+        : 0;
+
+    useEffect(() => {
+        function handleMouseDown(e: MouseEvent) {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                setOpen(false);
+            }
+        }
+        document.addEventListener('mousedown', handleMouseDown);
+        return () => document.removeEventListener('mousedown', handleMouseDown);
+    }, []);
+
+    const canToggle = businesses.length > 1;
+
+    function handleSelect(biz: Business) {
+        selectBusiness(biz);
+        setOpen(false);
+    }
+
+    return (
+        <div ref={containerRef} className="relative px-3 py-3 border-b border-border/50">
+            <button
+                onClick={() => canToggle && setOpen(prev => !prev)}
+                className={cn(
+                    "w-full flex items-center gap-2.5 rounded-lg p-2 transition-colors text-left",
+                    canToggle ? "hover:bg-slate-800/50 cursor-pointer" : "cursor-default"
+                )}
+            >
+                <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
+                    <span className="text-xs font-bold text-primary-foreground">
+                        {activeBusiness ? activeBusiness.name[0].toUpperCase() : '?'}
+                    </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-foreground truncate leading-tight">
+                        {activeBusiness ? activeBusiness.name : 'Select Business'}
+                    </p>
+                    {activeBusiness && (
+                        <p className="text-xs text-slate-400 leading-tight">
+                            {venueCount} {venueCount === 1 ? 'venue' : 'venues'}
+                        </p>
+                    )}
+                </div>
+                {canToggle && (
+                    <ChevronDown className={cn(
+                        "w-4 h-4 text-slate-400 shrink-0 transition-transform",
+                        open && "rotate-180"
+                    )} />
+                )}
+            </button>
+
+            {open && canToggle && (
+                <div className="absolute left-3 right-3 top-full mt-1 z-50 bg-card border border-border rounded-lg shadow-xl overflow-hidden">
+                    {businesses.map(biz => {
+                        const isSelected = activeBusiness?.id === biz.id;
+                        return (
+                            <button
+                                key={biz.id}
+                                onClick={() => handleSelect(biz)}
+                                className={cn(
+                                    "w-full flex items-center gap-2.5 px-3 py-2.5 transition-colors text-left",
+                                    isSelected
+                                        ? "bg-primary/10 text-primary"
+                                        : "text-slate-300 hover:bg-slate-800/60"
+                                )}
+                            >
+                                <div className={cn(
+                                    "w-7 h-7 rounded-md flex items-center justify-center shrink-0 text-xs font-bold",
+                                    isSelected ? "bg-primary text-primary-foreground" : "bg-slate-700 text-slate-200"
+                                )}>
+                                    {biz.name[0].toUpperCase()}
+                                </div>
+                                <span className="flex-1 text-sm truncate">{biz.name}</span>
+                                {isSelected && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+}
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
@@ -42,114 +151,110 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         router.push('/login');
     };
 
+    const userInitials = getUserInitials(currentUser?.name ?? '', currentUser?.email ?? '');
+
     return (
-        // Root container: Fixed to viewport edges (inset-0) to guarantee full coverage
-        // Flex Column to stack content and nav naturally
-        <div className="fixed inset-0 w-full bg-background text-foreground flex flex-col md:flex-row overflow-hidden">
+        <div className="fixed inset-0 bg-background text-foreground flex flex-col overflow-hidden">
 
-            {/* Sidebar (Desktop) */}
-            <aside className="w-64 border-r border-border bg-card/50 hidden md:flex flex-col glass-panel z-20 shrink-0">
-                <div className="p-6 border-b border-border/50">
-                    <div className="flex items-center justify-between">
-                        <div className="relative w-32 h-10">
-                            {/* Using standard img for quick file reference compatibility */}
-                            <img src="/clicr-logo.png" alt="CLICR" className="w-full h-full object-contain object-left" />
-                        </div>
-                        <Link href="/settings" className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors">
-                            <Settings className="w-5 h-5" />
-                        </Link>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2">v1.0.0 • {currentUser?.role || 'Loading'}</p>
+            {/* Full-Width Topbar */}
+            <header className="h-12 shrink-0 flex items-center justify-between px-4 border-b border-border/60 bg-card/60 backdrop-blur-sm z-30">
+                <div className="flex items-center gap-2.5">
+                    <img src="/clicr-logo.png" alt="CLICR" className="h-7 w-auto object-contain" />
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/25 leading-tight">
+                        v4.0
+                    </span>
                 </div>
-
-                <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-                    {NAV_ITEMS.map((item) => {
-                        const isActive = pathname.startsWith(item.href);
-                        return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                className={cn(
-                                    "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
-                                    isActive
-                                        ? "bg-primary text-white font-bold shadow-lg shadow-primary/25"
-                                        : "text-slate-400 hover:text-slate-100 hover:bg-slate-800/50"
-                                )}
-                            >
-                                <item.icon className={cn("w-5 h-5", isActive ? "text-white" : "text-slate-500 group-hover:text-slate-300")} />
-                                {item.label}
-                            </Link>
-                        );
-                    })}
-                </nav>
-
-                <div className="p-4 border-t border-border/50">
-                    <button onClick={handleSignOut} className="flex items-center gap-3 px-3 py-2 w-full text-slate-400 hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors">
-                        <LogOut className="w-5 h-5" />
-                        <span>Sign Out</span>
+                <div className="flex items-center gap-1">
+                    <button className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors" aria-label="Toggle dark mode">
+                        <Moon className="w-4 h-4" />
                     </button>
-                </div>
-            </aside>
-
-            {/* Main Content Area */}
-            {/* flex-1 grows to fill space, pushing Nav to bottom. min-h-0 prevents overflow issues. */}
-            <main className="flex-1 relative flex flex-col min-h-0 overflow-hidden">
-                <div className="flex-1 overflow-y-auto overscroll-none p-4 md:p-8">
-                    {/* Background Gradients */}
-                    <div className="fixed top-0 left-0 w-full h-[500px] bg-gradient-to-b from-primary/5 to-transparent pointer-events-none -z-10" />
-
-                    <div className="max-w-7xl mx-auto min-h-full">
-                        {children}
+                    <button className="relative p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors" aria-label="Notifications">
+                        <Bell className="w-4 h-4" />
+                        <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-primary" />
+                    </button>
+                    <div className="ml-1 w-7 h-7 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center">
+                        <span className="text-[11px] font-bold text-primary">{userInitials}</span>
                     </div>
                 </div>
-            </main>
+            </header>
 
-            {/* Mobile Bottom Navigation - Natural Flex Child */}
-            {/* No 'fixed'. Just sits at the bottom of the flex column. */}
-            <nav className="md:hidden flex-none bg-[#0f1116] border-t border-white/10 pb-[env(safe-area-inset-bottom)] z-50">
-                <div className="flex justify-around items-center p-2">
-                    {NAV_ITEMS.filter(i => !['Venues', 'Areas'].includes(i.label)).map((item) => {
-                        const isActive = pathname.startsWith(item.href);
-                        return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                className={cn(
-                                    "flex flex-col items-center gap-1 p-2 rounded-xl transition-all w-16",
-                                    isActive
-                                        ? "text-primary"
-                                        : "text-slate-500 hover:text-slate-300"
-                                )}
-                            >
-                                <div className={cn(
-                                    "p-1.5 rounded-full transition-all",
-                                    isActive ? "bg-primary/20" : "bg-transparent"
-                                )}>
-                                    <item.icon className={cn("w-5 h-5", isActive && "fill-current")} />
-                                </div>
-                                <span className="text-[10px] font-bold">{item.label}</span>
-                            </Link>
-                        );
-                    })}
-                    <Link
-                        href="/settings"
-                        className={cn(
-                            "flex flex-col items-center gap-1 p-2 rounded-xl transition-all w-16",
-                            pathname.startsWith('/settings')
-                                ? "text-primary"
-                                : "text-slate-500 hover:text-slate-300"
-                        )}
-                    >
-                        <div className={cn(
-                            "p-1.5 rounded-full transition-all",
-                            pathname.startsWith('/settings') ? "bg-primary/20" : "bg-transparent"
-                        )}>
-                            <Settings className="w-5 h-5" />
+            {/* Inner Row: Sidebar + Content */}
+            <div className="flex flex-1 min-h-0 flex-col md:flex-row overflow-hidden">
+
+                {/* Sidebar (Desktop) */}
+                <aside className="w-44 border-r border-border bg-card/50 hidden md:flex flex-col glass-panel z-20 shrink-0">
+                    <BusinessSelector />
+                    <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
+                        {NAV_ITEMS.map((item) => {
+                            const isActive = pathname.startsWith(item.href);
+                            return (
+                                <Link
+                                    key={item.href}
+                                    href={item.href}
+                                    className={cn(
+                                        "flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-150 group text-sm",
+                                        isActive
+                                            ? "bg-primary/10 text-primary font-bold"
+                                            : "text-slate-400 hover:text-slate-100 hover:bg-slate-800/50"
+                                    )}
+                                >
+                                    <item.icon className={cn(
+                                        "w-4 h-4 shrink-0",
+                                        isActive ? "text-primary" : "text-slate-500 group-hover:text-slate-300"
+                                    )} />
+                                    {item.label}
+                                </Link>
+                            );
+                        })}
+                    </nav>
+                    <div className="p-2 border-t border-border/50">
+                        <button
+                            onClick={handleSignOut}
+                            className="flex items-center gap-2.5 px-3 py-2 w-full text-sm text-slate-400 hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+                        >
+                            <LogOut className="w-4 h-4 shrink-0" />
+                            <span>Sign Out</span>
+                        </button>
+                    </div>
+                </aside>
+
+                {/* Main Content */}
+                <main className="flex-1 relative flex flex-col min-h-0 overflow-hidden">
+                    <div className="flex-1 overflow-y-auto overscroll-none p-4 md:p-8">
+                        <div className="fixed top-0 left-0 w-full h-[500px] bg-gradient-to-b from-primary/5 to-transparent pointer-events-none -z-10" />
+                        <div className="max-w-7xl mx-auto min-h-full">
+                            {children}
                         </div>
-                        <span className="text-[10px] font-bold">More</span>
-                    </Link>
-                </div>
-            </nav>
+                    </div>
+                </main>
+
+                {/* Mobile Bottom Nav */}
+                <nav className="md:hidden flex-none bg-[#0f1116] border-t border-white/10 pb-[env(safe-area-inset-bottom)] z-50">
+                    <div className="flex justify-around items-center p-2">
+                        {MOBILE_NAV_ITEMS.map((item) => {
+                            const isActive = pathname.startsWith(item.href);
+                            return (
+                                <Link
+                                    key={item.href}
+                                    href={item.href}
+                                    className={cn(
+                                        "flex flex-col items-center gap-1 p-2 rounded-xl transition-all w-14",
+                                        isActive ? "text-primary" : "text-slate-500 hover:text-slate-300"
+                                    )}
+                                >
+                                    <div className={cn(
+                                        "p-1.5 rounded-full transition-all",
+                                        isActive ? "bg-primary/20" : "bg-transparent"
+                                    )}>
+                                        <item.icon className={cn("w-5 h-5", isActive && "fill-current")} />
+                                    </div>
+                                    <span className="text-[10px] font-bold">{item.label}</span>
+                                </Link>
+                            );
+                        })}
+                    </div>
+                </nav>
+            </div>
         </div>
     );
 }
