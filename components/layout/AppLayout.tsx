@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
@@ -86,7 +86,7 @@ function BusinessSelector() {
             >
                 <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
                     <span className="text-xs font-bold text-primary-foreground">
-                        {activeBusiness ? activeBusiness.name[0].toUpperCase() : '?'}
+                        {activeBusiness ? (activeBusiness.name.charAt(0) || '?').toUpperCase() : '?'}
                     </span>
                 </div>
                 <div className="flex-1 min-w-0">
@@ -126,7 +126,7 @@ function BusinessSelector() {
                                     "w-7 h-7 rounded-md flex items-center justify-center shrink-0 text-xs font-bold",
                                     isSelected ? "bg-primary text-primary-foreground" : "bg-slate-700 text-slate-200"
                                 )}>
-                                    {biz.name[0].toUpperCase()}
+                                    {(biz.name.charAt(0) || '?').toUpperCase()}
                                 </div>
                                 <span className="flex-1 text-sm truncate">{biz.name}</span>
                                 {isSelected && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
@@ -143,13 +143,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const router = useRouter();
     const { currentUser } = useApp();
-    const supabase = createClient();
+    const supabase = useMemo(() => createClient(), []);
 
-    const handleSignOut = async () => {
+    const handleSignOut = useCallback(async () => {
         await supabase.auth.signOut();
         router.refresh();
         router.push('/login');
-    };
+    }, [supabase, router]);
 
     const userInitials = getUserInitials(currentUser?.name ?? '', currentUser?.email ?? '');
 
@@ -186,7 +186,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     <BusinessSelector />
                     <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
                         {NAV_ITEMS.map((item) => {
-                            const isActive = pathname.startsWith(item.href);
+                            const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
                             return (
                                 <Link
                                     key={item.href}
@@ -232,7 +232,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <nav className="md:hidden flex-none bg-[#0f1116] border-t border-white/10 pb-[env(safe-area-inset-bottom)] z-50">
                     <div className="flex justify-around items-center p-2">
                         {MOBILE_NAV_ITEMS.map((item) => {
-                            const isActive = pathname.startsWith(item.href);
+                            const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
                             return (
                                 <Link
                                     key={item.href}
