@@ -75,6 +75,7 @@ export default function DashboardPage() {
         activeBusiness,
         businesses,
         areas,
+        venues,
         events,
         scanEvents,
         bans,
@@ -186,6 +187,7 @@ export default function DashboardPage() {
             ts: number;
             kind: 'ENTRY' | 'EXIT' | 'ID_ACCEPTED' | 'ID_DENIED';
             areaId?: string;
+            venueId?: string;
         };
 
         const countRows: LogEntry[] = todayEvents.map((e) => ({
@@ -193,6 +195,7 @@ export default function DashboardPage() {
             ts: e.timestamp,
             kind: e.delta > 0 ? 'ENTRY' : 'EXIT',
             areaId: e.area_id,
+            venueId: e.venue_id,
         }));
 
         const scanRows: LogEntry[] = todayScanEvents.map((s) => ({
@@ -211,6 +214,12 @@ export default function DashboardPage() {
         areas.forEach((a) => { m[a.id] = a.name; });
         return m;
     }, [areas]);
+
+    const venueNameMap = useMemo(() => {
+        const m: Record<string, string> = {};
+        venues.forEach((v) => { m[v.id] = v.name; });
+        return m;
+    }, [venues]);
 
     // --- Render: Loading ---
     if (isLoading) {
@@ -360,31 +369,57 @@ export default function DashboardPage() {
                         </span>
                         <h2 className="text-base font-bold text-white">Live Event Log</h2>
                     </div>
-                    <div className="mt-4 space-y-2 max-h-72 overflow-y-auto pr-1">
+                    {/* Live Event Log — grouped by venue */}
+                    <div className="mt-4 max-h-72 overflow-y-auto pr-1">
                         {liveEventLog.length === 0 && (
                             <p className="text-xs text-slate-600 italic">No events recorded tonight.</p>
                         )}
-                        {liveEventLog.map((entry) => (
-                            <div
-                                key={entry.id}
-                                className="flex items-center justify-between gap-3 py-1.5 border-b border-slate-800/60 last:border-0"
-                            >
-                                <span
-                                    className={cn(
-                                        'text-xs font-bold px-2 py-0.5 rounded-md shrink-0',
-                                        badgeClass[entry.kind]
-                                    )}
-                                >
-                                    {badgeLabel[entry.kind]}
-                                </span>
-                                <span className="text-sm text-slate-400 flex-1 truncate">
-                                    {entry.areaId ? areaMap[entry.areaId] ?? 'Unknown Area' : '—'}
-                                </span>
-                                <span className="text-xs text-slate-500 shrink-0">
-                                    {formatTime(entry.ts)}
-                                </span>
-                            </div>
-                        ))}
+                        {(() => {
+                            // Group entries by venueId, preserving insertion order (newest-first sort already applied)
+                            const groups: { venueId: string | undefined; label: string; entries: typeof liveEventLog }[] = [];
+                            const seen = new Set<string>();
+
+                            liveEventLog.forEach(entry => {
+                                const key = entry.venueId ?? '__scan__';
+                                if (!seen.has(key)) {
+                                    seen.add(key);
+                                    groups.push({
+                                        venueId: entry.venueId,
+                                        label: entry.venueId ? (venueNameMap[entry.venueId] ?? 'Unknown Venue') : 'ID Scans',
+                                        entries: [],
+                                    });
+                                }
+                                const group = groups.find(g => (g.venueId ?? '__scan__') === key);
+                                group?.entries.push(entry);
+                            });
+
+                            return groups.map(group => (
+                                <div key={group.venueId ?? '__scan__'} className="mb-3 last:mb-0">
+                                    {/* Venue label */}
+                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">
+                                        {group.label}
+                                    </p>
+                                    <div className="space-y-2">
+                                        {group.entries.map(entry => (
+                                            <div
+                                                key={entry.id}
+                                                className="flex items-center justify-between gap-3 py-1.5 border-b border-slate-800/60 last:border-0"
+                                            >
+                                                <span className={cn('text-xs font-bold px-2 py-0.5 rounded-md shrink-0', badgeClass[entry.kind])}>
+                                                    {badgeLabel[entry.kind]}
+                                                </span>
+                                                <span className="text-sm text-slate-400 flex-1 truncate">
+                                                    {entry.areaId ? areaMap[entry.areaId] ?? 'Unknown Area' : '—'}
+                                                </span>
+                                                <span className="text-xs text-slate-500 shrink-0">
+                                                    {formatTime(entry.ts)}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ));
+                        })()}
                     </div>
                 </div>
             </div>
