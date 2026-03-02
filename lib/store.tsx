@@ -437,12 +437,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setState(optimisticState);
 
         try {
-            const res = await fetch('/api/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'RESET_COUNTS', venue_id: venueId }),
-                cache: 'no-store'
-            });
+            // authFetch attaches x-user-id so the server can resolve business_id
+            const res = await authFetch({ action: 'RESET_COUNTS', venue_id: venueId });
 
             if (res.ok) {
                 const updatedDB = await res.json();

@@ -180,36 +180,27 @@ export default function DashboardPage() {
         [ageDistribution]
     );
 
-    // Live Event Log — combine count events + scan events, newest first, last 20
+    // Live Event Log — count events only (ENTRY/EXIT), newest first, last 20
     const liveEventLog = useMemo(() => {
         type LogEntry = {
             id: string;
             ts: number;
-            kind: 'ENTRY' | 'EXIT' | 'ID_ACCEPTED' | 'ID_DENIED';
+            kind: 'ENTRY' | 'EXIT';
             areaId?: string;
             venueId?: string;
         };
 
-        const countRows: LogEntry[] = todayEvents.map((e) => ({
-            id: `c-${e.id}`,
-            ts: e.timestamp,
-            kind: e.delta > 0 ? 'ENTRY' : 'EXIT',
-            areaId: e.area_id,
-            venueId: e.venue_id,
-        }));
-
-        // venueId intentionally omitted — scan events are grouped under a generic
-        // "ID Scans" section header regardless of originating venue.
-        const scanRows: LogEntry[] = todayScanEvents.map((s) => ({
-            id: `s-${s.id}`,
-            ts: s.timestamp,
-            kind: s.scan_result === 'ACCEPTED' ? 'ID_ACCEPTED' : 'ID_DENIED',
-        }));
-
-        return [...countRows, ...scanRows]
+        return todayEvents
+            .map((e): LogEntry => ({
+                id: `c-${e.id}`,
+                ts: e.timestamp,
+                kind: e.delta > 0 ? 'ENTRY' : 'EXIT',
+                areaId: e.area_id,
+                venueId: e.venue_id,
+            }))
             .sort((a, b) => b.ts - a.ts)
             .slice(0, 20);
-    }, [todayEvents, todayScanEvents]);
+    }, [todayEvents]);
 
     const areaMap = useMemo(() => {
         const m: Record<string, string> = {};

@@ -482,11 +482,10 @@ export async function POST(request: Request) {
                                 venue_id: snap?.venue_id || null,
                                 area_id: areaId,
                                 delta: -currentVal,
-                                occupancy_new: 0,
+                                flow_type: 'OUT',
                                 event_type: 'RESET',
                                 source: 'reset',
                                 user_id: userId || null,
-                                timestamp: new Date().toISOString(),
                             });
                             if (auditErr) {
                                 console.error(`[RESET_COUNTS] Audit event insert failed for area ${areaId}:`, auditErr.message);
@@ -496,7 +495,7 @@ export async function POST(request: Request) {
 
                         const { error: snapUpdateErr } = await supabaseAdmin
                             .from('occupancy_snapshots')
-                            .update({ current_occupancy: 0, last_activity: new Date().toISOString() })
+                            .update({ current_occupancy: 0, last_reset_at: new Date().toISOString() })
                             .eq('area_id', areaId);
 
                         if (snapUpdateErr) {
