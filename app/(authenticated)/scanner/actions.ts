@@ -81,22 +81,33 @@ export async function processScan(payload: ScanPayload): Promise<{ success: bool
         // 3. Compute Hash
         const identityHash = generateIdentityHash(parsed.issuingState, parsed.idNumber, parsed.dob);
 
-        // 4. Check Bans (Using Admin Client to bypass RLS if needed, though RLS should allow reading bans for own business)
-        // We use admin here to ensure we see ALL bans even if RLS is tricky, but let's stick to RLS correct flow.
-        // Actually, 'bans' are sensitive. Regular staff might just need to know "IS BANNED" not "WHY".
-        // Let's use supabaseAdmin for the ban lookup to be safe and rigorous.
+        // 4. Check Bans — identity matching via hashed ID + region (banned_persons + patron_bans)
+        let hasBusinessBan = false;
+        let hasVenueBan = false;
+        let activeBan: any = null;
 
-        const { data: activeBans } = await supabaseAdmin
-            .from('bans')
-            .select('*')
+        const { data: hashMatches } = await supabaseAdmin
+            .from('banned_persons')
+            .select('id')
             .eq('business_id', businessId)
-            .eq('identity_token_hash', identityHash)
-            .eq('active', true)
-            .or(`end_at.is.null,end_at.gt.now`);
+            .eq('identity_token_hash', identityHash);
 
-        const hasBusinessBan = activeBans?.some(b => b.venue_id === null);
-        const hasVenueBan = activeBans?.some(b => b.venue_id === payload.venueId);
-        const activeBan = activeBans?.find(b => b.venue_id === null || b.venue_id === payload.venueId);
+        if (hashMatches?.length) {
+            for (const p of hashMatches) {
+                const { data: banResult } = await supabaseAdmin.rpc('check_ban_status', {
+                    p_business_id: businessId,
+                    p_patron_id: p.id,
+                    p_venue_id: payload.venueId
+                });
+                const row = Array.isArray(banResult) ? banResult[0] : banResult;
+                if (row?.is_banned) {
+                    hasBusinessBan = hasBusinessBan || !row.venue_id;
+                    hasVenueBan = hasVenueBan || !!row.venue_id;
+                    activeBan = row;
+                    break;
+                }
+            }
+        }
 
         // 5. Determine Outcome
         let outcome: 'ACCEPTED' | 'DENIED' = 'ACCEPTED';
@@ -116,32 +127,23 @@ export async function processScan(payload: ScanPayload): Promise<{ success: bool
             reason = 'EXPIRED';
         }
 
-        // 6. Record Identity (Upsert)
-        // We store minimal fields.
-        await supabaseAdmin.from('identities').upsert({
-            business_id: businessId,
-            identity_token_hash: identityHash,
-            issuing_region: parsed.issuingState,
-            dob_year: parsed.dob ? parseInt(parsed.dob.substring(0, 4)) : null,
-            initials: `${parsed.firstName?.[0] || ''}${parsed.lastName?.[0] || ''}`,
-            // We usually don't store full name unless policy updates
-        }, { onConflict: 'business_id, identity_token_hash' });
-
-        // 7. Log Scan
+        // 6. Log Scan (id_scans with identity_token_hash for spec compliance)
         await supabaseAdmin.from('id_scans').insert({
             business_id: businessId,
             venue_id: payload.venueId,
             area_id: payload.areaId || null,
             device_id: payload.deviceId || null,
-            user_id: user.id,
-            identity_token_hash: identityHash,
-            outcome,
-            denial_reason: reason,
-            metadata_json: {
-                age,
-                gender: parsed.gender,
-                zip: parsed.postalCode
-            }
+            scan_result: outcome,
+            deny_reason: reason,
+            age,
+            sex: parsed.gender || 'U',
+            zip_code: parsed.postalCode || '',
+            first_name: parsed.firstName,
+            last_name: parsed.lastName,
+            dob: parsed.dob,
+            id_number_last4: parsed.idNumber ? parsed.idNumber.slice(-4) : null,
+            issuing_state: parsed.issuingState,
+            identity_token_hash: identityHash
         });
 
         // 8. Auto-Increment Occupancy (If Accepted and Area specified)
@@ -150,8 +152,6 @@ export async function processScan(payload: ScanPayload): Promise<{ success: bool
             if (autoAdd && payload.areaId) {
                 // Use User Client (supabase) to trigger RPC, ensuring proper permissions and snapshot updates
                 const { error: rpcError } = await supabase.rpc('apply_occupancy_delta', {
-                    p_business_id: businessId,
-                    p_venue_id: payload.venueId,
                     p_area_id: payload.areaId,
                     p_delta: 1,
                     p_source: 'scan',
@@ -200,57 +200,107 @@ export async function banPatron(scanId: string | null, manualData: any | null, b
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return { success: false, error: 'Unauthorized' };
 
-        // Check Permissions (Manager only?)
-        // For now allow staff to ban, or verify role.
-
-        let identityHash = '';
+        let identityHash: string | null = null;
         let businessId = '';
+        let firstName = 'Unknown';
+        let lastName = 'Unknown';
+        let dob: string | null = null;
+        let idNumberLast4 = '';
+        let issuingState = '';
 
         if (scanId) {
-            // Fetch from scan log
-            // Use admin to ensure we get it
             const { data: scan } = await supabaseAdmin
                 .from('id_scans')
-                .select('identity_token_hash, business_id')
+                .select('identity_token_hash, business_id, first_name, last_name, dob, id_number_last4, issuing_state')
                 .eq('id', scanId)
                 .single();
 
             if (!scan) return { success: false, error: 'Scan record not found' };
-            identityHash = scan.identity_token_hash;
             businessId = scan.business_id;
+            identityHash = scan.identity_token_hash;
+            firstName = scan.first_name || 'Unknown';
+            lastName = scan.last_name || 'Unknown';
+            dob = scan.dob;
+            idNumberLast4 = scan.id_number_last4 || '';
+            issuingState = scan.issuing_state || '';
 
         } else if (manualData) {
-            // Manual Ban
             const { data: member } = await supabase.from('business_members').select('business_id').eq('user_id', user.id).single();
-            if (!member) return { error: 'No business' };
+            if (!member) return { success: false, error: 'No business' };
             businessId = member.business_id;
 
-            // validate manualData keys
-            const { state, idNumber, dob } = manualData;
-            if (!state || !idNumber || !dob) return { success: false, error: 'Missing ID details' };
+            const { state, idNumber, dob: manualDob } = manualData;
+            if (!state || !idNumber || !manualDob) return { success: false, error: 'Missing ID details' };
 
-            // Normalize DOB to YYYYMMDD? UI likely sends ISO or formatted.
-            // Assume UI sends YYYYMMDD for simplicity or we format it.
-            identityHash = generateIdentityHash(state, idNumber, dob);
+            identityHash = generateIdentityHash(state, idNumber, manualDob);
+            dob = manualDob.replace(/[^0-9]/g, '').substring(0, 8);
+            idNumberLast4 = idNumber.slice(-4);
+            issuingState = state;
+        } else {
+            return { success: false, error: 'Either scanId or manualData required' };
         }
 
-        // Insert Ban
-        await supabaseAdmin.from('bans').insert({
-            business_id: businessId,
-            venue_id: banDetails.scope === 'VENUE' ? banDetails.venueId : null,
-            identity_token_hash: identityHash,
-            reason_code: banDetails.reason,
-            notes: banDetails.notes,
-            end_at: banDetails.duration === 'PERMANENT' ? null : banDetails.endDate,
-            created_by: user.id
-        });
+        // Find or create banned_person (identity_token_hash for spec compliance)
+        let personId: string;
+        const dobDate = dob && dob.length >= 8 ? `${dob.slice(0, 4)}-${dob.slice(4, 6)}-${dob.slice(6, 8)}` : null;
 
-        // Audit Log
-        await supabaseAdmin.from('audit_logs').insert({
+        if (identityHash) {
+            const { data: existing } = await supabaseAdmin
+                .from('banned_persons')
+                .select('id')
+                .eq('business_id', businessId)
+                .eq('identity_token_hash', identityHash)
+                .limit(1)
+                .single();
+
+            if (existing) {
+                personId = existing.id;
+            } else {
+                const { data: inserted, error: insErr } = await supabaseAdmin.from('banned_persons').insert({
+                    business_id: businessId,
+                    first_name: firstName,
+                    last_name: lastName,
+                    date_of_birth: dobDate,
+                    id_number_last4: idNumberLast4 || null,
+                    issuing_state_or_country: issuingState || null,
+                    identity_token_hash: identityHash
+                }).select('id').single();
+                if (insErr) throw insErr;
+                personId = inserted!.id;
+            }
+        } else {
+            const { data: inserted, error: insErr } = await supabaseAdmin.from('banned_persons').insert({
+                business_id: businessId,
+                first_name: firstName,
+                last_name: lastName,
+                date_of_birth: dobDate,
+                id_number_last4: idNumberLast4 || null,
+                issuing_state_or_country: issuingState || null
+            }).select('id').single();
+            if (insErr) throw insErr;
+            personId = inserted!.id;
+        }
+
+        const { data: banRow, error: banErr } = await supabaseAdmin.from('patron_bans').insert({
+            banned_person_id: personId,
             business_id: businessId,
-            actor_user_id: user.id,
-            action: 'BAN_GUEST',
-            details: { hash_preview: identityHash.substring(0, 8), ...banDetails }
+            status: 'ACTIVE',
+            ban_type: banDetails.duration === 'PERMANENT' ? 'PERMANENT' : 'TEMPORARY',
+            end_datetime: banDetails.duration === 'PERMANENT' ? null : banDetails.endDate,
+            reason_category: banDetails.reason || 'OTHER',
+            reason_notes: banDetails.notes || null,
+            applies_to_all_locations: banDetails.scope !== 'VENUE',
+            location_ids: banDetails.scope === 'VENUE' && banDetails.venueId ? [banDetails.venueId] : [],
+            created_by_user_id: user.id
+        }).select('id').single();
+
+        if (banErr) throw banErr;
+
+        await supabaseAdmin.from('ban_audit_logs').insert({
+            ban_id: banRow!.id,
+            action: 'CREATED',
+            performed_by_user_id: user.id,
+            details_json: { hash_preview: identityHash?.substring(0, 8), ...banDetails }
         });
 
         return { success: true };

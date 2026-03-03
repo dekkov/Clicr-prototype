@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { Business, Venue, Area, Clicr, CountEvent, User, IDScanEvent, BanRecord, BannedPerson, PatronBan, BanEnforcementEvent, BanAuditLog, Device, CapacityOverride, VenueAuditLog, TurnaroundEvent } from './types';
 import { createClient } from '@/utils/supabase/client';
 
@@ -42,13 +42,18 @@ export type AppState = {
     activeBusiness: Business | null;
     activeVenueId: string | null;
 
+        activeShiftId: string | null;
+        activeShiftAreaId: string | null;
     isLoading: boolean;
+    teamMemberCount: number;
 };
 
 type AppContextType = AppState & {
     recordEvent: (event: Omit<CountEvent, 'id' | 'timestamp' | 'user_id' | 'business_id'>) => void;
     recordScan: (scan: Omit<IDScanEvent, 'id' | 'timestamp'>) => void;
     resetCounts: (venueId?: string) => void;
+    startShift: (venueId: string, areaId?: string) => Promise<string | null>;
+    endShift: (shiftId: string) => Promise<void>;
     addUser: (user: User) => Promise<void>;
     updateUser: (user: User) => Promise<void>;
     removeUser: (userId: string) => Promise<void>;
@@ -94,6 +99,7 @@ type AppContextType = AppState & {
     selectVenue: (venueId: string | null) => void;
     clearBusiness: () => void;
     refreshState: () => Promise<void>;
+    setPollingPaused: (paused: boolean) => void;
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -125,19 +131,28 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         businesses: [],
         activeBusiness: null,
         activeVenueId: null,
+        activeShiftId: null,
+        activeShiftAreaId: null,
 
         isLoading: true,
+        teamMemberCount: 0,
     });
 
     const isResettingRef = useRef(false);
     const activeBusinessIdRef = useRef<string | null>(null);
     const activeVenueIdRef = useRef<string | null>(null);
+    const activeShiftIdRef = useRef<string | null>(null);
     const userClearedRef = useRef(false);
     const lastAuthUserIdRef = useRef<string | null>(null);
     // Tracks when the last realtime snapshot update fired. Polls that started
     // before this timestamp carry stale area counts and must not overwrite
     // the realtime value (classic in-flight race for tap-link events).
     const lastRealtimeTsRef = useRef<number>(0);
+    const pollingPausedRef = useRef(false);
+
+    const setPollingPaused = useCallback((paused: boolean) => {
+        pollingPausedRef.current = paused;
+    }, []);
 
     const LAST_BIZ_KEY = 'clicr_last_biz_id';
 
@@ -154,6 +169,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             console.log("Skipping poll due to pending reset");
             return;
         }
+        if (pollingPausedRef.current) return;
 
         const pollStartTs = Date.now();
 
@@ -165,6 +181,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             // Detect user change — clear stale state so new user never sees previous user's data
             if (user && lastAuthUserIdRef.current !== null && lastAuthUserIdRef.current !== user.id) {
                 activeBusinessIdRef.current = null;
+                activeVenueIdRef.current = null;
+                activeShiftIdRef.current = null;
                 userClearedRef.current = false;
                 lastAuthUserIdRef.current = user.id;
                 try { localStorage.removeItem(LAST_BIZ_KEY); } catch { }
@@ -271,6 +289,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                     });
 
                     const nextActiveVenueId = activeVenueIdRef.current ?? (sortedVenues.length === 1 && cu?.role === 'MANAGER' ? sortedVenues[0].id : prev.activeVenueId);
+
+                    // When user has no businesses (removed from all), clear stale data — don't keep prev.businesses
+                    const hasNoMemberships = (data.businesses?.length ?? 0) === 0;
+                    const nextBusinesses = hasNoMemberships ? [] : (sortedBusinesses.length > 0 ? sortedBusinesses : prev.businesses);
+                    const nextActive = hasNoMemberships ? null : (prev.activeBusiness ?? autoSelected);
                     return {
                         ...prev,
                         ...data,
@@ -279,9 +302,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                         clicrs: data.clicrs || [],
                         events: data.events || [],
                         scanEvents: data.scanEvents || [],
-                        businesses: sortedBusinesses.length > 0 ? sortedBusinesses : prev.businesses,
-                        activeBusiness: prev.activeBusiness ?? autoSelected,
-                        business: prev.activeBusiness ?? autoSelected,
+                        businesses: nextBusinesses,
+                        activeBusiness: nextActive,
+                        business: nextActive,
                         activeVenueId: nextActiveVenueId,
                         isLoading: false
                     };
@@ -352,10 +375,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                         filter: `business_id=eq.${state.business.id}` // TENANT ISOLATION
                     },
                     (payload) => {
-                        // Skip realtime updates while writes are in flight — applying an
-                        // intermediate value (e.g. after click 1 of 4) would overwrite
-                        // the optimistic state showing the final count, causing visible flicker.
                         if (isWritingRef.current) return;
+                        if (pollingPausedRef.current) return;
 
                         if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
                             const newArea = payload.new as any;
@@ -405,6 +426,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     const recordEvent = async (data: Omit<CountEvent, 'id' | 'timestamp' | 'user_id' | 'business_id'>) => {
         if (!state.business) return;
+        if (!data.area_id) {
+            console.error('recordEvent: area_id is required');
+            return;
+        }
 
         isWritingRef.current += 1; // Acquire lock slot
 
@@ -414,6 +439,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             timestamp: Date.now(),
             user_id: state.currentUser.id,
             business_id: state.business.id,
+            ...(activeShiftIdRef.current ? { shift_id: activeShiftIdRef.current } : {}),
         };
 
         // Optimistic update
@@ -454,7 +480,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             // venues/areas with stale data, causing venue name flicker,
             // venueId becoming undefined (breaks guest-out), and fast-click races.
             if (!res.ok) {
-                console.error("Failed to record event (server error)", res.status);
+                const errBody = await res.json().catch(() => ({}));
+                console.error("Failed to record event", res.status, errBody);
             }
         } catch (error) {
             console.error("Failed to record event", error);
@@ -476,6 +503,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             ...data,
             id: Math.random().toString(36).substring(7),
             timestamp: Date.now(),
+            ...(activeShiftIdRef.current ? { shift_id: activeShiftIdRef.current } : {}),
         };
 
         // Optimistic
@@ -534,6 +562,36 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             isResettingRef.current = false;
             // Force immediate fresh poll
             refreshState();
+        }
+    };
+
+    const startShift = async (venueId: string, areaId?: string): Promise<string | null> => {
+        if (!state.business) return null;
+        try {
+            const res = await authFetch({
+                action: 'START_SHIFT',
+                payload: { venue_id: venueId, area_id: areaId || null, business_id: state.business.id },
+            });
+            if (!res.ok) return null;
+            const json = await res.json();
+            const shiftId = json.shift_id;
+            if (shiftId) {
+                activeShiftIdRef.current = shiftId;
+                setState(prev => ({ ...prev, activeShiftId: shiftId, activeShiftAreaId: areaId || null }));
+            }
+            return shiftId;
+        } catch {
+            return null;
+        }
+    };
+
+    const endShift = async (shiftId: string) => {
+        try {
+            await authFetch({ action: 'END_SHIFT', payload: { shift_id: shiftId } });
+            activeShiftIdRef.current = null;
+            setState(prev => ({ ...prev, activeShiftId: null, activeShiftAreaId: null }));
+        } catch (e) {
+            console.error('Failed to end shift', e);
         }
     };
 
@@ -972,7 +1030,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
 
     return (
-        <AppContext.Provider value={{ ...state, recordEvent, recordScan, resetCounts, addUser, updateUser, removeUser, updateBusiness, addClicr, updateClicr, deleteClicr, addVenue, updateVenue, addArea, updateArea, addDevice, updateDevice, addCapacityOverride, addVenueAuditLog, addBan, revokeBan, createPatronBan, updatePatronBan, recordBanEnforcement, recordTurnaround, refreshTrafficStats, businesses: state.businesses, activeBusiness: state.activeBusiness, activeVenueId: state.activeVenueId, selectBusiness, selectVenue, clearBusiness, refreshState } as AppContextType}>
+        <AppContext.Provider value={{ ...state, recordEvent, recordScan, resetCounts, startShift, endShift, addUser, updateUser, removeUser, updateBusiness, addClicr, updateClicr, deleteClicr, addVenue, updateVenue, addArea, updateArea, addDevice, updateDevice, addCapacityOverride, addVenueAuditLog, addBan, revokeBan, createPatronBan, updatePatronBan, recordBanEnforcement, recordTurnaround, refreshTrafficStats, businesses: state.businesses, activeBusiness: state.activeBusiness, activeVenueId: state.activeVenueId, selectBusiness, selectVenue, clearBusiness, refreshState, setPollingPaused } as AppContextType}>
             {children}
         </AppContext.Provider>
     );

@@ -170,13 +170,22 @@ export default function NewVenuePage() {
                     placeholder="0 for unlimited"
                 />
             </div>
-            <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-4 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl transition-all shadow-lg shadow-primary/25 disabled:opacity-50"
-            >
-                {isLoading ? 'Creating...' : 'Next: Set up Areas'}
-            </button>
+            <div className="flex gap-3">
+                <button
+                    type="button"
+                    onClick={() => router.push('/venues')}
+                    className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all"
+                >
+                    Skip for now
+                </button>
+                <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="flex-1 py-4 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl transition-all shadow-lg shadow-primary/25 disabled:opacity-50"
+                >
+                    {isLoading ? 'Creating...' : 'Next: Set up Areas'}
+                </button>
+            </div>
         </form>
     );
 

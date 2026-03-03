@@ -84,6 +84,97 @@ export async function createInitialVenue(formData: FormData): Promise<SetupResul
     }
 }
 
+export type OnboardingBatchInput = {
+    businessName: string;
+    timezone: string;
+    logoUrl?: string;
+    venue: { name: string; city?: string; state?: string; capacity?: number };
+    areas: { name: string; capacity?: number }[];
+};
+
+export type OnboardingBatchResult =
+    | { success: true; businessId: string; venueId: string; areaIds: string[] }
+    | { success: false; error: string };
+
+export async function createBusinessVenueAndAreas(input: OnboardingBatchInput): Promise<OnboardingBatchResult> {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'Not authenticated' };
+
+    const businessName = input.businessName?.trim();
+    if (!businessName) return { success: false, error: 'Business name is required' };
+    const venueName = input.venue?.name?.trim();
+    if (!venueName) return { success: false, error: 'Venue name is required' };
+    if (!input.areas?.length) return { success: false, error: 'At least one area is required' };
+
+    const timezone = input.timezone?.trim() || 'America/New_York';
+    const logoUrl = input.logoUrl?.trim() || null;
+    const capacity = input.venue.capacity != null && !isNaN(input.venue.capacity) && input.venue.capacity > 0
+        ? input.venue.capacity
+        : null;
+
+    try {
+        const { data: business, error: busError } = await supabaseAdmin
+            .from('businesses')
+            .insert({
+                name: businessName,
+                timezone,
+                ...(logoUrl ? { logo_url: logoUrl } : {}),
+            })
+            .select()
+            .single();
+        if (busError) throw busError;
+
+        const { error: memberError } = await supabaseAdmin
+            .from('business_members')
+            .upsert(
+                { business_id: business.id, user_id: user.id, role: 'OWNER' },
+                { onConflict: 'business_id,user_id' }
+            );
+        if (memberError) throw memberError;
+
+        const venueId = crypto.randomUUID();
+        const { error: venueError } = await supabaseAdmin
+            .from('venues')
+            .insert({
+                id: venueId,
+                business_id: business.id,
+                name: venueName,
+                city: input.venue.city || null,
+                state: input.venue.state || null,
+                capacity_max: capacity,
+                timezone,
+            });
+        if (venueError) throw venueError;
+
+        const areaIds: string[] = [];
+        for (const a of input.areas) {
+            const areaId = crypto.randomUUID();
+            const areaCap = a.capacity != null && !isNaN(a.capacity) && a.capacity > 0 ? a.capacity : null;
+            const { error: areaError } = await supabaseAdmin
+                .from('areas')
+                .insert({
+                    id: areaId,
+                    venue_id: venueId,
+                    business_id: business.id,
+                    name: a.name.trim(),
+                    capacity_max: areaCap,
+                    area_type: 'MAIN',
+                    counting_mode: 'BOTH',
+                    is_active: true,
+                });
+            if (areaError) throw areaError;
+            areaIds.push(areaId);
+        }
+
+        revalidatePath('/dashboard');
+        return { success: true, businessId: business.id, venueId, areaIds };
+    } catch (e: any) {
+        console.error('[setup] createBusinessVenueAndAreas error:', e);
+        return { success: false, error: e.message || 'Failed to create business, venue, and areas' };
+    }
+}
+
 export async function updateBusinessSettings(
     businessId: string,
     newSettings: Record<string, unknown>

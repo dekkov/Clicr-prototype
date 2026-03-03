@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { parseAAMVA } from '@/lib/aamva'; // Assuming this lib exists and is usable server-side
-// If parseAAMVA is client-only or not in lib, I'll assume I can import it or reproduce it. 
-// I'll check file existence first? No, I'll reference it and Duplicate it if needed.
-// Better: User said "Server function must... parse PDF417". 
-// I'll assume I can standard parse here.
+import { parseAAMVA } from '@/lib/aamva';
+import { generateIdentityHash } from '@/lib/identity-hash';
 
 interface ScanRequest {
     scan_data: string;
@@ -30,21 +27,58 @@ export async function POST(request: Request) {
         const isExpired = parsed.isExpired;
         const dob = parsed.dateOfBirth;
 
-        // 2. Check Bans (Server-side Authoritative)
-        // Check local bans table
-        const { data: bans } = await supabaseAdmin
-            .from('banned_persons')
-            .select('*')
-            .eq('business_id', business_id)
-            .ilike('first_name', parsed.firstName || '')
-            .ilike('last_name', parsed.lastName || '');
-        // This is a naive check. Real check would use fuzzy match or ID number if available.
-        // Better: Check by ID number if present.
+        // 2. Check Bans (Server-side Authoritative) — identity matching via hashed ID + region
+        const issuingState = parsed.state || '';
+        const idNumber = parsed.idNumber || '';
+        const identityHash = (issuingState && idNumber && dob)
+            ? generateIdentityHash(issuingState, idNumber, dob)
+            : null;
 
         let banResult = null;
-        if (bans && bans.length > 0) {
-            // Precise match
-            banResult = bans.find(b => b.dob === dob || (b.first_name?.toLowerCase() === parsed.firstName?.toLowerCase() && b.last_name?.toLowerCase() === parsed.lastName?.toLowerCase()));
+        if (identityHash) {
+            const { data: hashMatches } = await supabaseAdmin
+                .from('banned_persons')
+                .select('id')
+                .eq('business_id', business_id)
+                .eq('identity_token_hash', identityHash);
+            if (hashMatches?.length) {
+                for (const p of hashMatches) {
+                    const { data: banRow } = await supabaseAdmin.rpc('check_ban_status', {
+                        p_business_id: business_id,
+                        p_patron_id: p.id,
+                        p_venue_id: venue_id
+                    });
+                    const row = Array.isArray(banRow) ? banRow[0] : banRow;
+                    if (row?.is_banned) {
+                        banResult = row;
+                        break;
+                    }
+                }
+            }
+        }
+        // Fallback: legacy plain-text match for records without identity_token_hash
+        if (!banResult && idNumber) {
+            const last4 = idNumber.slice(-4);
+            const { data: legacyMatches } = await supabaseAdmin
+                .from('banned_persons')
+                .select('id')
+                .eq('business_id', business_id)
+                .eq('id_number_last4', last4)
+                .eq('issuing_state_or_country', issuingState);
+            if (legacyMatches?.length) {
+                for (const p of legacyMatches) {
+                    const { data: banRow } = await supabaseAdmin.rpc('check_ban_status', {
+                        p_business_id: business_id,
+                        p_patron_id: p.id,
+                        p_venue_id: venue_id
+                    });
+                    const row = Array.isArray(banRow) ? banRow[0] : banRow;
+                    if (row?.is_banned) {
+                        banResult = row;
+                        break;
+                    }
+                }
+            }
         }
 
         // 3. Logic
@@ -60,36 +94,38 @@ export async function POST(request: Request) {
         }
 
         if (banResult) {
-            status = 'BANNED';
-            message = `Banned: ${banResult.ban_reason || 'No reason'}`;
+            status = 'DENIED';
+            message = 'Banned';
         }
 
-        // 4. Record Scan
-        const scanEvent = {
+        // 4. Record Scan (with identity_token_hash for spec compliance)
+        const scanEvent: Record<string, unknown> = {
             business_id,
             venue_id,
             area_id,
             scan_result: status,
-            age: age,
+            age,
+            age_band: age >= 21 ? '21+' : 'Under 21',
             sex: parsed.sex || 'U',
             zip_code: parsed.postalCode || '00000',
-            first_name: parsed.firstName, // Store PII? Depends on policy. User asked for it.
+            first_name: parsed.firstName,
             last_name: parsed.lastName,
-            timestamp: now.toISOString()
+            dob,
+            id_number_last4: idNumber ? idNumber.slice(-4) : null,
+            issuing_state: issuingState,
+            id_type: 'DRIVERS_LICENSE',
         };
+        if (identityHash) scanEvent.identity_token_hash = identityHash;
 
-        const { error: insertError } = await supabaseAdmin.from('id_scans').insert(scanEvent);
+        await supabaseAdmin.from('id_scans').insert(scanEvent);
 
         // 5. Auto-Add to Count (Atomic RPC)
         if (status === 'ACCEPTED') {
-            // Call occupancy RPC
-            await supabaseAdmin.rpc('add_occupancy_delta', {
-                p_business_id: business_id,
-                p_venue_id: venue_id,
+            await supabaseAdmin.rpc('apply_occupancy_delta', {
                 p_area_id: area_id,
                 p_delta: 1,
-                p_source: 'AUTO_SCAN',
-                p_device_id: null // or pass it if we had it
+                p_source: 'auto_scan',
+                p_device_id: null
             });
         }
 

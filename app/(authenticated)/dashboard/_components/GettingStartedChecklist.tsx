@@ -1,21 +1,33 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { CheckCircle2, Circle, ChevronRight, X } from 'lucide-react';
 import { useApp } from '@/lib/store';
 import Link from 'next/link';
+import { listBoardViews } from '@/app/(authenticated)/settings/board-actions';
 
 const DISMISSED_KEY = 'clicr_checklist_dismissed';
 
 export function GettingStartedChecklist() {
-    const { activeBusiness, venues, areas, clicrs, users } = useApp();
+    const { activeBusiness, venues, areas, clicrs, users, teamMemberCount } = useApp();
     const [dismissed, setDismissed] = useState(false);
     const [mounted, setMounted] = useState(false);
+    const [boardViewCount, setBoardViewCount] = useState(0);
 
     useEffect(() => {
         setMounted(true);
         setDismissed(localStorage.getItem(DISMISSED_KEY) === 'true');
     }, []);
+
+    const loadBoardViews = useCallback(async () => {
+        if (!activeBusiness?.id) return;
+        const views = await listBoardViews(activeBusiness.id);
+        setBoardViewCount(views.length);
+    }, [activeBusiness?.id]);
+
+    useEffect(() => {
+        loadBoardViews();
+    }, [loadBoardViews]);
 
     const settings = activeBusiness?.settings;
 
@@ -52,8 +64,15 @@ export function GettingStartedChecklist() {
             id: 'invite',
             label: 'Invite your team',
             description: 'Add staff to help manage your venue',
-            completed: users.length > 1,
+            completed: users.length > 1 || (teamMemberCount ?? 0) > 1,
             href: '/settings/team',
+        },
+        {
+            id: 'board',
+            label: 'Create a Board View',
+            description: 'Display multiple counters on one screen',
+            completed: boardViewCount > 0,
+            href: '/settings/board-views',
         },
         {
             id: 'scan',

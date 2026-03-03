@@ -1,19 +1,24 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/store';
 import { Area, Clicr, Venue } from '@/lib/types';
-import { Building2, MapPin, Users, Check, Plus, ArrowRight, Mail, Shield, Scan, Ban } from 'lucide-react';
-import { createInitialBusiness, updateBusinessSettings } from '@/app/onboarding/setup-actions';
+import { Building2, MapPin, Users, Check, Plus, ArrowRight, ArrowLeft, Mail, Shield, Scan, Ban, LayoutGrid, Trash2 } from 'lucide-react';
+import { createBusinessVenueAndAreas, updateBusinessSettings } from '@/app/onboarding/setup-actions';
 import { inviteTeamMember } from '@/app/(authenticated)/settings/team-actions';
+import { createBoardView } from '@/app/(authenticated)/settings/board-actions';
 import type { Role } from '@/lib/types';
 
-type Step = 'BUSINESS' | 'VENUE' | 'AREAS' | 'CLICRS' | 'INVITE' | 'SCAN_CONFIG' | 'BAN_CONFIG';
+type Step = 'BUSINESS' | 'VENUE' | 'AREAS' | 'CLICRS' | 'INVITE' | 'BOARD_VIEW' | 'SCAN_CONFIG' | 'BAN_CONFIG';
 
 export default function OnboardingSetupPage() {
     const router = useRouter();
-    const { addVenue, addArea, addClicr, selectBusiness, refreshState } = useApp();
+    const { addClicr, selectBusiness, refreshState, businesses, isLoading: storeLoading } = useApp();
+
+    // Do NOT redirect based on businesses.length — that caused a race: after step 1, refreshState
+    // populates businesses and we'd redirect before the user could continue to step 2.
+    // "Add New Business" from sidebar also uses this flow; both need to complete the wizard.
 
     const [step, setStep] = useState<Step>('BUSINESS');
     const [isLoading, setIsLoading] = useState(false);
@@ -54,64 +59,42 @@ export default function OnboardingSetupPage() {
     const [createdClicrs, setCreatedClicrs] = useState<Clicr[]>([]);
     const [clicrInputs, setClicrInputs] = useState<Record<string, string>>({});
 
-    const STEP_LABELS: Step[] = ['BUSINESS', 'VENUE', 'AREAS', 'CLICRS', 'INVITE', 'SCAN_CONFIG', 'BAN_CONFIG'];
+    // Board View step state (optional)
+    const [boardViewName, setBoardViewName] = useState('');
+    const [boardViewDeviceIds, setBoardViewDeviceIds] = useState<string[]>([]);
+    const [boardViewLabels, setBoardViewLabels] = useState<Record<string, string>>({});
+    const [boardViewCreated, setBoardViewCreated] = useState(false);
+
+    const STEP_LABELS: Step[] = ['BUSINESS', 'VENUE', 'AREAS', 'CLICRS', 'INVITE', 'BOARD_VIEW', 'SCAN_CONFIG', 'BAN_CONFIG'];
     const currentIndex = STEP_LABELS.indexOf(step);
 
-    // --- STEP 1: BUSINESS ---
-    const handleCreateBusiness = async (e: React.FormEvent) => {
+    const goToPrevStep = () => {
+        const idx = STEP_LABELS.indexOf(step);
+        if (idx > 0) setStep(STEP_LABELS[idx - 1]);
+    };
+
+    // --- STEP 1: BUSINESS --- (collect only, no DB write)
+    const handleCreateBusiness = (e: React.FormEvent) => {
         e.preventDefault();
-        setIsLoading(true);
         setError(null);
-        const fd = new FormData();
-        fd.append('businessName', businessName);
-        fd.append('timezone', timezone);
-        if (logoUrl) fd.append('logoUrl', logoUrl);
-        const result = await createInitialBusiness(fd);
-        setIsLoading(false);
-        if (!result.success) {
-            setError(result.error);
-            return;
-        }
-        if (result.businessId) setNewBusinessId(result.businessId);
-        refreshState();
         setStep('VENUE');
     };
 
-    // --- STEP 2: VENUE ---
-    const handleCreateVenue = async (e: React.FormEvent) => {
+    // --- STEP 2: VENUE --- (collect only, no DB write)
+    const handleCreateVenue = (e: React.FormEvent) => {
         e.preventDefault();
-        setIsLoading(true);
-        const newId = crypto.randomUUID();
-        const parsedCapacity = parseInt(venueData.capacity, 10);
-        const venue: Venue = {
-            id: newId,
-            business_id: newBusinessId,
-            name: venueData.name,
-            city: venueData.city,
-            state: venueData.state,
-            default_capacity_total: !isNaN(parsedCapacity) && parsedCapacity > 0 ? parsedCapacity : null,
-            capacity_enforcement_mode: 'WARN_ONLY',
-            status: 'ACTIVE',
-            timezone,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            active: true,
-        };
-        await addVenue(venue);
-        setVenueId(newId);
-        setIsLoading(false);
+        setError(null);
         setStep('AREAS');
     };
 
-    // --- STEP 3: AREAS ---
-    const handleAddArea = async () => {
+    // --- STEP 3: AREAS --- (collect only; batch write on Next: Clicrs)
+    const handleAddArea = () => {
         if (!areaInput.name) return;
-        setIsLoading(true);
         const newAreaId = crypto.randomUUID();
         const parsedAreaCap = parseInt(areaInput.capacity, 10);
         const area: Area = {
             id: newAreaId,
-            venue_id: venueId,
+            venue_id: '', // set after batch create
             name: areaInput.name,
             default_capacity: !isNaN(parsedAreaCap) && parsedAreaCap > 0 ? parsedAreaCap : null,
             area_type: 'MAIN',
@@ -121,10 +104,42 @@ export default function OnboardingSetupPage() {
             updated_at: new Date().toISOString(),
             current_count: 0,
         } as Area;
-        await addArea(area);
         setCreatedAreas(prev => [...prev, area]);
         setAreaInput({ name: '', capacity: '100' });
+    };
+
+    const handleCompleteStep3 = async () => {
+        if (createdAreas.length === 0) return;
+        setIsLoading(true);
+        setError(null);
+        const parsedCapacity = parseInt(venueData.capacity, 10);
+        const result = await createBusinessVenueAndAreas({
+            businessName,
+            timezone,
+            logoUrl: logoUrl || undefined,
+            venue: {
+                name: venueData.name,
+                city: venueData.city || undefined,
+                state: venueData.state || undefined,
+                capacity: !isNaN(parsedCapacity) && parsedCapacity > 0 ? parsedCapacity : undefined,
+            },
+            areas: createdAreas.map(a => ({
+                name: a.name,
+                capacity: a.default_capacity ?? undefined,
+            })),
+        });
         setIsLoading(false);
+        if (!result.success) {
+            setError(result.error);
+            return;
+        }
+        setNewBusinessId(result.businessId);
+        setVenueId(result.venueId);
+        setCreatedAreas(prev =>
+            prev.map((a, i) => ({ ...a, id: result.areaIds[i], venue_id: result.venueId } as Area))
+        );
+        await refreshState();
+        setStep('CLICRS');
     };
 
     // --- STEP 4: CLICRS ---
@@ -144,6 +159,29 @@ export default function OnboardingSetupPage() {
         await addClicr(clicr);
         setCreatedClicrs(prev => [...prev, clicr]);
         setClicrInputs(prev => ({ ...prev, [areaId]: '' }));
+        setIsLoading(false);
+    };
+
+    const CLICR_TEMPLATES: { id: string; label: string; desc: string; names: string[] }[] = [
+        { id: 'single', label: 'Single door', desc: '1 counter', names: ['Front Door'] },
+        { id: 'entry_exit', label: 'Entry + Exit pair', desc: '2 counters', names: ['Entry Door', 'Exit Door'] },
+        { id: 'busy', label: 'Busy door setup', desc: '3 counters', names: ['Front Door 1', 'Front Door 2', 'VIP Door'] },
+    ];
+
+    const handleApplyTemplate = async (template: typeof CLICR_TEMPLATES[0], areaId: string) => {
+        setIsLoading(true);
+        const newClicrs: Clicr[] = template.names.map(name => ({
+            id: crypto.randomUUID(),
+            area_id: areaId,
+            name,
+            flow_mode: 'BIDIRECTIONAL' as const,
+            active: true,
+            current_count: 0,
+        }));
+        for (const c of newClicrs) {
+            await addClicr(c);
+        }
+        setCreatedClicrs(prev => [...prev, ...newClicrs]);
         setIsLoading(false);
     };
 
@@ -200,7 +238,7 @@ export default function OnboardingSetupPage() {
                                     {i < currentIndex ? <Check className="w-4 h-4" /> : i + 1}
                                 </div>
                                 <span className="text-[10px] font-bold hidden sm:block">
-                                    {{ BUSINESS: 'Org', VENUE: 'Venue', AREAS: 'Areas', CLICRS: 'Clicrs', INVITE: 'Team', SCAN_CONFIG: 'Scan', BAN_CONFIG: 'Bans' }[s]}
+                                    {{ BUSINESS: 'Org', VENUE: 'Venue', AREAS: 'Areas', CLICRS: 'Clicrs', INVITE: 'Team', BOARD_VIEW: 'Board', SCAN_CONFIG: 'Scan', BAN_CONFIG: 'Bans' }[s]}
                                 </span>
                             </div>
                             {i < STEP_LABELS.length - 1 && (
@@ -217,18 +255,22 @@ export default function OnboardingSetupPage() {
                             <Building2 className="text-primary w-6 h-6" />
                             <h2 className="text-2xl font-bold text-white">Create your organization</h2>
                         </div>
+                        <p className="text-xs text-slate-500">Fields marked <span className="text-slate-400">(optional)</span> can be left blank.</p>
                         <p className="text-slate-400 text-sm">This appears on your dashboard and reports.</p>
                         {error && <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">{error}</div>}
-                        <input
-                            type="text"
-                            required
-                            value={businessName}
-                            onChange={e => setBusinessName(e.target.value)}
-                            placeholder="e.g. Nightlife Group LLC"
-                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none"
-                        />
                         <div>
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 block">Timezone</label>
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 block">Organization name <span className="text-red-400">*</span></label>
+                            <input
+                                type="text"
+                                required
+                                value={businessName}
+                                onChange={e => setBusinessName(e.target.value)}
+                                placeholder="e.g. Nightlife Group LLC"
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 block">Timezone <span className="text-red-400">*</span></label>
                             <select
                                 value={timezone}
                                 onChange={e => setTimezone(e.target.value)}
@@ -266,24 +308,36 @@ export default function OnboardingSetupPage() {
                             <MapPin className="text-primary w-6 h-6" />
                             <h2 className="text-2xl font-bold text-white">Add your first venue</h2>
                         </div>
-                        <p className="text-slate-400 text-sm">A venue is a physical location you track occupancy for.</p>
+                        <p className="text-slate-400 text-sm">A venue is a physical location you track occupancy for. You can add more venues later after onboarding.</p>
                         <div className="space-y-4">
-                            <input type="text" required value={venueData.name} onChange={e => setVenueData(p => ({ ...p, name: e.target.value }))}
-                                placeholder="Venue name (e.g. Downtown Club)"
-                                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none" />
-                            <div className="grid grid-cols-2 gap-3">
-                                <input type="text" value={venueData.city} onChange={e => setVenueData(p => ({ ...p, city: e.target.value }))} placeholder="City"
-                                    className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none" />
-                                <input type="text" value={venueData.state} onChange={e => setVenueData(p => ({ ...p, state: e.target.value }))} placeholder="State"
-                                    className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none" />
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 block">Venue name <span className="text-red-400">*</span></label>
+                                <input type="text" required value={venueData.name} onChange={e => setVenueData(p => ({ ...p, name: e.target.value }))}
+                                    placeholder="e.g. Downtown Club"
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none" />
                             </div>
-                            <input type="number" value={venueData.capacity} onChange={e => setVenueData(p => ({ ...p, capacity: e.target.value }))}
-                                placeholder="Max capacity"
-                                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none" />
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 block">City <span className="text-slate-600">(optional)</span></label>
+                                    <input type="text" value={venueData.city} onChange={e => setVenueData(p => ({ ...p, city: e.target.value }))} placeholder="City"
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none" />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 block">State <span className="text-slate-600">(optional)</span></label>
+                                    <input type="text" value={venueData.state} onChange={e => setVenueData(p => ({ ...p, state: e.target.value }))} placeholder="State"
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none" />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 block">Max capacity <span className="text-slate-600">(optional)</span></label>
+                                <input type="number" value={venueData.capacity} onChange={e => setVenueData(p => ({ ...p, capacity: e.target.value }))}
+                                    placeholder="0 for unlimited"
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none" />
+                            </div>
                         </div>
                         <div className="flex gap-3">
-                            <button type="button" onClick={() => finish()} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all">
-                                Skip for now
+                            <button type="button" onClick={goToPrevStep} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2">
+                                <ArrowLeft className="w-4 h-4" /> Back
                             </button>
                             <button type="submit" disabled={isLoading} className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all disabled:opacity-50">
                                 {isLoading ? 'Creating...' : 'Next: Areas'}
@@ -294,18 +348,46 @@ export default function OnboardingSetupPage() {
 
                 {/* STEP 3: AREAS */}
                 {step === 'AREAS' && (
-                    <div className="space-y-6 bg-slate-900/50 border border-slate-800 p-8 rounded-2xl shadow-xl">
+                    <div className="relative space-y-6 bg-slate-900/50 border border-slate-800 p-8 rounded-2xl shadow-xl">
+                        {isLoading && (
+                            <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-slate-950/80 backdrop-blur-sm">
+                                <div className="flex flex-col items-center gap-3">
+                                    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                                    <span className="text-sm text-slate-400">Creating your organization…</span>
+                                </div>
+                            </div>
+                        )}
                         <div className="flex items-center gap-3">
                             <MapPin className="text-primary w-6 h-6" />
                             <h2 className="text-2xl font-bold text-white">Define areas</h2>
                         </div>
                         <p className="text-slate-400 text-sm">Add zones like Main Floor, VIP, Patio. You can add more later.</p>
+                        {error && <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">{error}</div>}
                         {createdAreas.length > 0 && (
                             <div className="space-y-2">
                                 {createdAreas.map(a => (
                                     <div key={a.id} className="flex items-center justify-between bg-slate-800/50 px-4 py-3 rounded-lg border border-slate-700">
                                         <span className="text-white font-medium">{a.name}</span>
-                                        <span className="text-xs text-emerald-500 font-bold flex items-center gap-1"><Check className="w-3 h-3" /> Added</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs text-emerald-500 font-bold flex items-center gap-1"><Check className="w-3 h-3" /> Added</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setCreatedAreas(prev => prev.filter(x => x.id !== a.id));
+                                                    setCreatedClicrs(prev => prev.filter(c => c.area_id !== a.id));
+                                                    setClicrInputs(prev => {
+                                                        const next = { ...prev };
+                                                        delete next[a.id];
+                                                        return next;
+                                                    });
+                                                }}
+                                                disabled={isLoading}
+                                                className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                                                title="Remove area"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -316,18 +398,18 @@ export default function OnboardingSetupPage() {
                                 className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none text-sm" />
                             <input type="number" value={areaInput.capacity} onChange={e => setAreaInput(p => ({ ...p, capacity: e.target.value }))}
                                 className="w-24 bg-slate-950 border border-slate-800 rounded-xl px-3 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none text-sm" />
-                            <button onClick={handleAddArea} disabled={!areaInput.name || isLoading}
+                            <button onClick={handleAddArea} disabled={!areaInput.name}
                                 className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-sm font-medium transition-all disabled:opacity-50 flex items-center gap-1">
                                 <Plus className="w-4 h-4" />
                             </button>
                         </div>
                         <div className="flex gap-3 pt-2 border-t border-slate-800">
-                            <button onClick={() => finish()} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all">
-                                Skip for now
+                            <button type="button" onClick={goToPrevStep} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2">
+                                <ArrowLeft className="w-4 h-4" /> Back
                             </button>
-                            <button onClick={() => setStep('CLICRS')} disabled={createdAreas.length === 0}
+                            <button type="button" onClick={handleCompleteStep3} disabled={createdAreas.length === 0 || isLoading}
                                 className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all disabled:opacity-50">
-                                Next: Clicrs
+                                {isLoading ? 'Creating...' : 'Next: Clicrs'}
                             </button>
                         </div>
                     </div>
@@ -341,12 +423,26 @@ export default function OnboardingSetupPage() {
                             <h2 className="text-2xl font-bold text-white">Add Clicrs</h2>
                         </div>
                         <p className="text-slate-400 text-sm">Name your counters per area (e.g. Front Door, Side Entrance).</p>
+
                         <div className="space-y-4">
                             {createdAreas.map(area => {
                                 const areaClicrs = createdClicrs.filter(c => c.area_id === area.id);
                                 return (
                                     <div key={area.id} className="bg-slate-950/30 p-4 rounded-xl border border-slate-800">
                                         <h3 className="font-bold text-white mb-3">{area.name}</h3>
+                                        <div className="flex flex-wrap gap-2 mb-3">
+                                            {CLICR_TEMPLATES.map(t => (
+                                                <button
+                                                    key={t.id}
+                                                    type="button"
+                                                    onClick={() => handleApplyTemplate(t, area.id)}
+                                                    disabled={isLoading}
+                                                    className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-white text-xs font-medium transition-colors disabled:opacity-50"
+                                                >
+                                                    {t.label} <span className="text-slate-500">({t.desc})</span>
+                                                </button>
+                                            ))}
+                                        </div>
                                         {areaClicrs.map(c => (
                                             <div key={c.id} className="flex items-center gap-2 mb-2 text-sm text-slate-300">
                                                 <div className="w-2 h-2 rounded-full bg-emerald-500" /> {c.name}
@@ -367,10 +463,10 @@ export default function OnboardingSetupPage() {
                             })}
                         </div>
                         <div className="flex gap-3 pt-2 border-t border-slate-800">
-                            <button onClick={() => setStep('INVITE')} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all">
-                                Skip for now
+                            <button type="button" onClick={goToPrevStep} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2">
+                                <ArrowLeft className="w-4 h-4" /> Back
                             </button>
-                            <button onClick={() => setStep('INVITE')} className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all">
+                            <button type="button" onClick={() => setStep('INVITE')} className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all">
                                 Next: Invite Team
                             </button>
                         </div>
@@ -384,7 +480,7 @@ export default function OnboardingSetupPage() {
                             <Mail className="text-primary w-6 h-6" />
                             <h2 className="text-2xl font-bold text-white">Invite your team</h2>
                         </div>
-                        <p className="text-slate-400 text-sm">Add staff members who will help manage your venue. You can always do this later.</p>
+                        <p className="text-slate-400 text-sm">Add staff members who will help manage your venue.</p>
 
                         {invitedList.length > 0 && (
                             <div className="space-y-2">
@@ -439,17 +535,92 @@ export default function OnboardingSetupPage() {
                         {error && <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">{error}</div>}
 
                         <div className="flex gap-3 pt-2 border-t border-slate-800">
-                            <button onClick={() => { setError(null); setStep('SCAN_CONFIG'); }} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all">
-                                Skip for now
+                            <button type="button" onClick={() => { setError(null); goToPrevStep(); }} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2">
+                                <ArrowLeft className="w-4 h-4" /> Back
                             </button>
-                            <button onClick={() => { setError(null); setStep('SCAN_CONFIG'); }} className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all">
-                                Next: Scanning
+                            <button type="button" onClick={() => { setError(null); setStep('BOARD_VIEW'); }} className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all">
+                                Next: Board View
                             </button>
                         </div>
                     </div>
                 )}
 
-                {/* STEP 6: SCAN_CONFIG */}
+                {/* STEP 6: BOARD_VIEW */}
+                {step === 'BOARD_VIEW' && (
+                    <div className="space-y-6 bg-slate-900/50 border border-slate-800 p-8 rounded-2xl shadow-xl">
+                        <div className="flex items-center gap-3">
+                            <LayoutGrid className="text-primary w-6 h-6" />
+                            <h2 className="text-2xl font-bold text-white">Create a Board View</h2>
+                        </div>
+                        <p className="text-slate-400 text-sm">Display multiple counters on one screen for TVs or door monitors.</p>
+
+                        {boardViewCreated ? (
+                            <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-4 py-3 rounded-xl">
+                                <Check className="w-5 h-5 text-emerald-500" />
+                                <span className="text-emerald-400 font-medium">Board view created</span>
+                            </div>
+                        ) : createdClicrs.length > 0 ? (
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 block">Board view name <span className="text-red-400">*</span></label>
+                                    <input type="text" value={boardViewName} onChange={e => setBoardViewName(e.target.value)}
+                                        placeholder="View name (e.g. Front Door Monitor)"
+                                        required
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none" />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Select counters (up to 5)</label>
+                                    <div className="space-y-2">
+                                        {createdClicrs.map(c => {
+                                            const area = createdAreas.find(a => a.id === c.area_id);
+                                            const isSelected = boardViewDeviceIds.includes(c.id);
+                                            return (
+                                                <button key={c.id} type="button" onClick={() => {
+                                                    if (isSelected) setBoardViewDeviceIds(prev => prev.filter(id => id !== c.id));
+                                                    else if (boardViewDeviceIds.length < 5) setBoardViewDeviceIds(prev => [...prev, c.id]);
+                                                }}
+                                                    className={`w-full flex items-center justify-between p-3 rounded-xl border text-left text-sm transition-all ${isSelected ? 'bg-primary/10 border-primary' : 'bg-slate-800 border-slate-700 hover:bg-slate-700'}`}>
+                                                    <span className={isSelected ? 'text-primary font-bold' : 'text-white'}>{c.name}</span>
+                                                    <span className="text-xs text-slate-500">{area?.name}</span>
+                                                    {isSelected && <Check className="w-4 h-4 text-primary" />}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="text-slate-500 text-sm">Add Clicrs first to create a board view.</p>
+                        )}
+
+                        <div className="flex gap-3 pt-2 border-t border-slate-800">
+                            <button type="button" onClick={goToPrevStep} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2">
+                                <ArrowLeft className="w-4 h-4" /> Back
+                            </button>
+                            <button type="button" onClick={() => setStep('SCAN_CONFIG')} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all">
+                                Next: Scan Config
+                            </button>
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    if (newBusinessId && boardViewName.trim() && boardViewDeviceIds.length > 0) {
+                                        setIsLoading(true);
+                                        const result = await createBoardView(boardViewName, boardViewDeviceIds, boardViewLabels, newBusinessId);
+                                        setIsLoading(false);
+                                        if (result.success) setBoardViewCreated(true);
+                                        setStep('SCAN_CONFIG');
+                                    }
+                                }}
+                                disabled={isLoading || !boardViewName.trim() || boardViewDeviceIds.length === 0}
+                                className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all disabled:opacity-50"
+                            >
+                                {isLoading ? 'Creating...' : 'Create & Next'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* STEP 7: SCAN_CONFIG */}
                 {step === 'SCAN_CONFIG' && (
                     <div className="space-y-6 bg-slate-900/50 border border-slate-800 p-8 rounded-2xl shadow-xl">
                         <div className="flex items-center gap-3">
@@ -486,17 +657,30 @@ export default function OnboardingSetupPage() {
                         </div>
 
                         <div className="flex gap-3 pt-2 border-t border-slate-800">
-                            <button onClick={() => setStep('BAN_CONFIG')} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all">
-                                Skip for now
+                            <button type="button" onClick={goToPrevStep} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2">
+                                <ArrowLeft className="w-4 h-4" /> Back
                             </button>
-                            <button onClick={() => { setScanConfigured(true); setStep('BAN_CONFIG'); }} className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all">
-                                Next: Ban Settings
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    if (newBusinessId) {
+                                        setIsLoading(true);
+                                        setScanConfigured(true);
+                                        await updateBusinessSettings(newBusinessId, { scan_method: scanMethod, scan_enabled_default: scanEnabled });
+                                        setIsLoading(false);
+                                    }
+                                    setStep('BAN_CONFIG');
+                                }}
+                                disabled={isLoading}
+                                className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all disabled:opacity-50"
+                            >
+                                {isLoading ? 'Saving...' : 'Save & Next'}
                             </button>
                         </div>
                     </div>
                 )}
 
-                {/* STEP 7: BAN_CONFIG */}
+                {/* STEP 8: BAN_CONFIG */}
                 {step === 'BAN_CONFIG' && (
                     <div className="space-y-6 bg-slate-900/50 border border-slate-800 p-8 rounded-2xl shadow-xl">
                         <div className="flex items-center gap-3">
@@ -550,11 +734,11 @@ export default function OnboardingSetupPage() {
                         </div>
 
                         <div className="flex gap-3 pt-2 border-t border-slate-800">
-                            <button onClick={() => finish()} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all">
-                                Skip for now
+                            <button type="button" onClick={goToPrevStep} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2">
+                                <ArrowLeft className="w-4 h-4" /> Back
                             </button>
-                            <button onClick={() => finish({ saveBanConfig: true })} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2">
-                                <Check className="w-5 h-5" /> Finish Setup
+                            <button type="button" onClick={() => finish({ saveBanConfig: true })} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2">
+                                <Check className="w-5 h-5" /> Save & finish setup
                             </button>
                         </div>
                     </div>

@@ -281,6 +281,15 @@ async function buildSyncResponse(
 
     const filteredUsers = usersList;
 
+    let teamMemberCount = 0;
+    if (activeBizId) {
+        const { count } = await supabaseAdmin
+            .from('business_members')
+            .select('*', { count: 'exact', head: true })
+            .eq('business_id', activeBizId);
+        teamMemberCount = count ?? 0;
+    }
+
     return {
         ...hydrated,
         businesses: allBusinesses,
@@ -290,7 +299,8 @@ async function buildSyncResponse(
         events: filteredEvents,
         scanEvents: filteredScans,
         users: filteredUsers,
-        currentUser: user
+        currentUser: user,
+        teamMemberCount
     };
 }
 
@@ -327,6 +337,9 @@ export async function POST(request: Request) {
         switch (action) {
             case 'RECORD_EVENT': {
                 const event = payload as CountEvent;
+                if (!event.area_id || typeof event.area_id !== 'string') {
+                    return NextResponse.json({ error: 'area_id is required for RECORD_EVENT' }, { status: 400 });
+                }
                 const banned = await isUserBanned(supabaseAdmin, event.user_id, event.venue_id);
                 if (banned) return NextResponse.json({ error: 'User is banned' }, { status: 403 });
 
@@ -334,15 +347,32 @@ export async function POST(request: Request) {
                 if (!eventBizId && userId) eventBizId = await getBusinessId();
                 if (!eventBizId) return NextResponse.json({ error: 'Could not resolve business_id for event' }, { status: 400 });
 
+                const { data: areaRow, error: areaErr } = await supabaseAdmin
+                    .from('areas')
+                    .select('id, business_id')
+                    .eq('id', event.area_id)
+                    .single();
+                if (areaErr || !areaRow) {
+                    return NextResponse.json({ error: 'Area not found or invalid area_id' }, { status: 400 });
+                }
+                if (areaRow.business_id !== eventBizId) {
+                    return NextResponse.json({ error: 'Area does not belong to your business' }, { status: 403 });
+                }
+
+                const deviceId = (event as any).clicr_id;
+                // Match tap route: use 6-param signature (003_rpcs) — omit p_shift_id until 012_shifts is applied
                 const { error: rpcError } = await supabaseAdmin.rpc('apply_occupancy_delta', {
                     p_area_id: event.area_id,
                     p_delta: event.delta,
                     p_source: event.event_type === 'SCAN' ? 'scan' : event.event_type === 'AUTO_SCAN' ? 'auto_scan' : 'manual',
-                    p_device_id: null,
+                    p_device_id: deviceId || null,
                     p_gender: event.gender || null,
                     p_idempotency_key: event.idempotency_key || null
                 });
-                if (rpcError) throw rpcError;
+                if (rpcError) {
+                    console.error('[sync] RECORD_EVENT RPC error:', rpcError);
+                    return NextResponse.json({ error: rpcError.message || 'Failed to record event' }, { status: 500 });
+                }
                 break;
             }
 
@@ -364,7 +394,8 @@ export async function POST(request: Request) {
                         id_number_last4: scan.id_number_last4,
                         issuing_state: scan.issuing_state,
                         city: scan.city,
-                        address_street: scan.address_street
+                        shift_id: (scan as any).shift_id || null,
+                        identity_token_hash: (scan as any).identity_token_hash || null
                     });
                 } catch (e) { console.error("Scan Persistence Failed", e); }
                 break;
@@ -418,6 +449,30 @@ export async function POST(request: Request) {
                     }
                 }
                 break;
+            }
+
+            case 'START_SHIFT': {
+                const { venue_id, area_id, business_id } = payload as { venue_id: string; area_id?: string; business_id: string };
+                if (!userId || !venue_id || !business_id) return NextResponse.json({ error: 'Missing user or venue' }, { status: 400 });
+                const { data: shift, error: shiftErr } = await supabaseAdmin.from('shifts').insert({
+                    user_id: userId,
+                    business_id,
+                    venue_id,
+                    area_id: area_id || null,
+                }).select('id').single();
+                if (shiftErr) throw shiftErr;
+                return NextResponse.json({ shift_id: shift?.id });
+            }
+
+            case 'END_SHIFT': {
+                const { shift_id } = payload as { shift_id: string };
+                if (!userId || !shift_id) return NextResponse.json({ error: 'Missing shift_id' }, { status: 400 });
+                const { error: endErr } = await supabaseAdmin.from('shifts')
+                    .update({ ended_at: new Date().toISOString() })
+                    .eq('id', shift_id)
+                    .eq('user_id', userId);
+                if (endErr) throw endErr;
+                return NextResponse.json({ success: true });
             }
 
             case 'RECORD_TURNAROUND': {

@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { IDScanEvent } from '@/lib/types';
 import { ParsedID } from '@/lib/aamva';
 import { logError } from '@/lib/core/errors';
+import { generateIdentityHash } from '@/lib/identity-hash';
 
 export type ScanResult = {
     status: 'ACCEPTED' | 'DENIED' | 'WARNED' | 'ERROR';
@@ -18,39 +19,58 @@ export async function submitScanAction(
     console.log("SERVER ACTION: submitScanAction started for venue:", venueId);
 
     const issuingState = rawDetails.state || 'Unknown';
-    // NOTE (V1/V2): supabaseAdmin bypasses RLS. This route should eventually use a session
-    // client enforcing row-level security, or delegate to MUTATIONS.recordScan().
     const businessId = await getBusinessId(venueId);
 
-    // C3: business_id is NOT NULL in id_scans — abort early if it can't be resolved
     if (!businessId) {
         logError('scan:submitScanAction', 'Could not resolve business_id for venue', { venueId });
         return null;
     }
 
-    // 0. SERVER-SIDE BAN CHECK using patron_bans + banned_persons
+    // 0. SERVER-SIDE BAN CHECK — identity matching via hashed ID + region (spec compliance)
     let finalStatus = result.status === 'DENIED' ? 'DENIED' : 'ACCEPTED';
+    const dob = rawDetails.dateOfBirth || '';
+    const idNumber = rawDetails.idNumber || '';
+    const identityHash = (issuingState && idNumber && dob)
+        ? generateIdentityHash(issuingState, idNumber, dob)
+        : null;
 
-    const last4 = rawDetails.idNumber ? rawDetails.idNumber.slice(-4) : null;
-    if (last4 && businessId) {
-        const { data: matchedPersons } = await supabaseAdmin
+    const checkBanForPerson = async (personId: string) => {
+        const { data: banResult } = await supabaseAdmin.rpc('check_ban_status', {
+            p_business_id: businessId,
+            p_patron_id: personId,
+            p_venue_id: venueId
+        });
+        const banRow = Array.isArray(banResult) ? banResult[0] : banResult;
+        return !!banRow?.is_banned;
+    };
+
+    if (identityHash) {
+        const { data: hashMatches } = await supabaseAdmin
             .from('banned_persons')
             .select('id')
+            .eq('business_id', businessId)
+            .eq('identity_token_hash', identityHash);
+        if (hashMatches?.length) {
+            for (const p of hashMatches) {
+                if (await checkBanForPerson(p.id)) {
+                    finalStatus = 'BANNED';
+                    break;
+                }
+            }
+        }
+    }
+    // Fallback: legacy plain-text match
+    if (finalStatus !== 'BANNED' && idNumber) {
+        const last4 = idNumber.slice(-4);
+        const { data: legacyMatches } = await supabaseAdmin
+            .from('banned_persons')
+            .select('id')
+            .eq('business_id', businessId)
             .eq('id_number_last4', last4)
-            .eq('issuing_state_or_country', issuingState)
-            .eq('business_id', businessId);
-
-        if (matchedPersons && matchedPersons.length > 0) {
-            for (const person of matchedPersons) {
-                const { data: banResult } = await supabaseAdmin.rpc('check_ban_status', {
-                    p_business_id: businessId,
-                    p_patron_id: person.id,
-                    p_venue_id: venueId
-                });
-                // D1: handle both RETURNS TABLE (array) and RETURNS jsonb (object) – migration conflict
-                const banRow = Array.isArray(banResult) ? banResult[0] : banResult;
-                if (banRow?.is_banned) {
-                    console.log("SERVER ACTION: DETECTED BAN HIT for person", person.id);
+            .eq('issuing_state_or_country', issuingState);
+        if (legacyMatches?.length) {
+            for (const p of legacyMatches) {
+                if (await checkBanForPerson(p.id)) {
                     finalStatus = 'BANNED';
                     break;
                 }
@@ -58,9 +78,8 @@ export async function submitScanAction(
         }
     }
 
-    // 1. Construct the scan record for id_scans
-    // C2: scan_result CHECK only allows 'ACCEPTED'|'DENIED'|'WARNED'|'ERROR'; BANNED maps to DENIED
-    const scanEvent = {
+    // 1. Construct the scan record for id_scans (with identity_token_hash for spec compliance)
+    const scanEvent: Record<string, unknown> = {
         business_id: businessId,
         venue_id: venueId,
         scan_result: finalStatus === 'BANNED' ? 'DENIED' : finalStatus,
@@ -68,15 +87,14 @@ export async function submitScanAction(
         age_band: getAgeBand(rawDetails.age || 0),
         sex: rawDetails.sex || 'U',
         zip_code: rawDetails.postalCode || '',
-
-        // PII
         first_name: rawDetails.firstName || null,
         last_name: rawDetails.lastName || null,
         dob: rawDetails.dateOfBirth || null,
-        id_number_last4: rawDetails.idNumber ? rawDetails.idNumber.slice(-4) : null,
+        id_number_last4: idNumber ? idNumber.slice(-4) : null,
         issuing_state: issuingState,
         id_type: 'DRIVERS_LICENSE',
     };
+    if (identityHash) (scanEvent as any).identity_token_hash = identityHash;
 
     // 2. Persist to id_scans
     const { data, error } = await supabaseAdmin

@@ -5,20 +5,25 @@ import { LayoutGrid, Maximize, ArrowLeft } from 'lucide-react';
 import { getBoardView } from '@/app/(authenticated)/settings/board-actions';
 import type { BoardView } from '@/lib/types';
 import Link from 'next/link';
+import { useApp } from '@/lib/store';
 
 type DeviceStatus = {
     id: string;
     name: string;
     current_count: number;
     area_name: string;
+    area_id?: string;
+    venue_id?: string;
 };
 
 export default function BoardDisplayPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
+    const { recordEvent, currentUser, business } = useApp();
     const [boardView, setBoardView] = useState<BoardView | null>(null);
     const [devices, setDevices] = useState<DeviceStatus[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const canTap = !!currentUser?.id && !!business?.id;
 
     const load = useCallback(async () => {
         const view = await getBoardView(id);
@@ -54,6 +59,8 @@ export default function BoardDisplayPage({ params }: { params: Promise<{ id: str
                         name: boardView.labels[did] || clicr?.name || 'Unknown',
                         current_count: clicr?.current_count ?? 0,
                         area_name: area?.name || '',
+                        area_id: clicr?.area_id,
+                        venue_id: area?.venue_id,
                     };
                 });
                 setDevices(mapped);
@@ -67,6 +74,19 @@ export default function BoardDisplayPage({ params }: { params: Promise<{ id: str
 
     const handleFullscreen = () => {
         document.documentElement.requestFullscreen?.();
+    };
+
+    const handleTap = (device: DeviceStatus, delta: number) => {
+        if (!device.venue_id || !device.area_id || !recordEvent) return;
+        recordEvent({
+            venue_id: device.venue_id,
+            area_id: device.area_id,
+            clicr_id: device.id,
+            delta,
+            flow_type: delta > 0 ? 'IN' : 'OUT',
+            event_type: 'TAP',
+            idempotency_key: `board-${device.id}-${Date.now()}-${delta}`,
+        });
     };
 
     if (isLoading) {
@@ -118,9 +138,25 @@ export default function BoardDisplayPage({ params }: { params: Promise<{ id: str
                         <div className="text-7xl md:text-9xl font-black tabular-nums text-primary leading-none mb-4">
                             {device.current_count}
                         </div>
-                        <div className="text-lg text-slate-300 font-bold">
+                        <div className="text-lg text-slate-300 font-bold mb-4">
                             {device.name}
                         </div>
+                        {canTap && device.venue_id && device.area_id && (
+                            <div className="flex flex-wrap gap-2 justify-center">
+                                {[1, 2, 3].map(n => (
+                                    <button key={`in-${n}`} onClick={() => handleTap(device, n)}
+                                        className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 text-sm font-bold border border-emerald-500/30 active:scale-95 transition-all">
+                                        +{n} IN
+                                    </button>
+                                ))}
+                                {[1, 2, 3].map(n => (
+                                    <button key={`out-${n}`} onClick={() => handleTap(device, -n)}
+                                        className="px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 text-sm font-bold border border-red-500/30 active:scale-95 transition-all">
+                                        -{n} OUT
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 ))}
             </div>

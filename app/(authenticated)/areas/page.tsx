@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useApp } from '@/lib/store';
 import { Area, AreaType, CountingMode, FlowMode, ShiftMode, Role } from '@/lib/types';
-import { Search, RefreshCw, ArrowUp, ArrowDown, Plus, ChevronDown, Sparkles, Play, Clock, Layers, Maximize2 } from 'lucide-react';
+import { Search, RefreshCw, ArrowUp, ArrowDown, Plus, ChevronDown, Sparkles, Play, Square, Clock, Layers, Maximize2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { canEditVenuesAndAreas, canStartShift, canAddClicr } from '@/lib/permissions';
@@ -24,7 +24,7 @@ const TIMEZONES = [
 ];
 
 export default function AreasPage() {
-    const { areas, clicrs, venues, areaTraffic, activeBusiness, addArea, addClicr, resetCounts, updateArea, isLoading, currentUser } = useApp();
+    const { areas, clicrs, venues, areaTraffic, activeBusiness, addArea, addClicr, resetCounts, startShift, endShift, updateArea, isLoading, currentUser, activeShiftId, activeShiftAreaId } = useApp();
     const userRole = currentUser?.role as Role | undefined;
     const canEdit = canEditVenuesAndAreas(userRole);
     const canShift = canStartShift(userRole);
@@ -57,6 +57,12 @@ export default function AreasPage() {
     const [newClicrFlow, setNewClicrFlow] = useState<FlowMode>('BIDIRECTIONAL');
     const [isAddingClicr, setIsAddingClicr] = useState(false);
 
+    const CLICR_TEMPLATES: { id: string; label: string; desc: string; names: string[] }[] = [
+        { id: 'single', label: 'Single door', desc: '1 counter', names: ['Front Door'] },
+        { id: 'entry_exit', label: 'Entry + Exit pair', desc: '2 counters', names: ['Entry Door', 'Exit Door'] },
+        { id: 'busy', label: 'Busy door setup', desc: '3 counters', names: ['Front Door 1', 'Front Door 2', 'VIP Door'] },
+    ];
+
     const handleAddClicr = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!addClicrAreaId || !newClicrName.trim()) return;
@@ -73,6 +79,24 @@ export default function AreasPage() {
         setAddClicrAreaId(null);
         setNewClicrName('');
         setNewClicrFlow('BIDIRECTIONAL');
+    };
+
+    const handleApplyTemplate = async (template: typeof CLICR_TEMPLATES[0]) => {
+        if (!addClicrAreaId) return;
+        setIsAddingClicr(true);
+        for (const name of template.names) {
+            await addClicr({
+                id: crypto.randomUUID(),
+                area_id: addClicrAreaId,
+                name,
+                flow_mode: newClicrFlow,
+                current_count: 0,
+                active: true,
+            });
+        }
+        setIsAddingClicr(false);
+        setAddClicrAreaId(null);
+        setNewClicrName('');
     };
 
     const handleCreateArea = async (e: React.FormEvent) => {
@@ -111,6 +135,7 @@ export default function AreasPage() {
 
     const handleStartShift = async (area: Area) => {
         setStartingShiftAreaId(area.id);
+        await startShift(area.venue_id, area.id);
         await resetCounts(area.venue_id);
         setStartingShiftAreaId(null);
     };
@@ -304,18 +329,30 @@ export default function AreasPage() {
                                                     Auto {area.auto_reset_time ?? ''}
                                                 </span>
                                             ) : canShift ? (
-                                                <button
-                                                    onClick={() => handleStartShift(area)}
-                                                    disabled={startingShiftAreaId === area.id}
-                                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[11px] font-medium border border-emerald-500/20 transition-colors disabled:opacity-50"
-                                                >
-                                                    {startingShiftAreaId === area.id ? (
-                                                        <span className="w-3 h-3 border-2 border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin" />
+                                                <div className="flex items-center gap-1">
+                                                    {activeShiftId && activeShiftAreaId === area.id ? (
+                                                        <button
+                                                            onClick={() => endShift(activeShiftId)}
+                                                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-red-500/10 hover:bg-red-500/20 text-red-400 text-[11px] font-medium border border-red-500/20 transition-colors"
+                                                        >
+                                                            <Square className="w-3 h-3" />
+                                                            End Shift
+                                                        </button>
                                                     ) : (
-                                                        <Play className="w-3 h-3" />
+                                                        <button
+                                                            onClick={() => handleStartShift(area)}
+                                                            disabled={startingShiftAreaId === area.id}
+                                                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[11px] font-medium border border-emerald-500/20 transition-colors disabled:opacity-50"
+                                                        >
+                                                            {startingShiftAreaId === area.id ? (
+                                                                <span className="w-3 h-3 border-2 border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin" />
+                                                            ) : (
+                                                                <Play className="w-3 h-3" />
+                                                            )}
+                                                            Start Shift
+                                                        </button>
                                                     )}
-                                                    Start Shift
-                                                </button>
+                                                </div>
                                             ) : (
                                                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-800 text-gray-500 text-[11px] font-medium border border-gray-700">
                                                     Manual
@@ -533,6 +570,22 @@ export default function AreasPage() {
                             <p className="text-sm text-gray-400 mb-4">
                                 Adding to <span className="text-white font-medium">{areas.find(a => a.id === addClicrAreaId)?.name}</span>
                             </p>
+                            <div className="space-y-2 mb-4">
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Quick setup</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {CLICR_TEMPLATES.map(t => (
+                                        <button
+                                            key={t.id}
+                                            type="button"
+                                            onClick={() => handleApplyTemplate(t)}
+                                            disabled={isAddingClicr}
+                                            className="px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors disabled:opacity-50"
+                                        >
+                                            {t.label} ({t.desc})
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
                             <form onSubmit={handleAddClicr} className="space-y-4">
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-gray-400">Clicr Name</label>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Building2, MapPin, Users, ArrowRight, Loader2, CheckCircle2 } from 'lucide-react';
+import { Building2, MapPin, Users, ArrowRight, ArrowLeft, Loader2, CheckCircle2 } from 'lucide-react';
 import { createInitialBusiness, createInitialVenue } from '@/app/onboarding/setup-actions';
 
 type Phase = 'BUSINESS' | 'VENUE' | 'DONE';
@@ -86,7 +86,18 @@ export function InlineSetup({ hasBusiness }: InlineSetupProps) {
                                 />
                             </div>
                         </div>
-                        <SubmitButton isPending={isPending} label="Continue" />
+                        <div className="flex gap-3">
+                            <button
+                                type="button"
+                                onClick={() => window.history.back()}
+                                className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2"
+                            >
+                                <ArrowLeft className="w-4 h-4" /> Back
+                            </button>
+                            <div className="flex-1">
+                                <SubmitButton isPending={isPending} label="Continue" />
+                            </div>
+                        </div>
                     </form>
                 </>
             ) : (
@@ -134,7 +145,18 @@ export function InlineSetup({ hasBusiness }: InlineSetupProps) {
                                 />
                             </div>
                         </div>
-                        <SubmitButton isPending={isPending} label="Go to Dashboard" />
+                        <div className="flex gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setPhase('BUSINESS')}
+                                className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2"
+                            >
+                                <ArrowLeft className="w-4 h-4" /> Back
+                            </button>
+                            <div className="flex-1">
+                                <SubmitButton isPending={isPending} label="Go to Dashboard" />
+                            </div>
+                        </div>
                     </form>
                 </>
             )}

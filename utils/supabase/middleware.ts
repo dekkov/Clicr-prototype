@@ -40,7 +40,8 @@ export async function updateSession(request: NextRequest) {
         path.startsWith('/venues') ||
         path.startsWith('/banning') ||
         path.startsWith('/reports') ||
-        path.startsWith('/settings');
+        path.startsWith('/settings') ||
+        path.startsWith('/onboarding/setup');
 
     if (!user) {
         if (isProtectedRoute) {

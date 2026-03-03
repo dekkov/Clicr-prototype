@@ -10,16 +10,17 @@ import type { Area } from '@/lib/types';
  * - MANUAL mode: exposes startShift() for the operator
  */
 export function useAreaShift(area: Area | null | undefined) {
-    const { resetCounts, refreshTrafficStats } = useApp();
+    const { startShift: storeStartShift, resetCounts, refreshTrafficStats } = useApp();
 
     const venueId = area?.venue_id;
 
     const startShift = useCallback(async (silent = false) => {
         if (!venueId || !area) return;
         if (!silent && !window.confirm('Start new shift? This resets all counts to zero.')) return;
+        await storeStartShift(venueId, area.id);
         await resetCounts(venueId);
         await refreshTrafficStats?.(venueId, area.id);
-    }, [venueId, area, resetCounts, refreshTrafficStats]);
+    }, [venueId, area, storeStartShift, resetCounts, refreshTrafficStats]);
 
     const checkAutoReset = useCallback(() => {
         if (!area || area.shift_mode !== 'AUTO') return;

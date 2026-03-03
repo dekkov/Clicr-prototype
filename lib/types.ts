@@ -206,6 +206,7 @@ export type CountEvent = {
     dob?: string; // YYYYMMDD
     event_type: 'TAP' | 'SCAN' | 'BULK' | 'RESET';
     idempotency_key?: string;
+    shift_id?: string;
 };
 
 export type IDScanEvent = {
@@ -235,6 +236,7 @@ export type IDScanEvent = {
     height?: string;
     weight?: string;
     id_number?: string;
+    shift_id?: string;
 };
 
 // --- PATRON BANNING SYSTEM TYPES ---

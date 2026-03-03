@@ -3,9 +3,84 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 
 import { useApp } from '@/lib/store';
+import { cn } from '@/lib/utils';
+
+/** Isolated config modal body — receives only a ref so it never re-renders when parent updates (fixes focus loss) */
+const ConfigModalBody = React.memo(function ConfigModalBody({
+    configRef,
+}: {
+    configRef: React.MutableRefObject<{
+        initialName: string;
+        clicrId: string;
+        hasTapToken: boolean;
+        tapToken: string;
+        initialClassifyMode: boolean;
+        onSave: (name: string) => void;
+        onCancel: () => void;
+        onGenerateToken: () => void;
+        onClassifyToggle: (newVal: boolean) => void;
+        onCopy: () => void;
+    } | null>;
+}) {
+    const snap = configRef.current;
+    if (!snap) return null;
+    const [name, setName] = useState(() => snap.initialName);
+    const [classifyMode, setClassifyMode] = useState(() => snap.initialClassifyMode);
+    const [copyFeedback, setCopyFeedback] = useState(false);
+    const handleCopy = () => {
+        snap.onCopy();
+        setCopyFeedback(true);
+        setTimeout(() => setCopyFeedback(false), 1500);
+    };
+    const handleClassifyToggle = () => {
+        const newVal = !classifyMode;
+        setClassifyMode(newVal);
+        snap.onClassifyToggle(newVal);
+    };
+    return (
+        <>
+            <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Counter Name</label>
+                <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white font-bold focus:outline-none focus:border-white transition-colors"
+                    placeholder="e.g. Main Entrance"
+                />
+            </div>
+            <div className="space-y-2">
+                <div className="flex justify-between items-center bg-slate-900/50 p-3 rounded-xl border border-white/5">
+                    <span className="text-sm font-bold text-white">Classify Scans</span>
+                    <button type="button" onClick={handleClassifyToggle} className={cn("w-12 h-7 rounded-full relative transition-colors", classifyMode ? "bg-emerald-500" : "bg-slate-700")}>
+                        <div className="absolute left-1 top-1 w-5 h-5 bg-white rounded-full shadow-md transition-transform" style={{ transform: classifyMode ? "translateX(20px)" : "translateX(0px)" }} />
+                    </button>
+                </div>
+            </div>
+            <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Remote Tap Link</label>
+                {snap.hasTapToken ? (
+                    <div className="space-y-2">
+                        <div className="flex gap-2">
+                            <input readOnly value={`${typeof window !== 'undefined' ? window.location.origin : ''}/tap/${snap.tapToken}`} className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-slate-400 text-xs font-mono focus:outline-none truncate" />
+                            <button type="button" onClick={handleCopy} className="px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-colors shrink-0">{copyFeedback ? 'Copied!' : 'Copy'}</button>
+                        </div>
+                        <button type="button" onClick={snap.onGenerateToken} className="w-full py-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-slate-500 text-slate-400 text-xs font-bold transition-colors">Regenerate Link</button>
+                    </div>
+                ) : (
+                    <button type="button" onClick={snap.onGenerateToken} className="w-full py-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-white text-white text-xs font-bold transition-colors">Generate Link</button>
+                )}
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-2">
+                <button type="button" onClick={snap.onCancel} className="py-3 rounded-xl text-slate-400 bg-[#1e2330] hover:bg-[#2a3040] font-semibold text-sm transition-colors">Cancel</button>
+                <button type="button" onClick={() => snap.onSave(name)} className="py-3 rounded-xl bg-white text-black font-bold text-sm hover:bg-slate-200 shadow-lg transition-all active:scale-95">Save Changes</button>
+            </div>
+        </>
+    );
+}, (prev, next) => prev.configRef === next.configRef);
+
 import { motion, AnimatePresence } from 'framer-motion';
 import { Settings2, Plus, Minus, XCircle, Check, Zap, Bug, RefreshCw } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { IDScanEvent } from '@/lib/types';
 import { parseAAMVA } from '@/lib/aamva';
 import { evaluateScan } from '@/lib/scan-service';
@@ -45,8 +120,9 @@ export default function ClicrPanel({
     const {
         clicrs, areas, events, venues,
         recordEvent, recordScan, recordTurnaround,
-        resetCounts, isLoading, patrons, patronBans, updateClicr, debug, currentUser,
-        turnarounds, trafficSessionStart
+        resetCounts, endShift, isLoading, patrons, patronBans, updateClicr, debug, currentUser,
+        turnarounds, trafficSessionStart, activeShiftId, activeShiftAreaId,
+        setPollingPaused
     } = useApp();
 
     const id = clicrId;
@@ -195,6 +271,18 @@ export default function ClicrPanel({
 
 
     const [editName, setEditName] = useState('');
+    const configModalRef = useRef<{
+        initialName: string;
+        clicrId: string;
+        hasTapToken: boolean;
+        tapToken: string;
+        initialClassifyMode: boolean;
+        onSave: (name: string) => void;
+        onCancel: () => void;
+        onGenerateToken: () => void;
+        onClassifyToggle: (newVal: boolean) => void;
+        onCopy: () => void;
+    } | null>(null);
     const [generatingToken, setGeneratingToken] = useState(false);
     const [copied, setCopied] = useState(false);
 
@@ -228,6 +316,11 @@ export default function ClicrPanel({
 
     }, [id, clicr, showConfigModal]);
 
+    useEffect(() => {
+        if (!showConfigModal) setPollingPaused?.(false);
+    }, [showConfigModal, setPollingPaused]);
+
+
     const saveConfig = async (name: string) => {
         if (clicr) {
             await updateClicr({
@@ -237,6 +330,7 @@ export default function ClicrPanel({
             });
         }
         setShowConfigModal(false);
+        setPollingPaused?.(false);
     };
 
     const generateTapToken = async () => {
@@ -463,10 +557,11 @@ export default function ClicrPanel({
                     }
                 }
 
+                if (!clicr?.area_id || !clicr?.id) return;
                 recordEvent({
                     venue_id: venueId,
-                    area_id: clicr?.area_id || 'area_001',
-                    clicr_id: clicr?.id || 'dev_001',
+                    area_id: clicr.area_id,
+                    clicr_id: clicr.id,
                     delta: 1,
                     flow_type: 'IN',
                     gender: parsed.sex || 'M',
@@ -627,13 +722,37 @@ export default function ClicrPanel({
                             <h1 className="text-white font-bold text-2xl tracking-tight">
                                 {clicr.name}
                             </h1>
-                            <button onClick={() => { setEditName(clicr.name); setShowConfigModal(true); }} className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 active:bg-slate-700 transition-colors">
+                            <button onClick={() => {
+                                setEditName(clicr.name);
+                                configModalRef.current = {
+                                    initialName: clicr.name,
+                                    clicrId: clicr.id,
+                                    hasTapToken: !!clicr.button_config?.tap_token,
+                                    tapToken: clicr.button_config?.tap_token ?? '',
+                                    initialClassifyMode: classifyMode,
+                                    onSave: (n) => saveConfig(n),
+                                    onCancel: () => { setShowConfigModal(false); setPollingPaused?.(false); },
+                                    onGenerateToken: generateTapToken,
+                                    onClassifyToggle: (newVal) => { setClassifyMode(newVal); localStorage.setItem(`clicr_classify_mode_${clicr.id}`, String(newVal)); },
+                                    onCopy: async () => { try { await navigator.clipboard.writeText(`${window.location.origin}/tap/${clicr.button_config!.tap_token}`); } catch {} },
+                                };
+                                setPollingPaused?.(true);
+                                setShowConfigModal(true);
+                            }} className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 active:bg-slate-700 transition-colors">
                                 <Settings2 className="w-4 h-4" />
                             </button>
                         </div>
                     </div>
-                    {/* Status Dot */}
+                    {/* Status Dot + End Shift */}
                     <div className="flex gap-4 items-center">
+                        {activeShiftId && activeShiftAreaId === clicr?.area_id && (
+                            <button
+                                onClick={() => endShift(activeShiftId)}
+                                className="px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs font-bold border border-red-500/30 transition-colors"
+                            >
+                                End Shift
+                            </button>
+                        )}
                         <div className={cn("w-2.5 h-2.5 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.6)]",
                             isLoading ? "bg-yellow-500" : "bg-[#00C853]"
                         )} />
@@ -925,118 +1044,19 @@ export default function ClicrPanel({
                 )}
             </AnimatePresence>
 
-            {/* CONFIG MODAL */}
-            <AnimatePresence>
-                {showConfigModal && (
-                    <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-6">
-                        <motion.div
-                            initial={{ scale: 0.9, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.9, opacity: 0 }}
-                            className="bg-[#0f1218] border border-slate-800 p-6 rounded-3xl w-full max-w-sm shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto"
-                        >
+            {/* CONFIG MODAL - plain div (no motion) to avoid focus loss from Framer re-renders */}
+            {showConfigModal && (
+                <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-6">
+                    <div className="bg-[#0f1218] border border-slate-800 p-6 rounded-3xl w-full max-w-sm shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
                             <div>
                                 <h3 className="text-xl font-bold text-white">Clicr Settings</h3>
                                 <p className="text-slate-500 text-sm">Customize your counter interface.</p>
                             </div>
 
-                            {/* Counter Name Input */}
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Counter Name</label>
-                                <input
-                                    type="text"
-                                    value={editName}
-                                    onChange={(e) => setEditName(e.target.value)}
-                                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white font-bold focus:outline-none focus:border-white transition-colors"
-                                    placeholder="e.g. Main Entrance"
-                                />
-                            </div>
-
-                            {/* Classify Toggle */}
-                            <div className="flex items-center justify-between bg-slate-900/50 p-3 rounded-xl border border-white/5">
-                                <span className="text-sm font-bold text-white">Classify Scans</span>
-                                <button
-                                    onClick={() => {
-                                        const newVal = !classifyMode;
-                                        setClassifyMode(newVal);
-                                        localStorage.setItem(`clicr_classify_mode_${clicr.id}`, String(newVal));
-                                    }}
-                                    className={cn("w-12 h-7 rounded-full relative transition-colors",
-                                        classifyMode ? "bg-emerald-500" : "bg-slate-700"
-                                    )}
-                                >
-                                    <div className="absolute left-1 top-1 w-5 h-5 bg-white rounded-full shadow-md transition-transform" style={{ transform: classifyMode ? "translateX(20px)" : "translateX(0px)" }} />
-                                </button>
-                            </div>
-
-                            {/* Shift config is now at the area level (Settings > Areas) */}
-
-                            {/* Remote Tap Link */}
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Remote Tap Link</label>
-                                {clicr.button_config?.tap_token ? (
-                                    <div className="space-y-2">
-                                        <div className="flex gap-2">
-                                            <input
-                                                readOnly
-                                                value={`${typeof window !== 'undefined' ? window.location.origin : ''}/tap/${clicr.button_config.tap_token}`}
-                                                className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-slate-400 text-xs font-mono focus:outline-none truncate"
-                                            />
-                                            <button
-                                                onClick={async () => {
-                                                    try {
-                                                        await navigator.clipboard.writeText(`${window.location.origin}/tap/${clicr.button_config!.tap_token}`);
-                                                        setCopied(true);
-                                                        setTimeout(() => setCopied(false), 1500);
-                                                    } catch {
-                                                        // clipboard unavailable (HTTP context, permission denied, etc.)
-                                                    }
-                                                }}
-                                                className="px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-colors shrink-0"
-                                            >
-                                                {copied ? 'Copied!' : 'Copy'}
-                                            </button>
-                                        </div>
-                                        <button
-                                            onClick={generateTapToken}
-                                            disabled={generatingToken}
-                                            className="w-full py-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-slate-500 text-slate-400 text-xs font-bold transition-colors disabled:opacity-50"
-                                        >
-                                            Regenerate Link
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <button
-                                        onClick={generateTapToken}
-                                        disabled={generatingToken}
-                                        className="w-full py-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-white text-white text-xs font-bold transition-colors disabled:opacity-50"
-                                    >
-                                        Generate Link
-                                    </button>
-                                )}
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3 pt-2">
-                                <button
-                                    onClick={() => {
-                                        // Just close, discard draft
-                                        setShowConfigModal(false);
-                                    }}
-                                    className="py-3 rounded-xl text-slate-400 bg-[#1e2330] hover:bg-[#2a3040] font-semibold text-sm transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={() => saveConfig(editName)}
-                                    className="py-3 rounded-xl bg-white text-black font-bold text-sm hover:bg-slate-200 shadow-lg transition-all active:scale-95"
-                                >
-                                    Save Changes
-                                </button>
-                            </div>
-                        </motion.div>
+                            <ConfigModalBody configRef={configModalRef} />
                     </div>
-                )}
-            </AnimatePresence>
+                </div>
+            )}
             {/* DEBUG PANEL - OWNER ONLY */}
             <AnimatePresence>
                 {showDebug && (
