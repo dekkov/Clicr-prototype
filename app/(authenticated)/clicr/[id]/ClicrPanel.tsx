@@ -699,7 +699,7 @@ export default function ClicrPanel({
     }
 
     return (
-        <div className="flex flex-col h-[100vh] bg-black relative overflow-hidden" onClick={() => inputRef.current?.focus({ preventScroll: true })}>
+        <div className="flex flex-col h-[100vh] bg-black relative overflow-hidden" onClick={() => { if (!isModalOpenRef.current) inputRef.current?.focus({ preventScroll: true }); }}>
             {/* Hidden Input */}
             <textarea
                 ref={inputRef as any}
