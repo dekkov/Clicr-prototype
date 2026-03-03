@@ -2,13 +2,13 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, notFound } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import {
     LayoutDashboard,
     MapPin,
     Layers,
-    MousePointer2,
+    Sparkles,
     BarChart3,
     Settings,
     LogOut,
@@ -18,21 +18,22 @@ import {
     ChevronDown,
     Check,
     Plus,
+    Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useApp } from '@/lib/store';
 import { Business, Role } from '@/lib/types';
-import { getScopeSelectorType, getVisibleNavItems, hasMinRole } from '@/lib/permissions';
+import { getScopeSelectorType, getVisibleNavItems, canAccessRoute, hasMinRole } from '@/lib/permissions';
 import type { NavItemDef } from '@/lib/permissions';
 
 const NAV_ITEMS: NavItemDef[] = [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { label: 'Venues',    href: '/venues',    icon: MapPin },
     { label: 'Areas',     href: '/areas',     icon: Layers },
-    { label: 'Clicrs',   href: '/clicr',     icon: MousePointer2 },
-    { label: 'Bans',     href: '/banning',   icon: Ban },
-    { label: 'Reports',  href: '/reports',   icon: BarChart3 },
-    { label: 'Settings', href: '/settings',  icon: Settings },
+    { label: 'Clicrs',    href: '/clicr',     icon: Sparkles },
+    { label: 'Bans',      href: '/banning',   icon: Ban },
+    { label: 'Reports',   href: '/reports',   icon: BarChart3 },
+    { label: 'Settings',  href: '/settings',  icon: Settings },
 ];
 
 const MOBILE_NAV_LABELS = ['Dashboard', 'Venues', 'Clicrs', 'Bans', 'Reports'];
@@ -77,45 +78,39 @@ function VenueSelector() {
     if (venues.length === 0) return null;
     if (venues.length === 1) {
         return (
-            <div className="px-3 py-3 border-b border-border/50">
-                <div className="flex items-center gap-2.5 rounded-lg p-2">
-                    <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
-                        <span className="text-xs font-bold text-primary-foreground">
-                            {(venues[0].name.charAt(0) || '?').toUpperCase()}
-                        </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-foreground truncate">{venues[0].name}</p>
-                        <p className="text-xs text-slate-400">Venue</p>
-                    </div>
+            <div className="w-full flex items-center gap-3 rounded-lg bg-purple-900/30 p-3">
+                <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center shrink-0">
+                    <span className="text-sm font-semibold text-white">
+                        {(venues[0].name.charAt(0) || '?').toUpperCase()}
+                    </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                    <div className="text-sm text-white truncate">{venues[0].name}</div>
+                    <div className="text-xs text-gray-400">Venue</div>
                 </div>
             </div>
         );
     }
 
     return (
-        <div ref={containerRef} className="relative px-3 py-3 border-b border-border/50">
+        <div ref={containerRef} className="relative">
             <button
                 onClick={() => setOpen(prev => !prev)}
-                className="w-full flex items-center gap-2.5 rounded-lg p-2 transition-colors text-left hover:bg-slate-800/50 cursor-pointer"
+                className="w-full flex items-center gap-3 rounded-lg bg-purple-900/30 p-3 hover:bg-purple-900/40 transition-colors text-left cursor-pointer"
             >
-                <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
-                    <span className="text-xs font-bold text-primary-foreground">
+                <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center shrink-0">
+                    <span className="text-sm font-semibold text-white">
                         {selectedVenue ? (selectedVenue.name.charAt(0) || '?').toUpperCase() : '?'}
                     </span>
                 </div>
-                <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-foreground truncate leading-tight">
-                        {selectedVenue ? selectedVenue.name : 'Select Venue'}
-                    </p>
-                    <p className="text-xs text-slate-400 leading-tight">
-                        {venues.length} venues
-                    </p>
+                <div className="flex-1 min-w-0 text-left">
+                    <div className="text-sm text-white truncate">{selectedVenue ? selectedVenue.name : 'Select Venue'}</div>
+                    <div className="text-xs text-gray-400">{venues.length} venues</div>
                 </div>
-                <ChevronDown className={cn("w-4 h-4 text-slate-400 shrink-0 transition-transform", open && "rotate-180")} />
+                <ChevronDown className={cn("w-4 h-4 text-gray-400 shrink-0 transition-transform", open && "rotate-180")} />
             </button>
             {open && (
-                <div className="absolute left-3 right-3 top-full mt-1 z-50 bg-card border border-border rounded-lg shadow-xl overflow-hidden">
+                <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-gray-900 border border-gray-800 rounded-lg shadow-xl overflow-hidden">
                     {venues.map(venue => {
                         const isSelected = venue.id === activeVenueId;
                         return (
@@ -124,17 +119,17 @@ function VenueSelector() {
                                 onClick={() => handleSelect(venue.id)}
                                 className={cn(
                                     "w-full flex items-center gap-2.5 px-3 py-2.5 transition-colors text-left",
-                                    isSelected ? "bg-primary/10 text-primary" : "text-slate-300 hover:bg-slate-800/60"
+                                    isSelected ? "bg-purple-900/40 text-white" : "text-gray-300 hover:bg-gray-800/60"
                                 )}
                             >
                                 <div className={cn(
                                     "w-7 h-7 rounded-md flex items-center justify-center shrink-0 text-xs font-bold",
-                                    isSelected ? "bg-primary text-primary-foreground" : "bg-slate-700 text-slate-200"
+                                    isSelected ? "bg-purple-600 text-white" : "bg-gray-700 text-gray-200"
                                 )}>
                                     {(venue.name.charAt(0) || '?').toUpperCase()}
                                 </div>
                                 <span className="flex-1 text-sm truncate">{venue.name}</span>
-                                {isSelected && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
+                                {isSelected && <Check className="w-3.5 h-3.5 text-purple-400 shrink-0" />}
                             </button>
                         );
                     })}
@@ -173,39 +168,39 @@ function BusinessSelector() {
     }
 
     return (
-        <div ref={containerRef} className="relative px-3 py-3 border-b border-border/50">
+        <div ref={containerRef} className="relative">
             <button
                 onClick={() => canToggle && setOpen(prev => !prev)}
                 className={cn(
-                    "w-full flex items-center gap-2.5 rounded-lg p-2 transition-colors text-left",
-                    canToggle ? "hover:bg-slate-800/50 cursor-pointer" : "cursor-default"
+                    "w-full flex items-center gap-3 rounded-lg bg-purple-900/30 p-3 transition-colors text-left",
+                    canToggle ? "hover:bg-purple-900/40 cursor-pointer" : "cursor-default"
                 )}
             >
-                <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
-                    <span className="text-xs font-bold text-primary-foreground">
+                <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center shrink-0">
+                    <span className="text-sm font-semibold text-white">
                         {activeBusiness ? (activeBusiness.name.charAt(0) || '?').toUpperCase() : '?'}
                     </span>
                 </div>
-                <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-foreground truncate leading-tight">
+                <div className="flex-1 min-w-0 text-left">
+                    <div className="text-sm text-white truncate">
                         {activeBusiness ? activeBusiness.name : 'Select Business'}
-                    </p>
+                    </div>
                     {activeBusiness && (
-                        <p className="text-xs text-slate-400 leading-tight">
+                        <div className="text-xs text-gray-400">
                             {venueCount} {venueCount === 1 ? 'venue' : 'venues'}
-                        </p>
+                        </div>
                     )}
                 </div>
                 {canToggle && (
                     <ChevronDown className={cn(
-                        "w-4 h-4 text-slate-400 shrink-0 transition-transform",
+                        "w-4 h-4 text-gray-400 shrink-0 transition-transform",
                         open && "rotate-180"
                     )} />
                 )}
             </button>
 
             {open && canToggle && (
-                <div className="absolute left-3 right-3 top-full mt-1 z-50 bg-card border border-border rounded-lg shadow-xl overflow-hidden">
+                <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-gray-900 border border-gray-800 rounded-lg shadow-xl overflow-hidden">
                     {businesses.map(biz => {
                         const isSelected = activeBusiness?.id === biz.id;
                         return (
@@ -215,30 +210,30 @@ function BusinessSelector() {
                                 className={cn(
                                     "w-full flex items-center gap-2.5 px-3 py-2.5 transition-colors text-left",
                                     isSelected
-                                        ? "bg-primary/10 text-primary"
-                                        : "text-slate-300 hover:bg-slate-800/60"
+                                        ? "bg-purple-900/40 text-white"
+                                        : "text-gray-300 hover:bg-gray-800/60"
                                 )}
                             >
                                 <div className={cn(
                                     "w-7 h-7 rounded-md flex items-center justify-center shrink-0 text-xs font-bold",
-                                    isSelected ? "bg-primary text-primary-foreground" : "bg-slate-700 text-slate-200"
+                                    isSelected ? "bg-purple-600 text-white" : "bg-gray-700 text-gray-200"
                                 )}>
                                     {(biz.name.charAt(0) || '?').toUpperCase()}
                                 </div>
                                 <span className="flex-1 text-sm truncate">{biz.name}</span>
-                                {isSelected && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
+                                {isSelected && <Check className="w-3.5 h-3.5 text-purple-400 shrink-0" />}
                             </button>
                         );
                     })}
                     {hasMinRole(currentUser?.role as Role | undefined, 'ADMIN') && (
                         <>
-                            <div className="border-t border-border/60" />
+                            <div className="border-t border-gray-700" />
                             <Link
                                 href="/onboarding/setup"
                                 onClick={() => setOpen(false)}
-                                className="w-full flex items-center gap-2.5 px-3 py-2.5 transition-colors text-left text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+                                className="w-full flex items-center gap-2.5 px-3 py-2.5 transition-colors text-left text-gray-400 hover:bg-gray-800/60 hover:text-white"
                             >
-                                <div className="w-7 h-7 rounded-md flex items-center justify-center shrink-0 bg-slate-800 border border-dashed border-slate-600">
+                                <div className="w-7 h-7 rounded-md flex items-center justify-center shrink-0 bg-gray-800 border border-dashed border-gray-600">
                                     <Plus className="w-3.5 h-3.5" />
                                 </div>
                                 <span className="text-sm">Add New Business</span>
@@ -252,11 +247,12 @@ function BusinessSelector() {
 }
 
 function ScopeSelector() {
-    const { currentUser, venues } = useApp();
+    const { currentUser, venues, businesses } = useApp();
     const role = currentUser?.role as Role | undefined;
     const assignedVenueIds = (currentUser as { assigned_venue_ids?: string[] })?.assigned_venue_ids ?? [];
     const assignedVenueCount = assignedVenueIds.length;
-    const scopeType = getScopeSelectorType(role, assignedVenueCount);
+    const businessCount = businesses?.length ?? 0;
+    const scopeType = getScopeSelectorType(role, assignedVenueCount, businessCount);
 
     if (scopeType === 'venue') {
         return <VenueSelector />;
@@ -270,7 +266,7 @@ function ScopeSelector() {
 export function AppLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const router = useRouter();
-    const { currentUser } = useApp();
+    const { currentUser, isLoading } = useApp();
     const supabase = useMemo(() => createClient(), []);
 
     const handleSignOut = useCallback(async () => {
@@ -285,108 +281,145 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     const visibleNavItems = getVisibleNavItems(userRole, NAV_ITEMS);
     const visibleMobileItems = visibleNavItems.filter(i => MOBILE_NAV_LABELS.includes(i.label));
 
+    // STAFF hitting /dashboard or /: redirect to /areas (must run in effect, not during render)
+    const staffRedirect = !isLoading && userRole === 'STAFF' && (pathname === '/dashboard' || pathname === '/');
+    useEffect(() => {
+        if (staffRedirect) router.replace('/areas');
+    }, [staffRedirect, router]);
+
+    if (staffRedirect) {
+        return (
+            <div className="flex flex-col h-screen bg-black text-white items-center justify-center">
+                <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+            </div>
+        );
+    }
+
+    if (!isLoading && userRole && !canAccessRoute(userRole, pathname)) {
+        notFound();
+    }
+
+    if (isLoading) {
+        return (
+            <div className="flex flex-col h-screen bg-black text-white items-center justify-center">
+                <div className="flex items-center gap-2 mb-6">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center">
+                        <Sparkles className="w-5 h-5 text-white" />
+                    </div>
+                    <span className="font-semibold">clicr</span>
+                    <span className="text-xs text-blue-400 ml-1">v4.0</span>
+                </div>
+                <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+            </div>
+        );
+    }
+
     return (
-        <div className="fixed inset-0 bg-background text-foreground flex flex-col overflow-hidden">
-
-            {/* Full-Width Topbar */}
-            <header className="h-12 shrink-0 flex items-center justify-between px-4 border-b border-border/60 bg-card/60 backdrop-blur-sm z-30">
-                <div className="flex items-center gap-2.5">
-                    <img src="/clicr-logo.png" alt="CLICR" className="h-7 w-auto object-contain" />
-                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/25 leading-tight">
-                        v4.0
-                    </span>
-                </div>
-                <div className="flex items-center gap-1">
-                    <button className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors" aria-label="Toggle dark mode">
-                        <Moon className="w-4 h-4" />
-                    </button>
-                    <button className="relative p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors" aria-label="Notifications">
-                        <Bell className="w-4 h-4" />
-                        <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-primary" />
-                    </button>
-                    <div className="ml-1 w-7 h-7 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center">
-                        <span className="text-[11px] font-bold text-primary">{userInitials}</span>
+        <div className="flex flex-col md:flex-row h-screen bg-black text-white overflow-hidden">
+            {/* Desktop: sidebar + main. Mobile: main only */}
+            <div className="flex flex-1 min-h-0 overflow-hidden">
+                {/* Sidebar - Design: w-64, border-gray-800 */}
+                <aside className="w-64 border-r border-gray-800 flex flex-col shrink-0 hidden md:flex">
+                {/* Logo */}
+                <div className="h-16 border-b border-gray-800 flex items-center px-4 shrink-0">
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center">
+                            <Sparkles className="w-5 h-5 text-white" />
+                        </div>
+                        <span className="font-semibold">clicr</span>
+                        <span className="text-xs text-blue-400 ml-1">v4.0</span>
                     </div>
                 </div>
-            </header>
 
-            {/* Inner Row: Sidebar + Content */}
-            <div className="flex flex-1 min-h-0 flex-col md:flex-row overflow-hidden">
-
-                {/* Sidebar (Desktop) */}
-                <aside className="w-44 border-r border-border bg-card/50 hidden md:flex flex-col glass-panel z-20 shrink-0">
+                {/* Group Selector (Business/Venue) */}
+                <div className="px-4 py-4 border-b border-gray-800 shrink-0">
                     <ScopeSelector />
-                    <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
-                        {visibleNavItems.map((item) => {
-                            const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
-                            return (
-                                <Link
-                                    key={item.href}
-                                    href={item.href}
-                                    className={cn(
-                                        "flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-150 group text-sm",
-                                        isActive
-                                            ? "bg-primary/10 text-primary font-bold"
-                                            : "text-slate-400 hover:text-slate-100 hover:bg-slate-800/50"
-                                    )}
-                                >
-                                    <item.icon className={cn(
-                                        "w-4 h-4 shrink-0",
-                                        isActive ? "text-primary" : "text-slate-500 group-hover:text-slate-300"
-                                    )} />
-                                    {item.label}
-                                </Link>
-                            );
-                        })}
-                    </nav>
-                    <div className="p-2 border-t border-border/50">
-                        <button
-                            onClick={handleSignOut}
-                            className="flex items-center gap-2.5 px-3 py-2 w-full text-sm text-slate-400 hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
-                        >
-                            <LogOut className="w-4 h-4 shrink-0" />
-                            <span>Sign Out</span>
-                        </button>
-                    </div>
+                </div>
+
+                {/* Navigation */}
+                <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+                    {visibleNavItems.map((item) => {
+                        const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+                        const Icon = item.icon;
+                        return (
+                            <Link
+                                key={item.href}
+                                href={item.href}
+                                className={cn(
+                                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
+                                    isActive ? "bg-purple-900/40 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800/50"
+                                )}
+                            >
+                                <Icon className="w-5 h-5 shrink-0" />
+                                <span>{item.label}</span>
+                            </Link>
+                        );
+                    })}
+                </nav>
+
+                {/* Settings + Sign out */}
+                <div className="px-3 py-4 border-t border-gray-800 space-y-1 shrink-0">
+                    <button
+                        onClick={handleSignOut}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800/50 transition-colors"
+                    >
+                        <LogOut className="w-5 h-5 shrink-0" />
+                        <span>Sign out</span>
+                    </button>
+                </div>
                 </aside>
 
-                {/* Main Content */}
-                <main className="flex-1 relative flex flex-col min-h-0 overflow-hidden">
-                    <div className="flex-1 overflow-y-auto overscroll-none p-4 md:p-8">
-                        <div className="fixed top-0 left-0 w-full h-[500px] bg-gradient-to-b from-primary/5 to-transparent pointer-events-none -z-10" />
-                        <div className="max-w-7xl mx-auto min-h-full">
-                            {children}
-                        </div>
+                {/* Main: Top bar + Content */}
+                <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                {/* Top Bar - Design: h-16 */}
+                <header className="h-16 border-b border-gray-800 flex items-center justify-end px-6 gap-4 shrink-0">
+                    <button className="w-10 h-10 rounded-lg hover:bg-gray-800 flex items-center justify-center transition-colors" aria-label="Theme">
+                        <Moon className="w-5 h-5 text-gray-400" />
+                    </button>
+                    <button className="w-10 h-10 rounded-lg hover:bg-gray-800 flex items-center justify-center transition-colors relative" aria-label="Notifications">
+                        <Bell className="w-5 h-5 text-gray-400" />
+                        <span className="absolute top-2 right-2 w-2 h-2 bg-blue-500 rounded-full" />
+                    </button>
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center text-sm font-semibold">
+                        {userInitials}
+                    </div>
+                </header>
+
+                {/* Page Content */}
+                <main className="flex-1 overflow-auto">
+                    <div className="p-6 max-w-[1600px] mx-auto">
+                        {children}
                     </div>
                 </main>
-
-                {/* Mobile Bottom Nav */}
-                <nav className="md:hidden flex-none bg-[#0f1116] border-t border-white/10 pb-[env(safe-area-inset-bottom)] z-50">
-                    <div className="flex justify-around items-center p-2">
-                        {visibleMobileItems.map((item) => {
-                            const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
-                            return (
-                                <Link
-                                    key={item.href}
-                                    href={item.href}
-                                    className={cn(
-                                        "flex flex-col items-center gap-1 p-2 rounded-xl transition-all w-14",
-                                        isActive ? "text-primary" : "text-slate-500 hover:text-slate-300"
-                                    )}
-                                >
-                                    <div className={cn(
-                                        "p-1.5 rounded-full transition-all",
-                                        isActive ? "bg-primary/20" : "bg-transparent"
-                                    )}>
-                                        <item.icon className={cn("w-5 h-5", isActive && "fill-current")} />
-                                    </div>
-                                    <span className="text-[10px] font-bold">{item.label}</span>
-                                </Link>
-                            );
-                        })}
-                    </div>
-                </nav>
+                </div>
             </div>
+
+            {/* Mobile Bottom Nav */}
+            <nav className="md:hidden flex-none bg-gray-900 border-t border-gray-800 pb-[env(safe-area-inset-bottom)] z-50">
+                <div className="flex justify-around items-center p-2">
+                    {visibleMobileItems.map((item) => {
+                        const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+                        return (
+                            <Link
+                                key={item.href}
+                                href={item.href}
+                                className={cn(
+                                    "flex flex-col items-center gap-1 p-2 rounded-xl transition-all w-14",
+                                    isActive ? "text-purple-400" : "text-gray-500 hover:text-gray-300"
+                                )}
+                            >
+                                <div className={cn(
+                                    "p-1.5 rounded-full transition-all",
+                                    isActive ? "bg-purple-900/40" : "bg-transparent"
+                                )}>
+                                    <item.icon className="w-5 h-5" />
+                                </div>
+                                <span className="text-[10px] font-bold">{item.label}</span>
+                            </Link>
+                        );
+                    })}
+                </div>
+            </nav>
         </div>
     );
 }

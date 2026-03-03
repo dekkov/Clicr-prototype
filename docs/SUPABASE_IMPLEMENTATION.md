@@ -191,7 +191,7 @@ if (process.env.NEXT_PUBLIC_APP_MODE !== 'demo') {
 }
 ```
 
-The `INITIAL_USER`, `INITIAL_VENUES`, etc. in `lib/db.ts` should ONLY be loaded when `APP_MODE=demo`.
+Initial data structures are in `lib/sync-data.ts` (Supabase-only).
 
 ### ❌ Double-Counting from Concurrent Taps
 

@@ -13,13 +13,13 @@ export default function TotalsLatencyDebug() {
 
     // Watch traffic.total_in changes to measure latency
     useEffect(() => {
-        if (lastClick > 0) {
+        if (lastClick > 0 && traffic) {
             const now = Date.now();
             const latency = now - lastClick;
-            setLogs(prev => [{ ts: now, msg: `UI Update: In=${traffic.total_in}`, latency }, ...prev]);
+            setLogs(prev => [{ ts: now, msg: `UI Update: In=${traffic.total_in ?? 0}`, latency }, ...prev]);
             setLastClick(0); // Reset
         }
-    }, [traffic.total_in]);
+    }, [traffic?.total_in]);
 
     const handleTestClick = async () => {
         const start = Date.now();
@@ -47,11 +47,11 @@ export default function TotalsLatencyDebug() {
             <div className="grid grid-cols-2 gap-8">
                 <div className="bg-slate-900 p-4 rounded border border-slate-700">
                     <h2 className="text-lg font-bold mb-4">Live Totals</h2>
-                    <div className="text-4xl text-emerald-400 mb-2">{traffic.total_in} <span className="text-sm text-slate-500">IN</span></div>
-                    <div className="text-4xl text-rose-400 mb-2">{traffic.total_out} <span className="text-sm text-slate-500">OUT</span></div>
-                    <div className="text-xl text-blue-400">Net: {traffic.net_delta}</div>
-                    <div className="text-sm text-slate-500 mt-2">Events: {traffic.event_count}</div>
-                    <div className="text-sm text-slate-500">Last Event ID: {events[0]?.id}</div>
+                    <div className="text-4xl text-emerald-400 mb-2">{traffic?.total_in ?? 0} <span className="text-sm text-slate-500">IN</span></div>
+                    <div className="text-4xl text-rose-400 mb-2">{traffic?.total_out ?? 0} <span className="text-sm text-slate-500">OUT</span></div>
+                    <div className="text-xl text-blue-400">Net: {traffic?.net_delta ?? 0}</div>
+                    <div className="text-sm text-slate-500 mt-2">Events: {traffic?.event_count ?? 0}</div>
+                    <div className="text-sm text-slate-500">Last Event ID: {events?.[0]?.id}</div>
                 </div>
 
                 <div className="bg-slate-900 p-4 rounded border border-slate-700 h-[400px] overflow-auto">

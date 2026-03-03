@@ -1,43 +1,32 @@
 @import "tailwindcss";
 
 :root {
-  /* Base Colors - Deep Dark Theme */
-  --background: #050505;
-  /* Almost Black */
+  /* Base - Design system (black/dark) */
+  --background: #000000;
   --foreground: #f8fafc;
-  /* Slate 50 */
 
-  /* Primary Brand - Clicr Purple */
-  --primary: #8b5cf6;
-  /* Violet 500 */
+  /* Primary - Purple accent (design: purple-600) */
+  --primary: #9333ea;
   --primary-foreground: #ffffff;
-  --primary-hover: #7c3aed;
-  /* Violet 600 */
+  --primary-hover: #7e22ce;
 
-  /* Secondary/Accent - Clicr Green */
+  /* Secondary - Emerald for positive */
   --secondary: #10b981;
-  /* Emerald 500 */
   --secondary-foreground: #ffffff;
 
-  /* Surfaces for cards */
-  --card: #111111;
-  /* Dark Gray */
+  /* Surfaces - Design card style */
+  --card: rgba(17, 24, 39, 0.5);
   --card-foreground: #f1f5f9;
 
-  /* Borders */
-  --border: #27272a;
-  /* Zinc 800 */
-  --input: #27272a;
-  --ring: #8b5cf6;
-  /* Matches Primary */
+  /* Borders - Design gray-800 */
+  --border: #1f2937;
+  --input: #1f2937;
+  --ring: #9333ea;
 
-  /* Status Colors */
+  /* Status */
   --success: #10b981;
-  /* Green */
   --warning: #f59e0b;
-  /* Amber */
   --destructive: #ef4444;
-  /* Red */
 
   /* Radii */
   --radius: 0.75rem;
@@ -100,18 +89,17 @@ html {
   overscroll-behavior-y: none;
 }
 
-/* Glassmorphism Utilities */
+/* Design system card utilities (bg-gray-900/50 border-gray-800) */
 .glass-panel {
-  background: rgba(30, 41, 59, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(17, 24, 39, 0.5);
+  border: 1px solid #1f2937;
+  border-radius: 0.75rem;
 }
 
 .glass-card {
-  background: linear-gradient(145deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.9));
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  background: rgba(17, 24, 39, 0.5);
+  border: 1px solid #1f2937;
+  border-radius: 0.75rem;
 }
 
 /* Scrollbar */

@@ -109,7 +109,7 @@ UI Component → useApp() hook → AppProvider.recordEvent()
     ↓ (optimistic)                    ↓ (async)
 setState(optimistic)          POST /api/sync { action: 'RECORD_EVENT', payload }
                                       ↓
-                              lib/db.ts (local JSON) or Supabase RPCs
+                              Supabase RPCs and tables
                                       ↓
                               Response → setState(server-confirmed)
 ```
@@ -139,7 +139,7 @@ UI Component → useApp() → DataClient.applyOccupancyDelta()
 
 ### Integration Steps
 
-1. **Create `LocalAdapter.ts`** that wraps the existing `lib/db.ts` and `lib/store.tsx` logic
+1. **Create `LocalAdapter.ts`** that wraps the existing `lib/store.tsx` logic
 2. **Implement `SupabaseAdapter.ts`** method by method using the RPCs from `/migrations/003_rpcs.sql`
 3. **Refactor `AppProvider`** to accept a `DataClient` instance instead of calling fetch/localStorage directly
 4. **Switch via env**: `NEXT_PUBLIC_APP_MODE=demo|production`
@@ -159,13 +159,11 @@ UI Component → useApp() → DataClient.applyOccupancyDelta()
 | `lib/core/metrics.ts` | Report/traffic RPC wrappers | Absorb into SupabaseAdapter |
 | `lib/core/errors.ts` | Error logging to app_errors table | Shared utility (both adapters) |
 | `lib/store.tsx` | Context provider with Supabase Realtime | Refactor to use DataClient |
-| `app/api/sync/route.ts` | Hybrid JSON + Supabase data proxy | Replace with direct DataClient calls |
+| `app/api/sync/route.ts` | Supabase-only data proxy | Uses `lib/sync-data.ts` |
 
 ### What gets removed in production
 
-- `data/db.json` (local JSON database) → replaced by Supabase
-- `lib/db.ts` (JSON file read/write) → replaced by SupabaseAdapter
-- `app/api/sync/route.ts` → replaced by direct DataClient calls from components
+- `data/db.json` and `lib/db.ts` have been removed; sync uses Supabase only
 
 ---
 

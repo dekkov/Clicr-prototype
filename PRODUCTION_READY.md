@@ -38,8 +38,7 @@ If you haven't already, push your code to a GitHub repository:
 - **Supabase Connectivity**: Ensure your Supabase project is active and accessible from Vercel's IP range (usually open 0.0.0.0/0 for SaaS).
 - **Email**: Test the support form to ensure Resend works in production.
 - **Database**: Since we are using a local JSON file for the *mock* DB in development (which won't persist on Vercel serverless functions), you **MUST** ensure you are using the Supabase integration for production data.
-   - *Note*: Currently, `lib/db.ts` writes to a local JSON file. **This will not work for long-term storage on Vercel.**
-   - **Recommendation**: Before "Launch", we need to fully swap `lib/db.ts` to read/write ONLY from Supabase, removing the JSON file fallbacks.
+   - Sync API uses Supabase only; `lib/db.ts` and `data/db.json` have been removed.
 
 ## 5. Verification
 Once deployed, visit your `https://your-project.vercel.app` URL and log in!

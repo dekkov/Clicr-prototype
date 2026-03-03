@@ -1,10 +1,9 @@
 'use server';
 
-import { createTicket } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import { SupportTicket } from '@/lib/types';
 import { Resend } from 'resend';
 
-// Helper to get Resend instance safely (prevents crashing if no key)
 const getResend = () => {
     const key = process.env.RESEND_API_KEY;
     if (!key) return null;
@@ -24,9 +23,36 @@ export async function submitSupportTicket(data: TicketFormData) {
     console.log(`[SUPPORT] Processing ticket from ${data.userId}`);
 
     const ticketId = crypto.randomUUID();
+    const messageId = crypto.randomUUID();
     const now = new Date().toISOString();
 
-    // 1. Create Ticket Object
+    const { error } = await supabaseAdmin.from('support_tickets').insert({
+        id: ticketId,
+        business_id: data.businessId,
+        user_id: data.userId,
+        subject: data.subject,
+        status: 'OPEN',
+        priority: data.priority,
+        category: data.category,
+        messages: [
+            {
+                id: messageId,
+                ticket_id: ticketId,
+                sender_id: data.userId,
+                message_text: data.description,
+                timestamp: now,
+                is_internal: false
+            }
+        ],
+        created_at: now,
+        updated_at: now,
+    });
+
+    if (error) {
+        console.error('[SUPPORT] Insert failed:', error);
+        throw new Error('Failed to create support ticket');
+    }
+
     const newTicket: SupportTicket = {
         id: ticketId,
         business_id: data.businessId,
@@ -34,12 +60,12 @@ export async function submitSupportTicket(data: TicketFormData) {
         subject: data.subject,
         status: 'OPEN',
         priority: data.priority,
-        category: data.category as any,
+        category: data.category,
         created_at: now,
         updated_at: now,
         messages: [
             {
-                id: crypto.randomUUID(),
+                id: messageId,
                 ticket_id: ticketId,
                 sender_id: data.userId,
                 message_text: data.description,
@@ -49,33 +75,23 @@ export async function submitSupportTicket(data: TicketFormData) {
         ]
     };
 
-    // 2. Save to DB (Mock or Supabase)
-    // LOCAL MOCK:
-    createTicket(newTicket);
-
-    // REAL SUPABASE (Uncomment when connected):
-    /*
-    const { error } = await supabase.from('support_tickets').insert({ ... });
-    */
-
-    // 3. Send Email Notification (to hello@clicrapp.com)
     await sendEmailNotification(newTicket);
 
     return { success: true, ticketId };
 }
 
 export async function getUserTickets(userId: string) {
-    // 1. Fetch from DB
-    // LOCAL MOCK:
-    const { getTickets } = await import('@/lib/db'); // Dynamic import to avoid build issues if mixed
-    const tickets = getTickets(userId);
-    return tickets;
+    const { data, error } = await supabaseAdmin
+        .from('support_tickets')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
 
-    // REAL SUPABASE:
-    /*
-    const { data } = await supabase.from('support_tickets').select('*').eq('user_id', userId);
-    return data || [];
-    */
+    if (error) {
+        console.error('[SUPPORT] Fetch tickets failed:', error);
+        return [];
+    }
+    return (data || []) as SupportTicket[];
 }
 
 async function sendEmailNotification(ticket: SupportTicket) {

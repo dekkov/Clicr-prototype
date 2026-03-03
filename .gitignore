@@ -45,5 +45,8 @@ next-env.d.ts
 # claude
 .claude/worktrees/
 
+# cursor
+.cursor/
+
 # local reference assets
 image-reference/

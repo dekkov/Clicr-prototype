@@ -77,8 +77,6 @@ clicr-v4/
 │   ├── core/                   # Mutation/metric helpers (absorb into adapters)
 │   └── supabase.ts             # Supabase client factory
 │
-├── data/
-│   └── db.json                 # Demo fixture data
 │
 ├── docs/                       # ★ Developer documentation
 │   ├── PRODUCT_SPEC.md         # Roles, flows, definitions

@@ -36,6 +36,10 @@ export default function AcceptInvitePage() {
 
             if (data?.user) {
                 const meta = data.user.user_metadata;
+                const bizId = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('businessId') : null;
+                if (bizId) {
+                    try { localStorage.setItem('clicr_last_biz_id', bizId); } catch { }
+                }
                 if (meta?.invited_business_id && !meta?.password_set) {
                     router.push('/auth/set-password');
                 } else {

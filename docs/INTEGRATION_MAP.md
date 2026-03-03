@@ -109,14 +109,9 @@ const snapshots = await client.getSnapshots({ businessId });
 | `METRICS.getDailyTrafficSummary(...)` | `client.getHourlyTraffic(scope, window)` |
 | `METRICS.checkBanStatus(...)` | `client.checkBanStatus(businessId, personId, venueId)` |
 
-### `lib/db.ts` (JSON Database)
+### Sync API (Supabase-only)
 
-This entire file is replaced by the DataClient. All 30+ functions in `db.ts` map to DataClient methods above.
-
-**Files to remove in production mode**:
-- `lib/db.ts`
-- `data/db.json`
-- The `/api/sync` route (replace with direct DataClient calls)
+The sync route (`/api/sync`) reads and writes exclusively from Supabase. `lib/db.ts` and `data/db.json` have been removed.
 
 ---
 

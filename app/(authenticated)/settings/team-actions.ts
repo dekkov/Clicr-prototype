@@ -33,6 +33,9 @@ export async function inviteTeamMember(
     if (!callerMembership || !['OWNER', 'ADMIN'].includes(callerMembership.role)) {
         return { success: false, error: 'Only owners and admins can invite members' };
     }
+    if (callerMembership.role === 'ADMIN' && role === 'ADMIN') {
+        return { success: false, error: 'Only owners can invite at Admin/GM level' };
+    }
 
     try {
         const hdrs = await headers();
@@ -40,31 +43,57 @@ export async function inviteTeamMember(
         const proto = hdrs.get('x-forwarded-proto') || 'http';
         const origin = `${proto}://${host}`;
 
-        const { data: invitedUser, error: inviteError } = await supabaseAdmin.auth.admin
-            .inviteUserByEmail(email, {
-                data: { invited_business_id: businessId, invited_role: role },
-                redirectTo: `${origin}/auth/accept-invite`,
-            });
+        const { data: { users } } = await supabaseAdmin.auth.admin.listUsers({
+            page: 1,
+            perPage: 1000,
+        });
+        const existingUser = users?.find((u) => u.email?.toLowerCase() === email.toLowerCase());
 
-        if (inviteError) throw inviteError;
+        let userId: string;
 
-        if (invitedUser?.user?.id) {
+        if (existingUser?.id) {
+            userId = existingUser.id;
             const payload: Record<string, unknown> = {
                 business_id: businessId,
-                user_id: invitedUser.user.id,
+                user_id: userId,
                 role,
                 invited_email: email,
             };
-            if (options?.assignedVenueIds?.length) {
-                payload.assigned_venue_ids = options.assignedVenueIds;
-            }
-            if (options?.assignedAreaIds?.length) {
-                payload.assigned_area_ids = options.assignedAreaIds;
-            }
+            if (options?.assignedVenueIds?.length) payload.assigned_venue_ids = options.assignedVenueIds;
+            if (options?.assignedAreaIds?.length) payload.assigned_area_ids = options.assignedAreaIds;
             const { error: memberError } = await supabaseAdmin
                 .from('business_members')
                 .upsert(payload, { onConflict: 'business_id,user_id' });
+            if (memberError) throw memberError;
 
+            const { error: otpError } = await supabaseAdmin.auth.signInWithOtp({
+                email,
+                options: {
+                    shouldCreateUser: false,
+                    emailRedirectTo: `${origin}/auth/accept-invite?businessId=${businessId}`,
+                },
+            });
+            if (otpError) throw otpError;
+        } else {
+            const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+                redirectTo: `${origin}/auth/accept-invite`,
+                data: { invited_business_id: businessId, invited_role: role },
+            });
+            if (inviteError) throw inviteError;
+            if (!inviteData?.user?.id) throw new Error('Invite succeeded but no user returned');
+            userId = inviteData.user.id;
+
+            const payload: Record<string, unknown> = {
+                business_id: businessId,
+                user_id: userId,
+                role,
+                invited_email: email,
+            };
+            if (options?.assignedVenueIds?.length) payload.assigned_venue_ids = options.assignedVenueIds;
+            if (options?.assignedAreaIds?.length) payload.assigned_area_ids = options.assignedAreaIds;
+            const { error: memberError } = await supabaseAdmin
+                .from('business_members')
+                .upsert(payload, { onConflict: 'business_id,user_id' });
             if (memberError) throw memberError;
         }
 
@@ -96,6 +125,16 @@ export async function removeTeamMember(
 
     if (!callerMembership || !['OWNER', 'ADMIN'].includes(callerMembership.role)) {
         return { success: false, error: 'Only owners and admins can remove members' };
+    }
+
+    const { data: targetMembership } = await supabaseAdmin
+        .from('business_members')
+        .select('role')
+        .eq('business_id', businessId)
+        .eq('user_id', userId)
+        .single();
+    if (callerMembership.role === 'ADMIN' && targetMembership?.role === 'ADMIN') {
+        return { success: false, error: 'Only owners can remove Admin/GM members' };
     }
 
     try {
@@ -147,6 +186,12 @@ export async function updateMemberRole(
     if (!targetMembership || targetMembership.role === 'OWNER') {
         return { success: false, error: 'Cannot change owner role' };
     }
+    if (callerMembership.role === 'ADMIN' && targetMembership.role === 'ADMIN') {
+        return { success: false, error: 'Only owners can edit Admin/GM members' };
+    }
+    if (callerMembership.role === 'ADMIN' && newRole === 'ADMIN') {
+        return { success: false, error: 'Only owners can assign Admin/GM role' };
+    }
 
     try {
         const { error } = await supabaseAdmin
@@ -192,6 +237,9 @@ export async function updateMemberAssignments(
 
     if (!targetMembership || targetMembership.role === 'OWNER') {
         return { success: false, error: 'Cannot update owner assignments' };
+    }
+    if (callerMembership.role === 'ADMIN' && targetMembership.role === 'ADMIN') {
+        return { success: false, error: 'Only owners can update Admin/GM assignments' };
     }
 
     try {

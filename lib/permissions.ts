@@ -23,8 +23,9 @@ export function getVisibleNavItems(role: Role | undefined, allItems: NavItemDef[
     return allItems;
 }
 
-export function getScopeSelectorType(role: Role | undefined, assignedVenueCount: number): 'business' | 'venue' | 'none' {
+export function getScopeSelectorType(role: Role | undefined, assignedVenueCount: number, businessCount: number): 'business' | 'venue' | 'none' {
     if (!role) return 'none';
+    if (businessCount >= 2) return 'business'; // Multi-business: always show selector
     if (role === 'MANAGER' && assignedVenueCount > 0) return 'venue';
     if (['OWNER', 'ADMIN', 'ANALYST'].includes(role)) return 'business';
     return 'none';
@@ -58,4 +59,17 @@ export function canAddClicr(role: Role | undefined): boolean {
 /** Manager cannot add venues; only Admin and Owner can. */
 export function canAddVenue(role: Role | undefined): boolean {
     return hasMinRole(role, 'ADMIN');
+}
+
+/** Whether the role can access the route. Uses explicit allowlists (ANALYST has Reports but not Areas). */
+export function canAccessRoute(role: Role | undefined, pathname: string): boolean {
+    if (!role) return false;
+    if (pathname === '/dashboard') return ['ANALYST', 'MANAGER', 'ADMIN', 'OWNER'].includes(role); // STAFF: areas + clicrs only
+    if (pathname.startsWith('/venues')) return ['MANAGER', 'ADMIN', 'OWNER'].includes(role);
+    if (pathname.startsWith('/areas')) return ['STAFF', 'MANAGER', 'ADMIN', 'OWNER'].includes(role);
+    if (pathname.startsWith('/clicr')) return ['STAFF', 'MANAGER', 'ADMIN', 'OWNER'].includes(role);
+    if (pathname.startsWith('/banning')) return ['MANAGER', 'ADMIN', 'OWNER'].includes(role);
+    if (pathname.startsWith('/reports')) return ['ANALYST', 'MANAGER', 'ADMIN', 'OWNER'].includes(role);
+    if (pathname.startsWith('/settings')) return ['ADMIN', 'OWNER'].includes(role);
+    return true; // Unknown routes allow
 }

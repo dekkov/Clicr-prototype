@@ -213,11 +213,19 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 }
 
                 // Discard stale responses from a previous business context.
-                // Cases: (a) wrong business returned, (b) no business returned when one is active
-                // (an unscoped poll that fired before selectBusiness completed).
+                // Cases: (a) wrong business returned (race), (b) no business returned when one is active.
+                // When user was REMOVED from the requested biz, it won't be in data.businesses — clear ref and apply.
                 if (activeBusinessIdRef.current && data.business?.id !== activeBusinessIdRef.current) {
-                    console.log('[sync] Discarding stale response, expected', activeBusinessIdRef.current, 'got', data.business?.id);
-                    return;
+                    const requestedInBusinesses = (data.businesses || []).some((b: Business) => b.id === activeBusinessIdRef.current);
+                    if (requestedInBusinesses) {
+                        // Race: requested biz is in list but we got different one — discard
+                        console.log('[sync] Discarding stale response, expected', activeBusinessIdRef.current, 'got', data.business?.id);
+                        return;
+                    }
+                    // User was removed from requested biz — clear stale ref and apply new data
+                    activeBusinessIdRef.current = null;
+                    activeVenueIdRef.current = null;
+                    try { localStorage.removeItem(LAST_BIZ_KEY); } catch { }
                 }
 
                 // Sync ref before setState so next poll includes ?businessId=
@@ -278,6 +286,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                         isLoading: false
                     };
                 });
+            } else {
+                setState(prev => ({ ...prev, isLoading: false }));
             }
         } catch (error) {
             console.error("Failed to sync state", error);
@@ -441,7 +451,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             // Intentionally not applying API response to state — the optimistic update
             // already reflects the change, and the 2-second polling interval will reconcile
             // server truth. Applying the response here overwrites Supabase-hydrated
-            // venues/areas with stale local db.json data, causing venue name flicker,
+            // venues/areas with stale data, causing venue name flicker,
             // venueId becoming undefined (breaks guest-out), and fast-click races.
             if (!res.ok) {
                 console.error("Failed to record event (server error)", res.status);

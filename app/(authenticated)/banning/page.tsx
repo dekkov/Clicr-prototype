@@ -98,42 +98,44 @@ export default function BanningPage() {
     });
 
     return (
-        <div className="p-8 space-y-8 animate-in fade-in duration-500">
-            {/* Page Header */}
-            <div className="flex justify-between items-start">
-                <div>
-                    <h1 className="text-3xl font-bold text-white">Bans</h1>
-                    <p className="text-slate-400 mt-1">
-                        {totalActiveBans} active ban{totalActiveBans !== 1 ? 's' : ''} across your venues
-                    </p>
+        <div className="p-6 max-w-[1600px] space-y-8">
+            {/* Page Header - Design */}
+            <div className="mb-8">
+                <div className="flex justify-between items-start">
+                    <div>
+                        <h1 className="text-3xl mb-1">Bans</h1>
+                        <p className="text-gray-400 text-sm">
+                            {totalActiveBans} active ban{totalActiveBans !== 1 ? 's' : ''} across your venues
+                        </p>
+                    </div>
+                    <Link
+                        href="/banning/new"
+                        className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 transition-colors flex items-center gap-2 text-sm"
+                    >
+                        <Shield className="w-4 h-4" /> Manage Bans
+                    </Link>
                 </div>
-                <Link
-                    href="/banning/new"
-                    className="bg-slate-800 hover:bg-slate-700 text-white font-bold px-5 py-3 rounded-xl flex items-center gap-2 border border-slate-700 transition-colors"
-                >
-                    <Shield className="w-4 h-4" /> Manage Bans
-                </Link>
             </div>
 
             {/* Search Bar */}
             <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
                 <input
                     type="text"
                     placeholder="Search bans..."
                     value={search}
                     onChange={e => setSearch(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl py-3 pl-12 pr-4 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full bg-gray-900 border border-gray-800 rounded-xl py-3 pl-12 pr-4 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
             </div>
 
             {/* Filter Tabs */}
-            <div className="flex bg-slate-900 rounded-xl p-1 border border-slate-700 w-fit">
+            <div className="flex bg-gray-900 rounded-xl p-1 border border-gray-800 w-fit">
                 {(['ALL', 'ACTIVE', 'REVOKED'] as const).map(f => (
                     <button
                         key={f}
                         onClick={() => setFilter(f)}
-                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filter === f ? 'bg-slate-700 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filter === f ? 'bg-gray-800 text-white shadow' : 'text-gray-400 hover:text-white'}`}
                     >
                         {f}
                     </button>
@@ -143,52 +145,52 @@ export default function BanningPage() {
             {/* Ban Cards */}
             <div className="space-y-3">
                 {(storeLoading || loading) ? (
-                    <p className="text-center text-slate-500 py-12">Loading bans...</p>
+                    <p className="text-center text-gray-500 py-12">Loading bans...</p>
                 ) : filteredBans.length === 0 ? (
-                    <p className="text-center text-slate-500 py-12">No bans found.</p>
+                    <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-12 text-center">
+                        <div className="w-16 h-16 rounded-xl bg-red-900/30 border border-red-500/20 flex items-center justify-center mx-auto mb-4">
+                            <Shield className="w-8 h-8 text-red-400" />
+                        </div>
+                        <h3 className="text-lg mb-2">No Bans</h3>
+                        <p className="text-gray-400 text-sm">Your ban list is currently empty.</p>
+                    </div>
                 ) : filteredBans.map(ban => (
                     <div
                         key={ban.id}
-                        className="bg-slate-900/50 border border-slate-800 rounded-2xl p-5 flex items-start gap-4"
+                        className="bg-gray-900/50 border border-gray-800 rounded-xl p-5 flex items-start gap-4"
                     >
-                        {/* Shield Icon */}
-                        <div className="flex-shrink-0 bg-red-500/10 border border-red-500/20 rounded-xl p-2.5">
-                            <Shield className="w-5 h-5 text-red-500" />
+                        <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-red-900/30 border border-red-500/20 flex items-center justify-center">
+                            <Shield className="w-6 h-6 text-red-400" />
                         </div>
 
-                        {/* Content */}
                         <div className="flex-1 min-w-0">
-                            {/* Row 1: Name + Scope + Status */}
                             <div className="flex flex-wrap items-center gap-2">
                                 <span className="font-bold text-white">
                                     {ban.banned_persons?.first_name} {ban.banned_persons?.last_name}
                                 </span>
-                                <span className="text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded-full">
+                                <span className="text-xs font-medium bg-gray-800 text-gray-300 border border-gray-700 px-2 py-0.5 rounded-full">
                                     {ban.applies_to_all_locations ? 'All Venues' : 'Venue Specific'}
                                 </span>
                                 {(ban.status === 'REMOVED' || ban.status === 'EXPIRED') && (
-                                    <span className="text-xs font-medium bg-slate-800 text-slate-500 border border-slate-700 px-2 py-0.5 rounded-full">
+                                    <span className="text-xs font-medium bg-gray-800 text-gray-500 border border-gray-700 px-2 py-0.5 rounded-full">
                                         {ban.status === 'EXPIRED' ? 'Expired' : 'Revoked'}
                                     </span>
                                 )}
                             </div>
 
-                            {/* Row 2: Reason */}
-                            <p className="text-slate-400 text-sm italic mt-1">
+                            <p className="text-gray-400 text-sm italic mt-1">
                                 {ban.reason_notes || ban.reason_category || '—'}
                             </p>
 
-                            {/* Row 3: Added by + date */}
-                            <p className="text-slate-600 text-xs mt-1">
+                            <p className="text-gray-600 text-xs mt-1">
                                 Added by Staff · {new Date(ban.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                             </p>
                         </div>
 
-                        {/* Revoke Button */}
                         {ban.status === 'ACTIVE' && (
                             <button
                                 onClick={() => handleRevoke(ban.id)}
-                                className="flex-shrink-0 text-xs font-bold text-slate-400 hover:text-white border border-slate-700 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors"
+                                className="flex-shrink-0 text-xs font-bold text-gray-400 hover:text-white border border-gray-700 hover:bg-gray-800 px-3 py-1.5 rounded-lg transition-colors"
                             >
                                 Revoke
                             </button>

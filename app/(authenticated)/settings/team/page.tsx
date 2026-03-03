@@ -53,7 +53,7 @@ function getInitials(name: string, email: string): string {
 }
 
 export default function TeamSettingsPage() {
-    const { activeBusiness, venues, areas } = useApp();
+    const { activeBusiness, venues, areas, currentUser } = useApp();
 
     const [members, setMembers] = useState<TeamMember[]>([]);
     const [isLoadingMembers, setIsLoadingMembers] = useState(true);
@@ -219,8 +219,8 @@ export default function TeamSettingsPage() {
                                     )}
                                 </span>
 
-                                {/* Kebab menu (non-owners only) */}
-                                {member.role !== 'OWNER' && (
+                                {/* Kebab menu (non-owners only; Admin cannot edit/remove other Admins) */}
+                                {member.role !== 'OWNER' && !(currentUser?.role === 'ADMIN' && member.role === 'ADMIN') && (
                                     <div className="relative shrink-0">
                                         <button
                                             onClick={() => setOpenKebabId(isKebabOpen ? null : member.id)}
@@ -318,7 +318,7 @@ export default function TeamSettingsPage() {
                                 <div>
                                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Role</label>
                                     <div className="grid grid-cols-1 gap-2 mt-2">
-                                        {(['ADMIN', 'MANAGER', 'STAFF', 'ANALYST'] as Role[]).map(role => (
+                                        {((['ADMIN', 'MANAGER', 'STAFF', 'ANALYST'] as Role[]).filter(r => currentUser?.role !== 'ADMIN' || r !== 'ADMIN')).map(role => (
                                             <button
                                                 key={role}
                                                 type="button"
@@ -441,7 +441,7 @@ export default function TeamSettingsPage() {
                                 <div>
                                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Role</label>
                                     <div className="grid grid-cols-1 gap-2 mt-2">
-                                        {(['ADMIN', 'MANAGER', 'STAFF', 'ANALYST'] as Role[]).map(role => (
+                                        {((['ADMIN', 'MANAGER', 'STAFF', 'ANALYST'] as Role[]).filter(r => currentUser?.role !== 'ADMIN' || r !== 'ADMIN')).map(role => (
                                             <button
                                                 key={role}
                                                 type="button"

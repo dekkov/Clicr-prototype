@@ -4,7 +4,7 @@ import React, { useMemo, useEffect, useState } from 'react';
 import { useApp } from '@/lib/store';
 import {
     Users, TrendingUp, ScanLine, ShieldBan,
-    Calendar, RefreshCw, Download, ChevronDown
+    Calendar, RefreshCw, Download
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -17,38 +17,38 @@ const KpiCard = ({
     value,
     detail,
     icon: Icon,
-    iconBg,
+    iconColor,
+    valueColor,
     detailColor,
 }: {
     label: string;
     value: string | number;
     detail: string;
     icon: React.ElementType;
-    iconBg: string;
+    iconColor?: string;
+    valueColor?: string;
     detailColor?: string;
 }) => (
-    <div className="glass-panel p-5 rounded-2xl border border-slate-800">
-        <div className="flex items-start justify-between mb-3">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">{label}</span>
-            <div className={cn("p-2 rounded-xl", iconBg)}>
-                <Icon className="w-4 h-4" />
-            </div>
+    <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">
+        <div className="flex items-center justify-between mb-4">
+            <div className="text-xs text-gray-400 uppercase tracking-wide">{label}</div>
+            <Icon className={cn("w-5 h-5", iconColor ?? "text-gray-500")} />
         </div>
-        <div className="text-4xl font-bold font-mono text-white mb-1">{value}</div>
-        <div className={cn("text-sm font-medium", detailColor ?? "text-slate-400")}>{detail}</div>
+        <div className={cn("text-4xl mb-2", valueColor ?? "text-white")}>{value}</div>
+        <div className={cn("text-sm", detailColor ?? "text-gray-400")}>{detail}</div>
     </div>
 );
 
 const AgeBand = ({ band, count, max }: { band: string; count: number; max: number }) => (
-    <div className="flex items-center gap-3">
-        <span className="text-xs text-slate-400 w-12 shrink-0">{band}</span>
-        <div className="flex-1 h-5 bg-slate-800/60 rounded overflow-hidden">
+    <div className="flex items-center gap-4">
+        <div className="w-16 text-sm text-gray-400">{band}</div>
+        <div className="flex-1 h-10 bg-gray-800 rounded-lg overflow-hidden">
             <div
-                className="h-full bg-primary/80 rounded transition-all"
+                className="h-full bg-gradient-to-r from-purple-600 to-purple-500 rounded-lg transition-all"
                 style={{ width: `${max > 0 ? (count / max) * 100 : 0}%` }}
             />
         </div>
-        <span className="text-sm font-bold text-slate-300 w-6 text-right">{count}</span>
+        <div className="w-12 text-right text-sm">{count}</div>
     </div>
 );
 
@@ -297,97 +297,92 @@ export default function DashboardPage() {
 
     return (
         <div className="space-y-8 animate-[fade-in_0.5s_ease-out]">
-            {/* Page Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-white">Live Insights</h1>
-                    <p className="text-slate-400 mt-1">Real-time data from all connected devices.</p>
-                </div>
-                <div className="flex items-center gap-3">
-                    {/* Tonight pill */}
-                    <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-full text-sm font-medium transition-colors">
-                        <Calendar className="w-4 h-4" />
-                        Tonight
-                        <ChevronDown className="w-3 h-3" />
-                    </button>
-                    {/* Reset Data */}
-                    <button
-                        disabled={isResetting}
-                        onClick={async () => {
-                            if (
-                                activeBusiness &&
-                                window.confirm(
-                                    'Are you sure you want to reset all occupancy counts to 0?'
-                                )
-                            ) {
-                                setIsResetting(true);
-                                await resetCounts();
-                                setIsResetting(false);
-                            }
-                        }}
-                        className={cn(
-                            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
-                            isResetting
-                                ? "bg-slate-800/50 text-slate-500 cursor-not-allowed"
-                                : "bg-slate-800 hover:bg-slate-700 text-slate-200"
-                        )}
-                    >
-                        <RefreshCw className={cn("w-4 h-4", isResetting && "animate-spin")} />
-                        {isResetting ? 'Resetting…' : 'Reset Data'}
-                    </button>
-                    {/* Export */}
-                    <button className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-primary/25">
-                        <Download className="w-4 h-4" />
-                        Export
-                    </button>
+            {/* Page Header - Design */}
+            <div className="mb-8">
+                <div className="flex items-center gap-4 mb-2">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-900/50 to-blue-900/50 border border-purple-500/20 flex items-center justify-center">
+                        <TrendingUp className="w-6 h-6 text-purple-400" />
+                    </div>
+                    <div className="flex-1">
+                        <h1 className="text-3xl mb-1">Live Insights</h1>
+                        <p className="text-gray-400 text-sm">Real-time data from all connected devices.</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button className="px-4 py-2 rounded-lg bg-gray-800/50 hover:bg-gray-800 transition-colors flex items-center gap-2 text-sm">
+                            <Calendar className="w-4 h-4" />
+                            <span>Tonight</span>
+                        </button>
+                        <button
+                            disabled={isResetting}
+                            onClick={async () => {
+                                if (activeBusiness && window.confirm('Are you sure you want to reset all occupancy counts to 0?')) {
+                                    setIsResetting(true);
+                                    await resetCounts();
+                                    setIsResetting(false);
+                                }
+                            }}
+                            className={cn(
+                                "px-4 py-2 rounded-lg bg-gray-800/50 hover:bg-gray-800 transition-colors flex items-center gap-2 text-sm",
+                                isResetting && "opacity-50 cursor-not-allowed"
+                            )}
+                        >
+                            <RefreshCw className={cn("w-4 h-4", isResetting && "animate-spin")} />
+                            <span>Reset Data</span>
+                        </button>
+                        <button className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 transition-colors flex items-center gap-2 text-sm">
+                            <Download className="w-4 h-4" />
+                            <span>Export</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
             {/* Getting Started Checklist */}
             <GettingStartedChecklist />
 
-            {/* KPI Cards */}
-            <div className={cn("grid grid-cols-2 xl:grid-cols-4 gap-4 transition-opacity duration-300", isResetting && "opacity-40 pointer-events-none")}>
+            {/* KPI Cards - Design */}
+            <div className={cn("grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6 transition-opacity duration-300", isResetting && "opacity-40 pointer-events-none")}>
                 <KpiCard
                     label="Live Occupancy"
                     value={liveOccupancy}
                     detail={`Peak: ${peakOccupancy}`}
                     icon={Users}
-                    iconBg="bg-primary/20 text-primary"
                 />
                 <KpiCard
                     label="Total Entries"
                     value={totalEntries}
                     detail={`Exits: -${totalExits}`}
                     icon={TrendingUp}
-                    iconBg="bg-amber-500/20 text-amber-400"
-                    detailColor="text-amber-400"
+                    iconColor="text-emerald-500"
+                    valueColor="text-emerald-400"
+                    detailColor="text-red-400"
                 />
                 <KpiCard
                     label="Scans Processed"
                     value={totalScans}
                     detail={`${deniedPct}% Denied`}
                     icon={ScanLine}
-                    iconBg="bg-blue-500/20 text-blue-400"
+                    iconColor="text-purple-500"
+                    valueColor="text-purple-400"
                 />
                 <KpiCard
                     label="Banned Hits"
                     value={activeBansCount}
                     detail="Flagged instantly"
                     icon={ShieldBan}
-                    iconBg="bg-red-500/20 text-red-400"
+                    iconColor="text-red-500"
+                    valueColor="text-red-400"
                 />
             </div>
 
-            {/* Age Distribution + Live Event Log */}
-            <div className={cn("grid grid-cols-1 lg:grid-cols-2 gap-6 transition-opacity duration-300", isResetting && "opacity-40 pointer-events-none")}>
+            {/* Age Distribution + Live Event Log - Design */}
+            <div className={cn("grid grid-cols-1 lg:grid-cols-3 gap-6 transition-opacity duration-300", isResetting && "opacity-40 pointer-events-none")}>
                 {/* Age Distribution */}
-                <div className="glass-panel p-6 rounded-2xl border border-slate-800">
-                    <div className="flex items-center gap-2 mb-1">
-                        <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" />
-                        <h2 className="text-base font-bold text-white">Age Distribution</h2>
+                <div className="lg:col-span-2 bg-gray-900/50 border border-gray-800 rounded-xl p-6">
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="text-lg">Age Distribution</div>
                     </div>
-                    <p className="text-xs text-slate-500 mb-5">ID scans accepted · Tonight</p>
+                    <div className="text-sm text-gray-400 mb-6">ID scans accepted · Tonight</div>
                     <div className="space-y-3">
                         {Object.entries(ageDistribution).map(([band, count]) => (
                             <AgeBand
@@ -401,45 +396,37 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Live Event Log */}
-                <div className="glass-panel p-6 rounded-2xl border border-slate-800">
-                    <div className="flex items-center gap-2 mb-1">
-                        <span className="relative flex h-2 w-2 shrink-0">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                        </span>
-                        <h2 className="text-base font-bold text-white">Live Event Log</h2>
+                <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">
+                    <div className="flex items-center gap-2 mb-6">
+                        <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                        <div className="text-lg">Live Event Log</div>
                     </div>
-                    {/* Live Event Log — grouped by venue */}
-                    <div className="mt-4 max-h-72 overflow-y-auto pr-1">
+                    <div className="space-y-4">
                         {liveEventLog.length === 0 && (
-                            <p className="text-xs text-slate-600 italic">No events recorded tonight.</p>
+                            <p className="text-xs text-gray-600 italic">No events recorded tonight.</p>
                         )}
                         {venueGroups.map(group => (
-                                <div key={group.venueId ?? '__scan__'} className="mb-3 last:mb-0">
-                                    {/* Venue label */}
-                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">
-                                        {group.label}
-                                    </p>
-                                    <div className="space-y-2">
-                                        {group.entries.map(entry => (
-                                            <div
-                                                key={entry.id}
-                                                className="flex items-center justify-between gap-3 py-1.5 border-b border-slate-800/60 last:border-0"
-                                            >
-                                                <span className={cn('text-xs font-bold px-2 py-0.5 rounded-md shrink-0', badgeClass[entry.kind])}>
-                                                    {badgeLabel[entry.kind]}
-                                                </span>
-                                                <span className="text-sm text-slate-400 flex-1 truncate">
-                                                    {entry.areaId ? areaMap[entry.areaId] ?? 'Unknown Area' : '—'}
-                                                </span>
-                                                <span className="text-xs text-slate-500 shrink-0">
-                                                    {formatTime(entry.ts)}
-                                                </span>
+                            <div key={group.venueId ?? '__scan__'} className="mb-3 last:mb-0">
+                                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">{group.label}</p>
+                                <div className="space-y-2">
+                                    {group.entries.map(entry => (
+                                        <div key={entry.id} className="border-l-2 border-gray-800 pl-4 pb-4 relative">
+                                            <div className={cn(
+                                                "text-xs uppercase tracking-wide mb-1",
+                                                entry.kind === "ENTRY" ? "text-emerald-400" :
+                                                entry.kind === "EXIT" ? "text-blue-400" : "text-gray-400"
+                                            )}>
+                                                {badgeLabel[entry.kind]}
                                             </div>
-                                        ))}
-                                    </div>
+                                            <div className="text-sm text-gray-300 mb-1">
+                                                {entry.areaId ? areaMap[entry.areaId] ?? 'Unknown Area' : '—'}
+                                            </div>
+                                            <div className="text-xs text-gray-500">{formatTime(entry.ts)}</div>
+                                        </div>
+                                    ))}
                                 </div>
-                            ))}
+                            </div>
+                        ))}
                     </div>
                 </div>
             </div>

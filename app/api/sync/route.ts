@@ -1,30 +1,23 @@
 import { NextResponse } from 'next/server';
-import { readDB, addEvent, addScan, resetAllCounts, addUser, updateUser, removeUser, writeDB, addClicr, updateClicr, updateArea, factoryResetDB, addBan, revokeBan, isUserBanned, createPatronBan, updatePatronBan, recordBanEnforcement, addVenue, updateVenue, addArea, addDevice, updateDevice, addCapacityOverride, addVenueAuditLog, assignEntityToUser, updateBusiness, DBData } from '@/lib/db';
-import { CountEvent, IDScanEvent, User, Clicr, Area, BanRecord, BanEnforcementEvent, Venue, TurnaroundEvent } from '@/lib/types';
+import { CountEvent, IDScanEvent, User, Clicr, Area, Venue } from '@/lib/types';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { createInitialDBData, isUserBanned, type DBData } from '@/lib/sync-data';
 
 export const dynamic = 'force-dynamic';
 
-// --- HYDRATION HELPER ---
-// --- HYDRATION HELPER ---
 async function hydrateData(data: DBData): Promise<DBData> {
-    // Always clear stale db.json business — per-user context section sets the real one
-    data.business = null as any;
+    data.business = null;
 
     try {
-        // 0. Fetch Structural Data (Source of Truth: Supabase)
         const [
             { data: sbVenues },
             { data: sbAreas },
-            { data: sbMembers }
         ] = await Promise.all([
             supabaseAdmin.from('venues').select('*'),
             supabaseAdmin.from('areas').select('*'),
-            supabaseAdmin.from('business_members').select('user_id, business_id, role, assigned_venue_ids, assigned_area_ids')
         ]);
 
         if (sbVenues) {
-            // Replace local venues with Supabase venues
             data.venues = sbVenues.map((v: any) => ({
                 id: v.id,
                 business_id: v.business_id,
@@ -55,8 +48,6 @@ async function hydrateData(data: DBData): Promise<DBData> {
                 parent_area_id: a.parent_area_id,
                 current_occupancy: a.current_occupancy ?? 0,
                 last_reset_at: a.last_reset_at || undefined,
-
-                // Required fields by Type
                 area_type: 'MAIN',
                 counting_mode: 'MANUAL',
                 is_active: true,
@@ -65,18 +56,12 @@ async function hydrateData(data: DBData): Promise<DBData> {
             }));
         }
 
-        // Note: User role and assignments are set from business_members in the per-user context
-        // section below. We no longer overwrite assigned_venue_ids here.
-
-        // 1. Fetch Occupancy Events (for live log)
-        // current_occupancy is now on areas directly — no snapshot fetch needed.
         const { data: occEvents } = await supabaseAdmin
             .from('occupancy_events')
             .select('*')
             .order('created_at', { ascending: false })
             .limit(100);
 
-        // 2. Map Occupancy Events to app format
         if (occEvents) {
             data.events = occEvents.map((e: any) => ({
                 id: e.id,
@@ -90,14 +75,8 @@ async function hydrateData(data: DBData): Promise<DBData> {
                 flow_type: e.flow_type as any,
                 event_type: e.event_type as any,
             }));
-
-            // RE-CALCULATE Clicr Session Counts from recent events (or all events if we fetched more)
-            // Ideally Clicr counts should reset daily or per session.
-            // We will let them be strictly 'session based' from the limited event window for now,
-            // but the AREA count from snapshot is the "GOLDEN RECORD".
         }
 
-        // 2. Fetch Scan Events
         const { data: scans, error: scanError } = await supabaseAdmin
             .from('id_scans')
             .select('*')
@@ -111,14 +90,11 @@ async function hydrateData(data: DBData): Promise<DBData> {
             })) as IDScanEvent[];
         }
 
-        // 3. Fetch Devices (Clicr Metadata Persistence)
         const { data: devices, error: devError } = await supabaseAdmin
             .from('devices')
             .select('*');
 
         if (!devError && devices) {
-            // Update local Clicrs with persisted names/configs
-            // Also merge new devices from DB if they don't exist locally
             devices.forEach((d: any) => {
                 const exists = data.clicrs.find(c => c.id === d.id);
                 if (!exists && d.device_type === 'COUNTER') {
@@ -142,19 +118,180 @@ async function hydrateData(data: DBData): Promise<DBData> {
                 if (match) {
                     return {
                         ...c,
-                        name: match.name, // Persisted name
-                        area_id: match.area_id || c.area_id, // Sync area_id from Supabase — stale db.json IDs break currentArea lookup
-                        button_config: match.button_config || c.button_config // Persisted buttons
+                        name: match.name,
+                        area_id: match.area_id || c.area_id,
+                        button_config: match.button_config || c.button_config
                     };
                 }
                 return c;
             });
         }
-
     } catch (err) {
         console.error("[API] Supabase Hydration Failed:", err);
     }
     return data;
+}
+
+async function buildSyncResponse(
+    userId: string,
+    userEmail: string,
+    requestedBusinessId: string | null,
+    requestedVenueId: string | null
+): Promise<Record<string, any>> {
+    const data = createInitialDBData();
+    const hydrated = await hydrateData(data);
+
+    let user: User = {
+        id: userId,
+        name: userEmail.split('@')[0],
+        email: userEmail,
+        role: 'OWNER',
+        assigned_venue_ids: [],
+        assigned_area_ids: [],
+        assigned_clicr_ids: []
+    };
+
+    try {
+        await supabaseAdmin.from('profiles').upsert({
+            id: userId,
+            email: userEmail,
+            role: 'OWNER',
+            full_name: userEmail.split('@')[0]
+        });
+    } catch { /* ignore */ }
+
+    let allBusinesses: any[] = [];
+    let activeBizId: string | null = null;
+    let allBizIds: string[] = [];
+
+    const { data: memberships } = await supabaseAdmin
+        .from('business_members')
+        .select('business_id, role, assigned_venue_ids, assigned_area_ids')
+        .eq('user_id', userId);
+
+    if (memberships && memberships.length > 0) {
+        allBizIds = memberships.map((m: any) => m.business_id);
+
+        if (requestedBusinessId && allBizIds.includes(requestedBusinessId)) {
+            activeBizId = requestedBusinessId;
+        } else if (allBizIds.length === 1) {
+            activeBizId = allBizIds[0];
+        }
+
+        const { data: bizRows } = await supabaseAdmin
+            .from('businesses')
+            .select('*')
+            .in('id', allBizIds);
+
+        if (bizRows) {
+            allBusinesses = bizRows.map((b: any) => ({
+                id: b.id,
+                name: b.name,
+                timezone: b.timezone || 'UTC',
+                settings: b.settings || { refresh_interval_sec: 5, capacity_thresholds: [80, 90, 100], reset_rule: 'MANUAL' }
+            }));
+        }
+
+        const activeBiz = allBusinesses.find(b => b.id === activeBizId);
+        if (activeBiz) hydrated.business = activeBiz;
+
+        const activeMembership = memberships.find((m: any) => m.business_id === activeBizId) || memberships[0];
+        const memRole = (activeMembership?.role || 'OWNER') as string;
+        const memVenueIds = (activeMembership?.assigned_venue_ids || []) as string[];
+        const memAreaIds = (activeMembership?.assigned_area_ids || []) as string[];
+
+        user.role = memRole as User['role'];
+
+        const bizVenueIds = hydrated.venues.filter(v => v.business_id === (activeBizId || activeMembership?.business_id)).map(v => v.id);
+
+        if (memRole === 'OWNER' || memRole === 'ADMIN' || memRole === 'ANALYST') {
+            user.assigned_venue_ids = bizVenueIds;
+            user.assigned_area_ids = hydrated.areas.filter(a => bizVenueIds.includes(a.venue_id)).map(a => a.id);
+        } else if (memRole === 'MANAGER') {
+            user.assigned_venue_ids = memVenueIds.length > 0
+                ? memVenueIds.filter((id: string) => bizVenueIds.includes(id))
+                : bizVenueIds;
+            user.assigned_area_ids = hydrated.areas.filter(a => user.assigned_venue_ids.includes(a.venue_id)).map(a => a.id);
+        } else {
+            user.assigned_area_ids = memAreaIds;
+            user.assigned_venue_ids = memAreaIds.length > 0
+                ? [...new Set(hydrated.areas.filter(a => memAreaIds.includes(a.id)).map(a => a.venue_id))]
+                : [];
+        }
+    }
+
+    const bizVenuesForActive = activeBizId
+        ? hydrated.venues.filter(v => v.business_id === activeBizId).map(v => v.id)
+        : hydrated.venues.filter(v => allBizIds.includes(v.business_id)).map(v => v.id);
+
+    let visibleVenueIds: string[];
+    let visibleAreaIds: string[];
+
+    if (user.role === 'STAFF') {
+        visibleAreaIds = user.assigned_area_ids || [];
+        visibleVenueIds = visibleAreaIds.length > 0
+            ? [...new Set(hydrated.areas.filter(a => visibleAreaIds.includes(a.id)).map(a => a.venue_id))]
+            : [];
+    } else if (user.role === 'MANAGER' && (user.assigned_venue_ids?.length ?? 0) > 0) {
+        visibleVenueIds = user.assigned_venue_ids.filter((id: string) => bizVenuesForActive.includes(id));
+        if (requestedVenueId && visibleVenueIds.includes(requestedVenueId)) {
+            visibleVenueIds = [requestedVenueId];
+        }
+        visibleAreaIds = hydrated.areas.filter(a => visibleVenueIds.includes(a.venue_id)).map(a => a.id);
+    } else {
+        visibleVenueIds = bizVenuesForActive;
+        visibleAreaIds = hydrated.areas.filter(a => visibleVenueIds.includes(a.venue_id)).map(a => a.id);
+    }
+
+    const filteredVenues = hydrated.venues.filter(v => visibleVenueIds.includes(v.id));
+    const filteredAreas = hydrated.areas.filter(a => visibleAreaIds.includes(a.id));
+    const filteredClicrs = hydrated.clicrs.filter(c => visibleAreaIds.includes(c.area_id));
+
+    const latestResetAt = Math.max(0, ...filteredAreas.map(a => a.last_reset_at ? new Date(a.last_reset_at).getTime() : 0));
+    const filteredEvents = hydrated.events.filter(e =>
+        visibleVenueIds.includes(e.venue_id) && (!latestResetAt || e.timestamp > latestResetAt)
+    );
+    const filteredScans = hydrated.scanEvents.filter(s =>
+        visibleVenueIds.includes(s.venue_id) && (!latestResetAt || s.timestamp > latestResetAt)
+    );
+
+    const memberUserIds = new Set<string>([userId]);
+    if (allBizIds.length > 0) {
+        const { data: members } = await supabaseAdmin
+            .from('business_members')
+            .select('user_id, assigned_venue_ids, assigned_area_ids')
+            .in('business_id', allBizIds);
+        (members || []).forEach((m: any) => memberUserIds.add(m.user_id));
+    }
+
+    const { data: profiles } = await supabaseAdmin
+        .from('profiles')
+        .select('id, email, full_name')
+        .in('id', [...memberUserIds]);
+
+    const usersList: User[] = (profiles || []).map((p: any) => ({
+        id: p.id,
+        name: p.full_name || p.email?.split('@')[0] || 'Unknown',
+        email: p.email || '',
+        role: p.id === userId ? user.role : 'STAFF',
+        assigned_venue_ids: [],
+        assigned_area_ids: [],
+        assigned_clicr_ids: []
+    }));
+
+    const filteredUsers = usersList;
+
+    return {
+        ...hydrated,
+        businesses: allBusinesses,
+        venues: filteredVenues,
+        areas: filteredAreas,
+        clicrs: filteredClicrs,
+        events: filteredEvents,
+        scanEvents: filteredScans,
+        users: filteredUsers,
+        currentUser: user
+    };
 }
 
 export async function GET(request: Request) {
@@ -162,226 +299,58 @@ export async function GET(request: Request) {
     const userEmail = request.headers.get('x-user-email');
     const url = new URL(request.url);
     const requestedBusinessId = url.searchParams.get('businessId');
-
-    let data = readDB();
-    data = await hydrateData(data); // Apply Hydration
-    let allBusinesses: any[] = [];
+    const requestedVenueId = url.searchParams.get('venueId');
 
     if (userId && userEmail) {
-        let user = data.users.find(u => u.id === userId);
-
-        if (!user) {
-            console.log(`[API] Auto-creating user ${userEmail} (${userId})`);
-
-            try {
-                // SELF-HEALING: Create Profile in Supabase if missing
-                await supabaseAdmin.from('profiles').upsert({
-                    id: userId,
-                    email: userEmail,
-                    role: 'OWNER',
-                    full_name: userEmail.split('@')[0]
-                });
-            } catch (profileErr) {
-                console.error("Profile auto-creation failed (ignoring to keep app alive):", profileErr);
-            }
-
-            user = {
-                id: userId,
-                name: userEmail.split('@')[0],
-                email: userEmail,
-                role: 'OWNER',
-                assigned_venue_ids: [],
-                assigned_area_ids: [],
-                assigned_clicr_ids: []
-            };
-            addUser(user);
-            // Fall through to business context loading below —
-            // this ensures existing Supabase data (business_members) is picked up
-            // even if db.json is ephemeral (serverless) or was reset.
-        }
-
-        data.currentUser = user;
-
-        // --- LOAD ALL BUSINESSES ---
-        let activeBizId: string | null = null;
-        let allBizIds: string[] = [];
-
-        const requestedVenueId = url.searchParams.get('venueId');
-
-        try {
-            const { data: memberships } = await supabaseAdmin
-                .from('business_members')
-                .select('business_id, role, assigned_venue_ids, assigned_area_ids')
-                .eq('user_id', userId);
-
-            if (memberships && memberships.length > 0) {
-                allBizIds = memberships.map((m: any) => m.business_id);
-
-                if (requestedBusinessId && allBizIds.includes(requestedBusinessId)) {
-                    activeBizId = requestedBusinessId;
-                } else if (allBizIds.length === 1) {
-                    activeBizId = allBizIds[0];
-                }
-
-                const { data: bizRows } = await supabaseAdmin
-                    .from('businesses')
-                    .select('*')
-                    .in('id', allBizIds);
-
-                if (bizRows) {
-                    allBusinesses = bizRows.map((b: any) => ({
-                        id: b.id,
-                        name: b.name,
-                        timezone: b.timezone || 'UTC',
-                        settings: b.settings || { refresh_interval_sec: 5, capacity_thresholds: [80, 90, 100], reset_rule: 'MANUAL' }
-                    }));
-                }
-
-                const activeBiz = allBusinesses.find(b => b.id === activeBizId);
-                if (activeBiz) data.business = activeBiz;
-
-                const activeMembership = memberships.find((m: any) => m.business_id === activeBizId) || memberships[0];
-                const memRole = (activeMembership?.role || 'OWNER') as string;
-                const memVenueIds = (activeMembership?.assigned_venue_ids || []) as string[];
-                const memAreaIds = (activeMembership?.assigned_area_ids || []) as string[];
-
-                user.role = memRole as User['role'];
-
-                const bizVenueIds = data.venues.filter(v => v.business_id === (activeBizId || activeMembership?.business_id)).map(v => v.id);
-
-                if (memRole === 'OWNER' || memRole === 'ADMIN' || memRole === 'ANALYST') {
-                    user.assigned_venue_ids = bizVenueIds;
-                    user.assigned_area_ids = data.areas.filter(a => bizVenueIds.includes(a.venue_id)).map(a => a.id);
-                } else if (memRole === 'MANAGER') {
-                    user.assigned_venue_ids = memVenueIds.length > 0
-                        ? memVenueIds.filter((id: string) => bizVenueIds.includes(id))
-                        : bizVenueIds;
-                    user.assigned_area_ids = data.areas.filter(a => user.assigned_venue_ids.includes(a.venue_id)).map(a => a.id);
-                } else {
-                    user.assigned_area_ids = memAreaIds;
-                    user.assigned_venue_ids = memAreaIds.length > 0
-                        ? [...new Set(data.areas.filter(a => memAreaIds.includes(a.id)).map(a => a.venue_id))]
-                        : [];
-                }
-            }
-        } catch (e) { console.error("Business Context Load Failed", e); }
-
-        // --- ROLE-BASED FILTERING ---
-        let visibleVenueIds: string[];
-        let visibleAreaIds: string[];
-
-        const bizVenuesForActive = activeBizId
-            ? data.venues.filter(v => v.business_id === activeBizId).map(v => v.id)
-            : data.venues.filter(v => allBizIds.includes(v.business_id)).map(v => v.id);
-
-        if (user.role === 'STAFF') {
-            visibleAreaIds = user.assigned_area_ids || [];
-            visibleVenueIds = visibleAreaIds.length > 0
-                ? [...new Set(data.areas.filter(a => visibleAreaIds.includes(a.id)).map(a => a.venue_id))]
-                : [];
-        } else if (user.role === 'MANAGER' && (user.assigned_venue_ids?.length ?? 0) > 0) {
-            visibleVenueIds = user.assigned_venue_ids.filter((id: string) => bizVenuesForActive.includes(id));
-            if (requestedVenueId && visibleVenueIds.includes(requestedVenueId)) {
-                visibleVenueIds = [requestedVenueId];
-            }
-            visibleAreaIds = data.areas.filter(a => visibleVenueIds.includes(a.venue_id)).map(a => a.id);
-        } else {
-            visibleVenueIds = bizVenuesForActive;
-            visibleAreaIds = data.areas.filter(a => visibleVenueIds.includes(a.venue_id)).map(a => a.id);
-        }
-
-        const filteredVenues = data.venues.filter(v => visibleVenueIds.includes(v.id));
-        const filteredAreas = data.areas.filter(a => visibleAreaIds.includes(a.id));
-        const filteredClicrs = data.clicrs.filter(c => visibleAreaIds.includes(c.area_id));
-
-        const latestResetAt = Math.max(0, ...filteredAreas.map(a => a.last_reset_at ? new Date(a.last_reset_at).getTime() : 0));
-        const filteredEvents = data.events.filter(e =>
-            visibleVenueIds.includes(e.venue_id) && (!latestResetAt || e.timestamp > latestResetAt)
-        );
-        const filteredScans = data.scanEvents.filter(s =>
-            visibleVenueIds.includes(s.venue_id) && (!latestResetAt || s.timestamp > latestResetAt)
-        );
-
-        const filteredUsers = data.users.filter(u =>
-            u.id === user.id ||
-            (u.assigned_venue_ids || []).some((vid: string) => visibleVenueIds.includes(vid)) ||
-            (u.assigned_area_ids || []).some((aid: string) => visibleAreaIds.includes(aid))
-        );
-
-        return NextResponse.json({
-            ...data,
-            businesses: allBusinesses,
-            venues: filteredVenues,
-            areas: filteredAreas,
-            clicrs: filteredClicrs,
-            events: filteredEvents,
-            scanEvents: filteredScans,
-            users: filteredUsers,
-            currentUser: user
-        });
+        const response = await buildSyncResponse(userId, userEmail, requestedBusinessId, requestedVenueId);
+        return NextResponse.json(response);
     }
 
-    return NextResponse.json({ ...data, businesses: allBusinesses });
+    const data = createInitialDBData();
+    const hydrated = await hydrateData(data);
+    return NextResponse.json({ ...hydrated, businesses: [] });
 }
 
 export async function POST(request: Request) {
     const body = await request.json();
     const { action, payload } = body;
     const userId = request.headers.get('x-user-id');
-    let updatedData: DBData | undefined;
+    const userEmail = request.headers.get('x-user-email') || '';
+
+    const getBusinessId = async () => {
+        if (!userId) return null;
+        const { data: m } = await supabaseAdmin.from('business_members').select('business_id').eq('user_id', userId).limit(1).single();
+        return m?.business_id ?? null;
+    };
 
     try {
         switch (action) {
-            case 'RECORD_EVENT':
+            case 'RECORD_EVENT': {
                 const event = payload as CountEvent;
-                if (isUserBanned(event.user_id, event.venue_id)) {
-                    return NextResponse.json({ error: 'User is banned' }, { status: 403 });
-                }
+                const banned = await isUserBanned(supabaseAdmin, event.user_id, event.venue_id);
+                if (banned) return NextResponse.json({ error: 'User is banned' }, { status: 403 });
 
-                // Resolve Business ID dynamically
                 let eventBizId = event.business_id;
-                if (!eventBizId && userId) {
-                    const { data: m } = await supabaseAdmin.from('business_members').select('business_id').eq('user_id', userId).limit(1).single();
-                    if (m) eventBizId = m.business_id;
-                }
-                const finalEventBizId = eventBizId;
-                if (!finalEventBizId) {
-                    return NextResponse.json({ error: 'Could not resolve business_id for event' }, { status: 400 });
-                }
+                if (!eventBizId && userId) eventBizId = await getBusinessId();
+                if (!eventBizId) return NextResponse.json({ error: 'Could not resolve business_id for event' }, { status: 400 });
 
-                // ATOMIC UPDATE via RPC
-                try {
-                    const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('apply_occupancy_delta', {
-                        p_area_id: event.area_id,
-                        p_delta: event.delta,
-                        p_source: event.event_type === 'SCAN' ? 'scan' : event.event_type === 'AUTO_SCAN' ? 'auto_scan' : 'manual',
-                        p_device_id: null,
-                        p_gender: event.gender || null,
-                        p_idempotency_key: event.idempotency_key || null
-                    });
-
-                    if (rpcError) throw rpcError;
-
-                    // Success - update local optimized state
-                    // We can also return the new TRUE count from the RPC to the client
-                    // For now, we update local memory to match
-                    updatedData = addEvent(event);
-
-                } catch (e) {
-                    console.error("Supabase Atomic Update Failed", e);
-                    return NextResponse.json({ error: 'Count Failed' }, { status: 500 });
-                }
+                const { error: rpcError } = await supabaseAdmin.rpc('apply_occupancy_delta', {
+                    p_area_id: event.area_id,
+                    p_delta: event.delta,
+                    p_source: event.event_type === 'SCAN' ? 'scan' : event.event_type === 'AUTO_SCAN' ? 'auto_scan' : 'manual',
+                    p_device_id: null,
+                    p_gender: event.gender || null,
+                    p_idempotency_key: event.idempotency_key || null
+                });
+                if (rpcError) throw rpcError;
                 break;
+            }
 
-            case 'RECORD_SCAN':
+            case 'RECORD_SCAN': {
                 const scan = payload as IDScanEvent;
-                // PERSIST: Save scan to Supabase
+                let scanBizId: string | null = null;
+                if (userId) scanBizId = await getBusinessId();
                 try {
-                    let scanBizId: string | null = null;
-                    if (userId) {
-                        const { data: scanMember } = await supabaseAdmin.from('business_members').select('business_id').eq('user_id', userId).limit(1).single();
-                        if (scanMember) scanBizId = scanMember.business_id;
-                    }
                     await supabaseAdmin.from('id_scans').insert({
                         business_id: scanBizId || scan.business_id,
                         venue_id: scan.venue_id,
@@ -389,8 +358,6 @@ export async function POST(request: Request) {
                         age: scan.age,
                         sex: scan.sex,
                         zip_code: scan.zip_code,
-
-                        // PII Fields
                         first_name: scan.first_name,
                         last_name: scan.last_name,
                         dob: scan.dob,
@@ -400,27 +367,14 @@ export async function POST(request: Request) {
                         address_street: scan.address_street
                     });
                 } catch (e) { console.error("Scan Persistence Failed", e); }
-                updatedData = addScan(scan);
                 break;
+            }
 
             case 'RESET_COUNTS': {
-                // Resolve business_id from user session
-                let resetBizId: string | null = null;
-                if (userId) {
-                    const { data: resetMember } = await supabaseAdmin
-                        .from('business_members')
-                        .select('business_id')
-                        .eq('user_id', userId)
-                        .limit(1)
-                        .single();
-                    if (resetMember) resetBizId = resetMember.business_id;
-                }
-
+                const resetBizId = await getBusinessId();
                 if (resetBizId) {
-                    // 1. Resolve which areas to reset
                     let areasToReset: string[] = [];
                     if (body.venue_id) {
-                        // VENUE scope — reset only areas in this venue
                         const { data: venueAreas } = await supabaseAdmin
                             .from('areas')
                             .select('id')
@@ -428,7 +382,6 @@ export async function POST(request: Request) {
                             .eq('business_id', resetBizId);
                         areasToReset = (venueAreas || []).map((a: any) => a.id);
                     } else {
-                        // BUSINESS scope — reset all areas for this business (used by dashboard "Reset Data" button)
                         const { data: bizAreas } = await supabaseAdmin
                             .from('areas')
                             .select('id')
@@ -436,7 +389,6 @@ export async function POST(request: Request) {
                         areasToReset = (bizAreas || []).map((a: any) => a.id);
                     }
 
-                    // 2. Zero each area's count (current_occupancy now lives on areas)
                     for (const areaId of areasToReset) {
                         const { data: area, error: areaReadErr } = await supabaseAdmin
                             .from('areas')
@@ -444,15 +396,11 @@ export async function POST(request: Request) {
                             .eq('id', areaId)
                             .single();
 
-                        if (areaReadErr) {
-                            console.error(`[RESET_COUNTS] Failed to read area ${areaId}:`, areaReadErr.message);
-                            continue; // skip this area — don't write a bad audit event
-                        }
+                        if (areaReadErr) continue;
 
                         const currentVal = area?.current_occupancy ?? 0;
-
                         if (currentVal !== 0) {
-                            const { error: auditErr } = await supabaseAdmin.from('occupancy_events').insert({
+                            await supabaseAdmin.from('occupancy_events').insert({
                                 business_id: resetBizId,
                                 venue_id: area?.venue_id || null,
                                 area_id: areaId,
@@ -462,272 +410,145 @@ export async function POST(request: Request) {
                                 source: 'reset',
                                 user_id: userId || null,
                             });
-                            if (auditErr) {
-                                console.error(`[RESET_COUNTS] Audit event insert failed for area ${areaId}:`, auditErr.message);
-                                // Continue — still zero the area; the audit trail is best-effort
-                            }
                         }
 
-                        const { error: areaUpdateErr } = await supabaseAdmin
-                            .from('areas')
+                        await supabaseAdmin.from('areas')
                             .update({ current_occupancy: 0, last_reset_at: new Date().toISOString() })
                             .eq('id', areaId);
-
-                        if (areaUpdateErr) {
-                            console.error(`[RESET_COUNTS] Area update failed for area ${areaId}:`, areaUpdateErr.message);
-                            // Continue to remaining areas — partial reset is better than total failure
-                        }
                     }
-                } else {
-                    console.warn('[RESET_COUNTS] Could not resolve business_id — Supabase snapshots not zeroed.');
                 }
-
-                updatedData = resetAllCounts(body.venue_id);
                 break;
             }
 
             case 'RECORD_TURNAROUND': {
-                const turnaround = payload as TurnaroundEvent;
+                const turnaround = payload as any;
                 let bizId = turnaround.business_id;
-                if (!bizId && userId) {
-                    const { data: m } = await supabaseAdmin.from('business_members').select('business_id').eq('user_id', userId).limit(1).single();
-                    if (m) bizId = m.business_id;
-                }
-                if (!bizId) {
-                    return NextResponse.json({ error: 'Could not resolve business_id' }, { status: 400 });
-                }
-                try {
-                    await supabaseAdmin.from('turnarounds').insert({
-                        business_id: bizId,
-                        venue_id: turnaround.venue_id || null,
-                        area_id: turnaround.area_id || null,
-                        device_id: turnaround.device_id || null,
-                        count: turnaround.count,
-                        reason: turnaround.reason || null,
-                        created_by: userId || turnaround.created_by
-                    });
-                } catch (e) {
-                    console.error("Turnaround persistence failed", e);
-                    return NextResponse.json({ error: 'Failed to record turnaround' }, { status: 500 });
-                }
+                if (!bizId && userId) bizId = await getBusinessId();
+                if (!bizId) return NextResponse.json({ error: 'Could not resolve business_id' }, { status: 400 });
+                await supabaseAdmin.from('turnarounds').insert({
+                    business_id: bizId,
+                    venue_id: turnaround.venue_id || null,
+                    area_id: turnaround.area_id || null,
+                    device_id: turnaround.device_id || null,
+                    count: turnaround.count,
+                    reason: turnaround.reason || null,
+                    created_by: userId || turnaround.created_by
+                });
                 return NextResponse.json({ success: true });
             }
 
-            // ... (Pass through other cases directly) ...
-            case 'ADD_USER': updatedData = addUser(payload as User); break;
-            case 'UPDATE_USER': updatedData = updateUser(payload as User); break;
-            case 'REMOVE_USER': updatedData = removeUser(payload.id); break;
+            case 'ADD_USER':
+            case 'UPDATE_USER':
+            case 'REMOVE_USER':
+                break;
 
             case 'DELETE_ACCOUNT':
-                // Permanently delete user from Auth and Profile
                 if (payload.id) {
-                    try {
-                        // 1. Delete from Supabase Auth (This usually cascades to profile if set up, but let's be sure)
-                        await supabaseAdmin.auth.admin.deleteUser(payload.id);
-
-                        // 2. Explicitly delete profile just in case
-                        await supabaseAdmin.from('profiles').delete().eq('id', payload.id);
-
-                        // 3. Update local state
-                        updatedData = removeUser(payload.id);
-                    } catch (e) {
-                        console.error("Delete Account Failed", e);
-                        return NextResponse.json({ error: 'Deletion failed' }, { status: 500 });
-                    }
+                    await supabaseAdmin.auth.admin.deleteUser(payload.id);
+                    await supabaseAdmin.from('profiles').delete().eq('id', payload.id);
                 }
                 break;
 
-            case 'ADD_CLICR':
+            case 'ADD_CLICR': {
                 const newClicr = payload as Clicr;
-
-                // Resolve Business
-                let clicrBizId: string | null = null;
-                if (userId) {
-                    const { data: clicrMember } = await supabaseAdmin.from('business_members').select('business_id').eq('user_id', userId).limit(1).single();
-                    if (clicrMember) clicrBizId = clicrMember.business_id;
-                }
-
-                if (!clicrBizId) {
-                    return NextResponse.json({ error: 'Could not resolve business_id for ADD_CLICR' }, { status: 400 });
-                }
-
-                try {
-                    const { error } = await supabaseAdmin.from('devices').insert({
-                        id: newClicr.id,
-                        business_id: clicrBizId,
-                        area_id: newClicr.area_id,
-                        name: newClicr.name,
-                        device_type: 'COUNTER',
-                        status: (newClicr.active ?? true) ? 'ACTIVE' : 'INACTIVE',
-                        button_config: newClicr.button_config || { label_a: 'GUEST IN', label_b: 'GUEST OUT' }
-                    });
-
-                    if (error) {
-                        console.error("ADD_CLICR persistence failed", error);
-                        return NextResponse.json({ error: `Database Insert Failed: ${error.message} (${error.code})` }, { status: 500 });
-                    }
-                } catch (e: any) {
-                    console.error("ADD_CLICR persistence exception", e);
-                    return NextResponse.json({ error: 'Server Error: ' + e.message }, { status: 500 });
-                }
-
-                updatedData = addClicr(newClicr);
-                break;
-
-            case 'ADD_VENUE': {
-                const newVenue = payload as Venue;
-                // Trust the business_id sent by the client (user selected it from the picker).
-                // Fall back to first membership only if the payload omitted it.
-                let venueBizId: string | null = newVenue.business_id || null;
-                if (!venueBizId && userId) {
-                    const { data: venueMember } = await supabaseAdmin.from('business_members').select('business_id').eq('user_id', userId).limit(1).single();
-                    if (venueMember) venueBizId = venueMember.business_id;
-                }
-                if (!venueBizId) {
-                    return NextResponse.json({ error: 'Could not resolve business_id for ADD_VENUE' }, { status: 400 });
-                }
-                try {
-                    const { error } = await supabaseAdmin.from('venues').insert({
-                        id: newVenue.id,
-                        business_id: venueBizId,
-                        name: newVenue.name,
-                        city: newVenue.city || null,
-                        state: newVenue.state || null,
-                        timezone: newVenue.timezone || 'America/New_York',
-                        status: newVenue.status || 'ACTIVE',
-                        capacity_max: newVenue.default_capacity_total ?? null,
-                        capacity_enforcement_mode: newVenue.capacity_enforcement_mode || 'WARN_ONLY',
-                    });
-                    if (error) {
-                        console.error("ADD_VENUE persistence failed", error);
-                        return NextResponse.json({ error: `Database Insert Failed: ${error.message} (${error.code})` }, { status: 500 });
-                    }
-                } catch (e: any) {
-                    console.error("ADD_VENUE persistence exception", e);
-                    return NextResponse.json({ error: 'Server Error: ' + e.message }, { status: 500 });
-                }
-                updatedData = addVenue(newVenue);
+                const clicrBizId = await getBusinessId();
+                if (!clicrBizId) return NextResponse.json({ error: 'Could not resolve business_id for ADD_CLICR' }, { status: 400 });
+                const { error } = await supabaseAdmin.from('devices').insert({
+                    id: newClicr.id,
+                    business_id: clicrBizId,
+                    area_id: newClicr.area_id,
+                    name: newClicr.name,
+                    device_type: 'COUNTER',
+                    status: (newClicr.active ?? true) ? 'ACTIVE' : 'INACTIVE',
+                    button_config: newClicr.button_config || { label_a: 'GUEST IN', label_b: 'GUEST OUT' }
+                });
+                if (error) return NextResponse.json({ error: `Database Insert Failed: ${error.message}` }, { status: 500 });
                 break;
             }
 
-            case 'UPDATE_VENUE':
-                const venue = payload as Venue;
-                try {
-                    await supabaseAdmin.from('venues').update({
-                        name: venue.name,
-                        // address, etc. (map if needed)
-                        capacity_max: venue.total_capacity ?? venue.default_capacity_total ?? null,
-                        capacity_enforcement_mode: venue.capacity_enforcement_mode,
-                        status: venue.status
-                    }).eq('id', venue.id);
-                } catch (e) {
-                    console.error("Update Venue Persistence Failed", e);
-                    // Don't block flow, but log
-                }
-                updatedData = updateVenue(venue);
+            case 'ADD_VENUE': {
+                const newVenue = payload as Venue;
+                let venueBizId = newVenue.business_id || null;
+                if (!venueBizId && userId) venueBizId = await getBusinessId();
+                if (!venueBizId) return NextResponse.json({ error: 'Could not resolve business_id for ADD_VENUE' }, { status: 400 });
+                const { error } = await supabaseAdmin.from('venues').insert({
+                    id: newVenue.id,
+                    business_id: venueBizId,
+                    name: newVenue.name,
+                    city: newVenue.city || null,
+                    state: newVenue.state || null,
+                    timezone: newVenue.timezone || 'America/New_York',
+                    status: newVenue.status || 'ACTIVE',
+                    capacity_max: newVenue.default_capacity_total ?? null,
+                    capacity_enforcement_mode: newVenue.capacity_enforcement_mode || 'WARN_ONLY',
+                });
+                if (error) return NextResponse.json({ error: `Database Insert Failed: ${error.message}` }, { status: 500 });
                 break;
+            }
 
-            case 'UPDATE_AREA':
-                const areaPayload = payload as Area;
-                try {
-                    const updatePayload: Record<string, any> = {
-                        name: areaPayload.name,
-                        capacity_max: areaPayload.default_capacity ?? areaPayload.capacity_max,
-                    };
-                    await supabaseAdmin.from('areas').update(updatePayload).eq('id', areaPayload.id);
-                } catch (e) {
-                    console.error("Update Area Persistence Failed", e);
-                    return NextResponse.json({ error: 'Update Failed' }, { status: 500 });
-                }
-                updatedData = updateArea(areaPayload);
+            case 'UPDATE_VENUE': {
+                const venue = payload as Venue;
+                await supabaseAdmin.from('venues').update({
+                    name: venue.name,
+                    capacity_max: venue.total_capacity ?? venue.default_capacity_total ?? null,
+                    capacity_enforcement_mode: venue.capacity_enforcement_mode,
+                    status: venue.status
+                }).eq('id', venue.id);
                 break;
+            }
+
+            case 'UPDATE_AREA': {
+                const areaPayload = payload as Area;
+                await supabaseAdmin.from('areas').update({
+                    name: areaPayload.name,
+                    capacity_max: areaPayload.default_capacity ?? areaPayload.capacity_max,
+                }).eq('id', areaPayload.id);
+                break;
+            }
 
             case 'ADD_AREA': {
                 const newArea = payload as Area;
-                let areaBizId: string | null = null;
-                if (userId) {
-                    const { data: areaMember } = await supabaseAdmin.from('business_members').select('business_id').eq('user_id', userId).limit(1).single();
-                    if (areaMember) areaBizId = areaMember.business_id;
-                }
-                if (!areaBizId) {
-                    return NextResponse.json({ error: 'Could not resolve business_id for ADD_AREA' }, { status: 400 });
-                }
-                try {
-                    const insertPayload: Record<string, any> = {
-                        id: newArea.id,
-                        venue_id: newArea.venue_id,
-                        business_id: areaBizId,
-                        name: newArea.name,
-                        area_type: newArea.area_type || 'MAIN',
-                        capacity_max: newArea.default_capacity ?? (newArea as any).capacity_max ?? null,
-                        counting_mode: newArea.counting_mode || 'MANUAL',
-                        is_active: newArea.is_active ?? true,
-                    };
-                    const { error } = await supabaseAdmin.from('areas').insert(insertPayload);
-                    if (error) {
-                        console.error("ADD_AREA persistence failed", error);
-                        return NextResponse.json({ error: `Database Insert Failed: ${error.message} (${error.code})` }, { status: 500 });
-                    }
-                } catch (e: any) {
-                    console.error("ADD_AREA persistence exception", e);
-                    return NextResponse.json({ error: 'Server Error: ' + e.message }, { status: 500 });
-                }
-                updatedData = addArea(newArea);
+                const areaBizId = await getBusinessId();
+                if (!areaBizId) return NextResponse.json({ error: 'Could not resolve business_id for ADD_AREA' }, { status: 400 });
+                const { error } = await supabaseAdmin.from('areas').insert({
+                    id: newArea.id,
+                    venue_id: newArea.venue_id,
+                    business_id: areaBizId,
+                    name: newArea.name,
+                    area_type: newArea.area_type || 'MAIN',
+                    capacity_max: newArea.default_capacity ?? (newArea as any).capacity_max ?? null,
+                    counting_mode: newArea.counting_mode || 'MANUAL',
+                    is_active: newArea.is_active ?? true,
+                });
+                if (error) return NextResponse.json({ error: `Database Insert Failed: ${error.message}` }, { status: 500 });
                 break;
             }
 
             case 'UPDATE_CLICR': {
                 const clicrPayload = payload as Clicr;
-                try {
-                    await supabaseAdmin.from('devices').update({
-                        name: clicrPayload.name,
-                        button_config: clicrPayload.button_config || null,
-                        direction_mode: clicrPayload.direction_mode || 'bidirectional',
-                    }).eq('id', clicrPayload.id);
-                } catch (e) {
-                    console.error("UPDATE_CLICR persistence failed", e);
-                }
-                updatedData = updateClicr(clicrPayload);
+                await supabaseAdmin.from('devices').update({
+                    name: clicrPayload.name,
+                    button_config: clicrPayload.button_config || null,
+                    direction_mode: clicrPayload.direction_mode || 'bidirectional',
+                }).eq('id', clicrPayload.id);
                 break;
             }
 
-            case 'DELETE_CLICR':
+            case 'DELETE_CLICR': {
                 const delPayload = payload as { id: string };
-                try {
-                    // Soft delete
-                    const { error } = await supabaseAdmin.from('devices')
-                        .update({ deleted_at: new Date().toISOString() })
-                        .eq('id', delPayload.id);
-
-                    if (error) {
-                        console.error("DELETE_CLICR persistence failed", error); // Log full error object
-                        return NextResponse.json({ error: `Delete Failed: ${error.message} (${error.code})` }, { status: 500 });
-                    }
-
-                    // Update local state
-                    updatedData = readDB();
-                    updatedData.clicrs = updatedData.clicrs.filter(c => c.id !== delPayload.id);
-                    writeDB(updatedData);
-
-                } catch (e: any) {
-                    console.error("DELETE_CLICR Exception", e);
-                    return NextResponse.json({ error: 'Server Error: ' + e.message }, { status: 500 });
-                }
+                const { error } = await supabaseAdmin.from('devices')
+                    .update({ deleted_at: new Date().toISOString() })
+                    .eq('id', delPayload.id);
+                if (error) return NextResponse.json({ error: `Delete Failed: ${error.message}` }, { status: 500 });
                 break;
+            }
 
             case 'UPDATE_BUSINESS': {
                 const { business_id: _bid, ...updateFields } = payload;
-                if (userId) {
-                    let businessId = payload.business_id;
-                    if (!businessId) {
-                        const { data: bizMembership } = await supabaseAdmin.from('business_members').select('business_id').eq('user_id', userId).limit(1).single();
-                        businessId = bizMembership?.business_id;
-                    }
-                    if (businessId) {
-                        await supabaseAdmin.from('businesses').update(updateFields).eq('id', businessId);
-                    }
+                const businessId = payload.business_id || await getBusinessId();
+                if (businessId) {
+                    await supabaseAdmin.from('businesses').update(updateFields).eq('id', businessId);
                 }
-                updatedData = updateBusiness(updateFields);
                 break;
             }
 
@@ -735,82 +556,20 @@ export async function POST(request: Request) {
                 return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
         }
 
-        // --- CRITICAL FIX: HYDRATE RESPONSE ---
-        // Before returning, we MUST hydrate the data from Supabase so the client gets the real counts
-        // especially for events/scans/resets
-        if (['RECORD_SCAN', 'RESET_COUNTS', 'UPDATE_CLICR'].includes(action) && updatedData) {
-            updatedData = await hydrateData(updatedData);
+        if (userId && userEmail) {
+            const { data: postMembership } = await supabaseAdmin
+                .from('business_members')
+                .select('business_id')
+                .eq('user_id', userId)
+                .limit(1)
+                .single();
+
+            const requestedBusinessId = postMembership?.business_id ?? null;
+            const response = await buildSyncResponse(userId, userEmail, requestedBusinessId, null);
+            return NextResponse.json(response);
         }
 
-        // --- AUTO-ASSIGNMENT & FILTERING ---
-        if (userId && updatedData) {
-            // Restore correct business context for this user via business_members
-            try {
-                const { data: postMembership } = await supabaseAdmin
-                    .from('business_members')
-                    .select('business_id')
-                    .eq('user_id', userId)
-                    .limit(1)
-                    .single();
-
-                if (postMembership?.business_id) {
-                    const { data: myBusiness } = await supabaseAdmin
-                        .from('businesses')
-                        .select('*')
-                        .eq('id', postMembership.business_id)
-                        .single();
-
-                    if (myBusiness) {
-                        updatedData.business = {
-                            id: myBusiness.id,
-                            name: myBusiness.name,
-                            timezone: myBusiness.timezone || 'UTC',
-                            settings: myBusiness.settings || { refresh_interval_sec: 5, capacity_thresholds: [80, 90, 100], reset_rule: 'MANUAL' }
-                        };
-                    }
-                }
-            } catch (e) { console.error("Business Context Load Failed (POST)", e); }
-
-            if (action === 'ADD_VENUE') updatedData = assignEntityToUser(userId, 'VENUE', payload.id);
-            if (action === 'ADD_AREA') updatedData = assignEntityToUser(userId, 'AREA', payload.id);
-            if (action === 'ADD_CLICR') updatedData = assignEntityToUser(userId, 'CLICR', payload.id);
-
-            const user = updatedData.users.find(u => u.id === userId);
-            if (user) {
-                const visibleVenueIds = user.assigned_venue_ids || [];
-                const filteredVenues = updatedData.venues.filter(v => visibleVenueIds.includes(v.id));
-                const filteredAreas = updatedData.areas.filter(a => visibleVenueIds.includes(a.venue_id));
-                const visibleAreaIds = filteredAreas.map(a => a.id);
-                const filteredClicrs = updatedData.clicrs.filter(c => visibleAreaIds.includes(c.area_id));
-
-                const postLatestResetAt = Math.max(0, ...filteredAreas.map(a => a.last_reset_at ? new Date(a.last_reset_at).getTime() : 0));
-                const filteredEvents = updatedData.events.filter(e =>
-                    visibleVenueIds.includes(e.venue_id) && (!postLatestResetAt || e.timestamp > postLatestResetAt)
-                );
-                const filteredScans = updatedData.scanEvents.filter(s =>
-                    visibleVenueIds.includes(s.venue_id) && (!postLatestResetAt || s.timestamp > postLatestResetAt)
-                );
-
-                // SECURITY FIX: Filter Users to only those in the same scope
-                const filteredUsers = updatedData.users.filter(u =>
-                    u.id === user.id ||
-                    u.assigned_venue_ids.some(vid => visibleVenueIds.includes(vid))
-                );
-
-                return NextResponse.json({
-                    ...updatedData,
-                    venues: filteredVenues,
-                    areas: filteredAreas,
-                    clicrs: filteredClicrs,
-                    events: filteredEvents,
-                    scanEvents: filteredScans,
-                    users: filteredUsers,
-                    currentUser: user
-                });
-            }
-        }
-
-        return NextResponse.json(updatedData);
+        return NextResponse.json({ success: true });
     } catch (error) {
         console.error("API Error", error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
