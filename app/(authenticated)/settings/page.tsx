@@ -1,14 +1,17 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/store';
-import { Building2, Save, Users, ShieldAlert, Shield, ChevronRight, LayoutGrid } from 'lucide-react';
+import { Building2, Save, Users, ShieldAlert, Shield, ChevronRight, LayoutGrid, Trash2, X, AlertTriangle } from 'lucide-react';
 import { Role } from '@/lib/types';
 import Link from 'next/link';
 import { canManageSettings } from '@/lib/permissions';
+import { deleteBusiness } from '@/app/onboarding/setup-actions';
 
 export default function SettingsPage() {
-    const { business, currentUser, venues, updateBusiness, refreshState } = useApp();
+    const router = useRouter();
+    const { business, businesses, currentUser, venues, updateBusiness, refreshState, clearBusiness, selectBusiness } = useApp();
     const [businessName, setBusinessName] = useState(business?.name ?? '');
 
     useEffect(() => {
@@ -16,6 +19,39 @@ export default function SettingsPage() {
     }, [business?.name]);
     const [isSaving, setIsSaving] = useState(false);
     const [saved, setSaved] = useState(false);
+
+    // Delete business modal state
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [deleteConfirmText, setDeleteConfirmText] = useState('');
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
+
+    const canDelete = deleteConfirmText === business?.name;
+
+    const handleDeleteBusiness = async () => {
+        if (!business || !canDelete) return;
+        setIsDeleting(true);
+        setDeleteError(null);
+        try {
+            const result = await deleteBusiness(business.id);
+            if (!result.success) {
+                setDeleteError('error' in result ? result.error : 'Failed to delete business');
+                return;
+            }
+            const remaining = businesses.filter(b => b.id !== business.id);
+            if (remaining.length > 0) {
+                selectBusiness(remaining[0]);
+                router.push('/dashboard');
+            } else {
+                clearBusiness();
+                router.push('/onboarding/setup');
+            }
+        } catch {
+            setDeleteError('An unexpected error occurred. Please try again.');
+        } finally {
+            setIsDeleting(false);
+        }
+    };
 
     if (!canManageSettings(currentUser?.role as Role | undefined)) {
         return (
@@ -139,6 +175,106 @@ export default function SettingsPage() {
                     </button>
                 </form>
             </div>
+
+            {/* Danger Zone — OWNER only */}
+            {currentUser?.role === 'OWNER' && (
+                <div className="border border-red-900/50 rounded-xl p-6 space-y-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-red-900/20 border border-red-500/20 flex items-center justify-center">
+                            <AlertTriangle className="w-5 h-5 text-red-400" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-bold text-white">Danger Zone</h2>
+                            <p className="text-sm text-gray-500">Irreversible actions — proceed with caution.</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-between bg-gray-950/50 border border-gray-800 rounded-lg p-4">
+                        <div>
+                            <p className="font-medium text-white text-sm">Delete this business</p>
+                            <p className="text-xs text-gray-500 mt-0.5">Permanently deletes all venues, areas, devices, scans, bans, and reports.</p>
+                        </div>
+                        <button
+                            onClick={() => { setShowDeleteModal(true); setDeleteConfirmText(''); setDeleteError(null); }}
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-900/20 border border-red-500/30 text-red-400 hover:bg-red-900/40 hover:border-red-500/50 text-sm font-medium transition-all"
+                        >
+                            <Trash2 className="w-4 h-4" /> Delete Business
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete confirmation modal */}
+            {showDeleteModal && business && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+                    <div className="w-full max-w-md bg-gray-900 border border-gray-700 rounded-2xl p-6 space-y-5 shadow-2xl">
+                        <div className="flex items-start justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-red-900/20 border border-red-500/20 flex items-center justify-center shrink-0">
+                                    <AlertTriangle className="w-5 h-5 text-red-400" />
+                                </div>
+                                <h3 className="text-lg font-bold text-white">Delete business</h3>
+                            </div>
+                            <button
+                                onClick={() => { if (!isDeleting) setShowDeleteModal(false); }}
+                                disabled={isDeleting}
+                                className="p-1 text-gray-500 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <p className="text-sm text-gray-400">
+                            This will <span className="text-white font-medium">permanently delete</span> <span className="text-red-400 font-medium">{business.name}</span> and all associated data — venues, areas, devices, scans, bans, and reports. This cannot be undone.
+                        </p>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest block">
+                                Type <span className="text-white font-mono">{business.name}</span> to confirm
+                            </label>
+                            <input
+                                type="text"
+                                value={deleteConfirmText}
+                                onChange={e => setDeleteConfirmText(e.target.value)}
+                                placeholder={business.name}
+                                autoFocus
+                                className="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-red-500/40 focus:border-red-500 outline-none text-sm"
+                            />
+                        </div>
+
+                        {deleteError && (
+                            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+                                {deleteError}
+                            </div>
+                        )}
+
+                        <div className="flex gap-3 pt-1">
+                            <button
+                                onClick={() => setShowDeleteModal(false)}
+                                disabled={isDeleting}
+                                className="flex-1 py-3 border border-gray-700 text-gray-400 hover:text-white rounded-xl font-medium transition-all disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleDeleteBusiness}
+                                disabled={!canDelete || isDeleting}
+                                className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            >
+                                {isDeleting ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        Deleting…
+                                    </>
+                                ) : (
+                                    <>
+                                        <Trash2 className="w-4 h-4" /> Delete forever
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

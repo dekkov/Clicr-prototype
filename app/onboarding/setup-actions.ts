@@ -204,3 +204,40 @@ export async function updateBusinessSettings(
         return { success: false, error: e.message || 'Failed to update settings' };
     }
 }
+
+export async function deleteBusiness(businessId: string): Promise<SetupResult> {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'Not authenticated' };
+
+    // Server-side OWNER check — never trust client role
+    const { data: membership, error: memberError } = await supabaseAdmin
+        .from('business_members')
+        .select('role')
+        .eq('business_id', businessId)
+        .eq('user_id', user.id)
+        .single();
+
+    if (memberError || !membership) {
+        if (memberError) console.error('[setup] deleteBusiness membership check error:', memberError);
+        return { success: false, error: 'Business not found or access denied' };
+    }
+    if (membership.role !== 'OWNER') {
+        return { success: false, error: 'Only the business owner can delete the business' };
+    }
+
+    try {
+        const { error } = await supabaseAdmin
+            .from('businesses')
+            .delete()
+            .eq('id', businessId);
+
+        if (error) throw error;
+
+        revalidatePath('/dashboard');
+        return { success: true };
+    } catch (e: any) {
+        console.error('[setup] deleteBusiness error:', e);
+        return { success: false, error: e.message || 'Failed to delete business' };
+    }
+}
