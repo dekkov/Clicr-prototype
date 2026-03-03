@@ -17,7 +17,6 @@ import {
     BarChart3,
     Trash2,
     Pencil,
-    MapPin,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useApp } from '@/lib/store';
@@ -66,10 +65,11 @@ export default function TeamSettingsPage() {
     const [isInviting, setIsInviting] = useState(false);
     const [inviteError, setInviteError] = useState<string | null>(null);
     const [openKebabId, setOpenKebabId] = useState<string | null>(null);
-    const [editRoleMember, setEditRoleMember] = useState<TeamMember | null>(null);
-    const [editAssignmentsMember, setEditAssignmentsMember] = useState<TeamMember | null>(null);
-    const [isUpdatingRole, setIsUpdatingRole] = useState(false);
-    const [isUpdatingAssignments, setIsUpdatingAssignments] = useState(false);
+    const [editMember, setEditMember] = useState<TeamMember | null>(null);
+    const [editRole, setEditRole] = useState<Role>('STAFF');
+    const [editVenueIds, setEditVenueIds] = useState<string[]>([]);
+    const [editAreaIds, setEditAreaIds] = useState<string[]>([]);
+    const [isUpdating, setIsUpdating] = useState(false);
 
     const loadMembers = useCallback(async () => {
         if (!activeBusiness) return;
@@ -246,25 +246,16 @@ export default function TeamSettingsPage() {
                                                         <button
                                                             onClick={() => {
                                                                 setOpenKebabId(null);
-                                                                setEditRoleMember(member);
+                                                                setEditMember(member);
+                                                                setEditRole(member.role);
+                                                                setEditVenueIds(member.assignedVenueIds ?? []);
+                                                                setEditAreaIds(member.assignedAreaIds ?? []);
                                                             }}
                                                             className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800/60 hover:text-white"
                                                         >
                                                             <Pencil className="w-4 h-4" />
-                                                            Edit role
+                                                            Edit
                                                         </button>
-                                                        {(member.role === 'MANAGER' || member.role === 'STAFF') && (
-                                                            <button
-                                                                onClick={() => {
-                                                                    setOpenKebabId(null);
-                                                                    setEditAssignmentsMember(member);
-                                                                }}
-                                                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800/60 hover:text-white"
-                                                            >
-                                                                <MapPin className="w-4 h-4" />
-                                                                Edit assignments
-                                                            </button>
-                                                        )}
                                                         <div className="border-t border-border/50 my-1" />
                                                         <button
                                                             onClick={() => handleRemoveUser(member.id)}
@@ -427,151 +418,136 @@ export default function TeamSettingsPage() {
                 )}
             </AnimatePresence>
 
-            {/* Edit role modal */}
+            {/* Edit member modal (role + assignments together) */}
             <AnimatePresence>
-                {editRoleMember && activeBusiness && (
+                {editMember && activeBusiness && editMember.role !== 'OWNER' && (
                     <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-6">
                         <motion.div
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.95, opacity: 0 }}
-                            className="bg-card border border-border rounded-2xl w-full max-w-md p-8 shadow-2xl relative"
+                            className="bg-card border border-border rounded-2xl w-full max-w-md p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto"
                         >
                             <button
-                                onClick={() => setEditRoleMember(null)}
+                                onClick={() => { setEditMember(null); }}
                                 className="absolute top-6 right-6 text-slate-500 hover:text-white"
                             >
                                 <XCircle className="w-6 h-6" />
                             </button>
-                            <h2 className="text-xl font-bold text-white mb-2">Edit role</h2>
-                            <p className="text-sm text-slate-400 mb-6">{editRoleMember.name || editRoleMember.email}</p>
-                            <div className="space-y-2 mb-6">
-                                {(['ADMIN', 'MANAGER', 'STAFF', 'ANALYST'] as Role[]).map(role => (
-                                    <button
-                                        key={role}
-                                        type="button"
-                                        onClick={async () => {
-                                            if (role === editRoleMember.role) return;
-                                            setIsUpdatingRole(true);
-                                            const result = await updateMemberRole(editRoleMember.id, activeBusiness.id, role);
-                                            setIsUpdatingRole(false);
-                                            if (result.success) {
-                                                setMembers(prev => prev.map(m => m.id === editRoleMember.id ? { ...m, role } : m));
-                                                setEditRoleMember(null);
-                                            }
-                                        }}
-                                        disabled={isUpdatingRole || role === editRoleMember.role}
-                                        className={cn(
-                                            "w-full flex items-center justify-between p-3 rounded-xl border text-left transition-all",
-                                            editRoleMember.role === role
-                                                ? "bg-primary/10 border-primary"
-                                                : "bg-background/30 border-border hover:bg-slate-800/60"
-                                        )}
-                                    >
-                                        <span className={cn("font-medium text-sm", editRoleMember.role === role ? "text-primary" : "text-white")}>
-                                            {ROLE_DEFINITIONS[role].label}
-                                        </span>
-                                        {editRoleMember.role === role && <CheckCircle2 className="w-4 h-4 text-primary" />}
-                                    </button>
-                                ))}
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
+                            <h2 className="text-xl font-bold text-white mb-2">Edit member</h2>
+                            <p className="text-sm text-slate-400 mb-6">{editMember.name || editMember.email}</p>
 
-            {/* Edit assignments modal */}
-            <AnimatePresence>
-                {editAssignmentsMember && activeBusiness && (editAssignmentsMember.role === 'MANAGER' || editAssignmentsMember.role === 'STAFF') && (
-                    <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-                        <motion.div
-                            initial={{ scale: 0.95, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.95, opacity: 0 }}
-                            className="bg-card border border-border rounded-2xl w-full max-w-md p-8 shadow-2xl relative"
-                        >
-                            <button
-                                onClick={() => setEditAssignmentsMember(null)}
-                                className="absolute top-6 right-6 text-slate-500 hover:text-white"
-                            >
-                                <XCircle className="w-6 h-6" />
-                            </button>
-                            <h2 className="text-xl font-bold text-white mb-2">Edit assignments</h2>
-                            <p className="text-sm text-slate-400 mb-6">{editAssignmentsMember.name || editAssignmentsMember.email}</p>
-
-                            {editAssignmentsMember.role === 'MANAGER' && (
-                                <div className="mb-6">
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Venues</label>
-                                    <div className="max-h-48 overflow-y-auto space-y-2 mt-2">
-                                        {venues.filter(v => v.business_id === activeBusiness.id).map(venue => (
-                                            <label
-                                                key={venue.id}
-                                                className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-slate-800/40 cursor-pointer"
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    checked={(editAssignmentsMember.assignedVenueIds ?? []).includes(venue.id)}
-                                                    onChange={async (e) => {
-                                                        const next = e.target.checked
-                                                            ? [...(editAssignmentsMember.assignedVenueIds ?? []), venue.id]
-                                                            : (editAssignmentsMember.assignedVenueIds ?? []).filter(id => id !== venue.id);
-                                                        setIsUpdatingAssignments(true);
-                                                        const result = await updateMemberAssignments(editAssignmentsMember.id, activeBusiness.id, { assignedVenueIds: next });
-                                                        setIsUpdatingAssignments(false);
-                                                        if (result.success) {
-                                                            setMembers(prev => prev.map(m => m.id === editAssignmentsMember.id ? { ...m, assignedVenueIds: next } : m));
-                                                            setEditAssignmentsMember(prev => prev ? { ...prev, assignedVenueIds: next } : null);
-                                                        }
-                                                    }}
-                                                    disabled={isUpdatingAssignments}
-                                                    className="rounded border-border"
-                                                />
-                                                <span className="text-sm text-white">{venue.name}</span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {editAssignmentsMember.role === 'STAFF' && (
+                            <div className="space-y-6">
                                 <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Areas</label>
-                                    <div className="max-h-48 overflow-y-auto space-y-2 mt-2">
-                                        {areas.filter(a => venues.some(v => v.id === a.venue_id && v.business_id === activeBusiness.id)).map(area => (
-                                            <label
-                                                key={area.id}
-                                                className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-slate-800/40 cursor-pointer"
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Role</label>
+                                    <div className="grid grid-cols-1 gap-2 mt-2">
+                                        {(['ADMIN', 'MANAGER', 'STAFF', 'ANALYST'] as Role[]).map(role => (
+                                            <button
+                                                key={role}
+                                                type="button"
+                                                onClick={() => {
+                                                    setEditRole(role);
+                                                    if (role !== 'MANAGER') setEditVenueIds([]);
+                                                    if (role !== 'STAFF') setEditAreaIds([]);
+                                                }}
+                                                className={cn(
+                                                    "flex items-center justify-between p-3 rounded-xl border text-left transition-all",
+                                                    editRole === role ? "bg-primary/10 border-primary" : "bg-background/30 border-border hover:bg-slate-800/60"
+                                                )}
                                             >
-                                                <input
-                                                    type="checkbox"
-                                                    checked={(editAssignmentsMember.assignedAreaIds ?? []).includes(area.id)}
-                                                    onChange={async (e) => {
-                                                        const next = e.target.checked
-                                                            ? [...(editAssignmentsMember.assignedAreaIds ?? []), area.id]
-                                                            : (editAssignmentsMember.assignedAreaIds ?? []).filter(id => id !== area.id);
-                                                        setIsUpdatingAssignments(true);
-                                                        const result = await updateMemberAssignments(editAssignmentsMember.id, activeBusiness.id, { assignedAreaIds: next });
-                                                        setIsUpdatingAssignments(false);
-                                                        if (result.success) {
-                                                            setMembers(prev => prev.map(m => m.id === editAssignmentsMember.id ? { ...m, assignedAreaIds: next } : m));
-                                                            setEditAssignmentsMember(prev => prev ? { ...prev, assignedAreaIds: next } : null);
-                                                        }
-                                                    }}
-                                                    disabled={isUpdatingAssignments}
-                                                    className="rounded border-border"
-                                                />
-                                                <span className="text-sm text-white">{area.name}</span>
-                                            </label>
+                                                <span className={cn("font-medium text-sm", editRole === role ? "text-primary" : "text-white")}>
+                                                    {ROLE_DEFINITIONS[role].label}
+                                                </span>
+                                                {editRole === role && <CheckCircle2 className="w-4 h-4 text-primary" />}
+                                            </button>
                                         ))}
                                     </div>
                                 </div>
-                            )}
 
-                            <p className="text-xs text-slate-500 mt-4">
-                                {editAssignmentsMember.role === 'MANAGER'
-                                    ? 'Managers see only the venues you assign. Leave empty for no access.'
-                                    : 'Staff see only the areas you assign. Leave empty for no access.'}
-                            </p>
+                                {editRole === 'MANAGER' && (
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Assign Venues</label>
+                                        <p className="text-xs text-slate-500 mt-1 mb-2">Select which venues this manager can access.</p>
+                                        <div className="max-h-40 overflow-y-auto space-y-2 mt-2">
+                                            {venues.filter(v => v.business_id === activeBusiness.id).map(venue => (
+                                                <label key={venue.id} className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-slate-800/40 cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={editVenueIds.includes(venue.id)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) setEditVenueIds(prev => [...prev, venue.id]);
+                                                            else setEditVenueIds(prev => prev.filter(id => id !== venue.id));
+                                                        }}
+                                                        className="rounded border-border"
+                                                    />
+                                                    <span className="text-sm text-white">{venue.name}</span>
+                                                </label>
+                                            ))}
+                                            {venues.filter(v => v.business_id === activeBusiness.id).length === 0 && (
+                                                <p className="text-xs text-slate-500">No venues yet.</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {editRole === 'STAFF' && (
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Assign Areas</label>
+                                        <p className="text-xs text-slate-500 mt-1 mb-2">Select which areas this staff member can access.</p>
+                                        <div className="max-h-40 overflow-y-auto space-y-2 mt-2">
+                                            {areas.filter(a => venues.some(v => v.id === a.venue_id && v.business_id === activeBusiness.id)).map(area => (
+                                                <label key={area.id} className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-slate-800/40 cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={editAreaIds.includes(area.id)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) setEditAreaIds(prev => [...prev, area.id]);
+                                                            else setEditAreaIds(prev => prev.filter(id => id !== area.id));
+                                                        }}
+                                                        className="rounded border-border"
+                                                    />
+                                                    <span className="text-sm text-white">{area.name}</span>
+                                                </label>
+                                            ))}
+                                            {areas.filter(a => venues.some(v => v.id === a.venue_id && v.business_id === activeBusiness.id)).length === 0 && (
+                                                <p className="text-xs text-slate-500">No areas yet.</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <button
+                                    onClick={async () => {
+                                        if (!editMember) return;
+                                        setIsUpdating(true);
+                                        const roleResult = editRole !== editMember.role
+                                            ? await updateMemberRole(editMember.id, activeBusiness.id, editRole)
+                                            : { success: true };
+                                        if (!roleResult.success) {
+                                            setIsUpdating(false);
+                                            return;
+                                        }
+                                        const assignOpts =
+                                            editRole === 'MANAGER' ? { assignedVenueIds: editVenueIds, assignedAreaIds: [] } :
+                                            editRole === 'STAFF' ? { assignedVenueIds: [], assignedAreaIds: editAreaIds } :
+                                            { assignedVenueIds: [], assignedAreaIds: [] };
+                                        const assignResult = await updateMemberAssignments(editMember.id, activeBusiness.id, assignOpts);
+                                        setIsUpdating(false);
+                                        if (roleResult.success && assignResult.success) {
+                                            setMembers(prev => prev.map(m =>
+                                                m.id === editMember.id
+                                                    ? { ...m, role: editRole, assignedVenueIds: editVenueIds, assignedAreaIds: editAreaIds }
+                                                    : m
+                                            ));
+                                            setEditMember(null);
+                                        }
+                                    }}
+                                    disabled={isUpdating}
+                                    className="w-full py-3 bg-primary text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {isUpdating ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</> : 'Save changes'}
+                                </button>
+                            </div>
                         </motion.div>
                     </div>
                 )}
