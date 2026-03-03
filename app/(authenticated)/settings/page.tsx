@@ -97,7 +97,7 @@ export default function SettingsPage() {
 
                 <Link
                     href="/settings/bans"
-                    className="flex items-center gap-4 p-5 bg-gray-900/50 border border-gray-800 rounded-xl hover:bg-gray-800/50 hover:border-gray-700 transition-all group sm:col-span-2"
+                    className="flex items-center gap-4 p-5 bg-gray-900/50 border border-gray-800 rounded-xl hover:bg-gray-800/50 hover:border-gray-700 transition-all group"
                 >
                     <div className="w-10 h-10 rounded-lg bg-purple-900/30 border border-purple-500/20 flex items-center justify-center">
                         <Shield className="w-5 h-5 text-purple-400" />

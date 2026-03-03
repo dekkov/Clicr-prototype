@@ -20,6 +20,9 @@
 | 14 | `audit_logs` | System audit trail | ✅ | Append only |
 | 15 | `app_errors` | Client error logging | ✅ | Append only |
 | 16 | `onboarding_progress` | Setup wizard state | ✅ | CRUD |
+| 17 | `board_views` | Saved board layout configs per area | ✅ | CRUD |
+| 18 | `shifts` | Shift records (start/end, auto-reset) | ✅ | CRUD |
+| 19 | `support_tickets` | In-app support requests | ✅ | CRUD |
 
 ---
 
@@ -30,15 +33,16 @@ All primary keys are `UUID DEFAULT uuid_generate_v4()`.
 Key relationships:
 ```
 businesses ──1:N──> venues ──1:N──> areas ──1:N──> devices
-     │                │               │
-     └──1:N──> business_members      │
-     │                                │
-     └──1:N──> occupancy_snapshots ←──┘
-     │         (unique: biz+venue+area)
+     │                │               │               │
+     └──1:N──> business_members      │               └──1:N──> board_views
+     │         (assigned_venue_ids,  │
+     │          assigned_area_ids)   └──1:N──> occupancy_snapshots
+     │                                └──1:N──> shifts
      │
-     └──1:N──> occupancy_events
-     └──1:N──> id_scans
+     └──1:N──> occupancy_events  (shift_id FK → shifts)
+     └──1:N──> id_scans          (shift_id FK → shifts)
      └──1:N──> banned_persons ──1:N──> patron_bans ──1:N──> ban_audit_logs
+     └──1:N──> support_tickets
 ```
 
 ---
@@ -67,9 +71,11 @@ EXISTS (
 
 Destructive operations use `has_role_in(business_id, 'ADMIN')`:
 - DELETE venues/areas/devices → OWNER only
-- CREATE bans → SUPERVISOR+
+- CREATE bans → MANAGER+
 - Team management → ADMIN+
 - Business settings → ADMIN+
+
+**Roles (in hierarchy):** OWNER > ADMIN > MANAGER > STAFF. ANALYST is read-only and sits alongside STAFF in the hierarchy.
 
 ### Important: No Silent Empty Arrays
 

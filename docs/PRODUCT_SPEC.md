@@ -12,8 +12,9 @@ CLICR is a B2B SaaS platform for real-time occupancy tracking, ID scanning, patr
 |------|------------|
 | **OWNER** | Full access. Can delete venues, remove team members, manage billing, reset data. One per business. |
 | **ADMIN** | Create/edit venues, areas, devices. Manage team invites. Cannot delete business or transfer ownership. |
-| **SUPERVISOR** | Operate counters, manage bans, run scans. Can reset counts for assigned areas. |
-| **USER (Door Staff)** | Tap counters and scan IDs only. Cannot view analytics or manage bans. |
+| **MANAGER** | Operate counters, manage bans, run scans. Can reset counts for assigned areas. |
+| **STAFF (Door Staff)** | Tap counters and scan IDs only. Cannot view analytics or manage bans. |
+| **ANALYST** | Read-only access to reports and dashboards. Cannot operate counters or manage bans. |
 
 ---
 
@@ -42,7 +43,7 @@ CLICR is a B2B SaaS platform for real-time occupancy tracking, ID scanning, patr
 - All scan data stored as immutable `id_scans` records
 
 ### 2.4 Banning
-- Supervisors create bans: select person (from scan history or manual entry)
+- Managers create bans: select person (from scan history or manual entry)
 - Ban types: TEMPORARY (with end date) or PERMANENT
 - Reason categories: Violence, Harassment, Theft, Fake ID, Drugs, Policy Violation, Other
 - Bans can apply to: all locations or specific venues

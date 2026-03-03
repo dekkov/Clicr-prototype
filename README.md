@@ -1,6 +1,8 @@
-# CLICR V4 — Developer Handoff
+# CLICR V4
 
-> Real-time occupancy tracking, ID scanning, patron banning, and venue analytics for the hospitality industry.
+> Real-time occupancy tracking, ID scanning, and patron management for the hospitality industry.
+
+CLICR replaces clunky standalone ID scanners and analog clickers with one connected platform — live communicated counters, Bluetooth ID scanning, and clean reporting, visible from anywhere.
 
 ---
 
@@ -13,13 +15,13 @@ npm install
 # 2. Copy environment config
 cp .env.example .env.local
 
-# 3. Start development server (demo mode - no Supabase needed)
+# 3. Start development server (demo mode — no Supabase needed)
 npm run dev
 
 # 4. Open http://localhost:3000
 ```
 
-**Demo mode** uses the `LocalAdapter` — all data lives in `localStorage`. No Supabase credentials required.
+**Demo mode** uses `LocalAdapter` — all data lives in `localStorage`. No Supabase credentials required.
 
 ---
 
@@ -28,11 +30,12 @@ npm run dev
 ```bash
 # 1. Create a Supabase project at https://supabase.com
 
-# 2. Run migrations in order
-supabase db push --file migrations/001_schema.sql
-supabase db push --file migrations/002_indexes.sql
-supabase db push --file migrations/003_rpcs.sql
-supabase db push --file migrations/004_rls.sql
+# 2. Run migrations in order via the Supabase SQL Editor:
+#    migrations/001_schema.sql  → all tables
+#    migrations/002_indexes.sql → performance indexes
+#    migrations/003_rpcs.sql    → atomic stored procedures
+#    migrations/004_rls.sql     → row-level security
+#    (continue through 013_identity_hash.sql)
 
 # 3. Enable Realtime on tables:
 #    Dashboard → Database → Replication → Enable for:
@@ -56,45 +59,53 @@ npm run build
 
 ```
 clicr-v4/
-├── app/                        # Next.js App Router pages
-│   ├── (authenticated)/        # Protected routes (dashboard, venues, reports, etc.)
-│   ├── api/sync/               # Data proxy route (to be replaced by DataClient)
+├── app/
+│   ├── (authenticated)/        # Protected routes (requires auth)
+│   │   ├── dashboard/          # Live occupancy overview
+│   │   ├── venues/             # Venue management
+│   │   ├── areas/              # Area management
+│   │   ├── clicr/              # Clicr (counter) configuration
+│   │   ├── devices/            # Device management
+│   │   ├── scanner/            # ID scanner screen
+│   │   ├── banning/            # Patron ban management
+│   │   ├── guests/             # Guest history
+│   │   ├── reports/            # Analytics & exports
+│   │   ├── settings/           # Business & account settings
+│   │   └── support/            # Support
+│   ├── login/ signup/ auth/    # Authentication
+│   ├── onboarding/             # First-run setup wizard
 │   ├── demo/                   # Interactive marketing demo
-│   ├── login/                  # Authentication
-│   └── onboarding/             # First-run wizard
+│   ├── board/                  # Board view
+│   └── tap/                    # Quick-tap view
 │
 ├── components/                 # Shared UI components
+│   └── ui/                     # Base primitives (Button, Input, etc.)
 │
 ├── core/                       # ★ Data layer abstraction
 │   └── adapters/
-│       ├── DataClient.ts       # Interface contract (the single source of truth)
-│       ├── LocalAdapter.ts     # Demo mode (localStorage)
-│       └── SupabaseAdapter.ts  # Production mode (stub — implement this)
+│       ├── DataClient.ts       # Interface contract (read this first)
+│       ├── LocalAdapter.ts     # Demo mode — localStorage (complete)
+│       ├── SupabaseAdapter.ts  # Production mode (stub — implement this)
+│       └── index.ts            # Factory function
 │
-├── lib/                        # Current prototype utilities
-│   ├── store.tsx               # Zustand-based state (to be refactored)
+├── lib/                        # Utilities
 │   ├── types.ts                # TypeScript type definitions
-│   ├── core/                   # Mutation/metric helpers (absorb into adapters)
+│   ├── core/                   # Mutation/metric helpers
 │   └── supabase.ts             # Supabase client factory
 │
+├── migrations/                 # ★ Supabase DDL (run in order, 001 → 013)
 │
 ├── docs/                       # ★ Developer documentation
-│   ├── PRODUCT_SPEC.md         # Roles, flows, definitions
+│   ├── PRODUCT_SPEC.md         # Roles, flows, data model
 │   ├── ARCHITECTURE.md         # Routes, state, DataClient strategy
-│   ├── SUPABASE_IMPLEMENTATION.md  # Tables, RLS, RPCs, reset logic
-│   ├── REPORTING_FORMULAS.md   # Exact calculation logic
+│   ├── SUPABASE_IMPLEMENTATION.md
+│   ├── REPORTING_FORMULAS.md
 │   ├── INTEGRATION_MAP.md      # Function-by-function replacement guide
-│   └── QA_CHECKLIST.md         # Manual testing scenarios
+│   └── QA_CHECKLIST.md
 │
-├── migrations/                 # ★ Supabase DDL (run in order)
-│   ├── 001_schema.sql          # 16 tables with constraints
-│   ├── 002_indexes.sql         # Performance indexes
-│   ├── 003_rpcs.sql            # Atomic stored procedures
-│   └── 004_rls.sql             # Row-level security policies
-│
-├── .env.example                # Environment variable template
-├── package.json
-└── README.md                   # This file
+├── PRODUCT_SPEC.md             # Full product specification
+├── DEVELOPER_HANDOFF.md        # Onboarding guide for new developers
+└── .env.example
 ```
 
 ---
@@ -111,7 +122,7 @@ All data access goes through a single `DataClient` interface. Two implementation
 | **Storage** | localStorage | Supabase (Postgres) |
 | **Auth** | Stubbed (mock user) | Supabase Auth |
 | **Realtime** | Polling | Supabase Channels |
-| **Status** | ✅ Complete | 📝 Stub (implement all methods) |
+| **Status** | ✅ Complete | 📝 Stub — implement all methods |
 
 ```typescript
 import { getDataClient } from '@/core/adapters';
@@ -126,17 +137,28 @@ const result = await client.applyOccupancyDelta({
 });
 ```
 
+### Data Model
+
+```
+Business (tenant)
+└── Venue
+    └── Area
+        └── Clicr (communicated counter: IN_ONLY | OUT_ONLY | BIDIRECTIONAL)
+```
+
+Every tap creates an append-only `CountEvent`. Occupancy is derived from event replay, never stored as a mutable integer directly.
+
 ### Critical RPCs
 
 | RPC | Why it matters |
-|-----|---------------|
-| `apply_occupancy_delta` | Row-locked atomic counting. Prevents race conditions. |
-| `reset_counts` | Multi-table transactional reset with audit logging. |
-| `get_report_summary` | Server-side aggregation (don't transfer raw events to client). |
+|-----|----------------|
+| `apply_occupancy_delta` | Row-locked atomic counting — prevents race conditions |
+| `reset_area_counts` / `reset_venue_counts` | Transactional reset with audit log |
+| `get_report_summary` | Server-side aggregation — don't transfer raw events to client |
 
 ### RLS (Row-Level Security)
 
-Every table is locked down. A user can only see data for businesses they're a member of:
+Every table is locked to the authenticated user's business membership:
 ```sql
 CREATE POLICY venues_select ON venues FOR SELECT
     USING (is_member_of(business_id));
@@ -148,33 +170,42 @@ CREATE POLICY venues_select ON venues FOR SELECT
 
 | Document | Read when... |
 |----------|-------------|
-| **[PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md)** | You need to understand what the product does |
-| **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** | You need to understand how the code is structured |
-| **[SUPABASE_IMPLEMENTATION.md](docs/SUPABASE_IMPLEMENTATION.md)** | You're implementing the SupabaseAdapter |
-| **[INTEGRATION_MAP.md](docs/INTEGRATION_MAP.md)** | You need to know which functions to replace |
-| **[REPORTING_FORMULAS.md](docs/REPORTING_FORMULAS.md)** | You're working on analytics or charts |
-| **[QA_CHECKLIST.md](docs/QA_CHECKLIST.md)** | You're testing or reviewing changes |
+| **[DEVELOPER_HANDOFF.md](DEVELOPER_HANDOFF.md)** | You're a new developer getting started |
+| **[docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md)** | You need to understand what the product does |
+| **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** | You need to understand how the code is structured |
+| **[docs/SUPABASE_IMPLEMENTATION.md](docs/SUPABASE_IMPLEMENTATION.md)** | You're implementing the SupabaseAdapter |
+| **[docs/INTEGRATION_MAP.md](docs/INTEGRATION_MAP.md)** | You need to know which functions to replace |
+| **[docs/REPORTING_FORMULAS.md](docs/REPORTING_FORMULAS.md)** | You're working on analytics or charts |
+| **[docs/QA_CHECKLIST.md](docs/QA_CHECKLIST.md)** | You're testing or reviewing changes |
 
 ---
 
 ## Scripts
 
 ```bash
-npm run dev      # Start development server
-npm run build    # Production build
-npm run start    # Start production server
-npm run test     # Run tests
+npm run dev       # Start development server
+npm run build     # Production build
+npm run start     # Start production server
+npm run lint      # ESLint
+npm run db:push   # Push schema to Supabase
+npm run db:pull   # Pull schema from Supabase
 ```
 
 ---
 
 ## Tech Stack
 
-- **Next.js 16** (App Router)
-- **TypeScript** (strict mode)
-- **Tailwind CSS 4**
-- **Supabase** (Postgres + Auth + Realtime)
-- **Zustand** (state management, to be refactored)
-- **Framer Motion** (animations)
-- **Recharts** (charts)
-- **jsPDF + xlsx** (export)
+| Technology | Version | Purpose |
+|---|---|---|
+| Next.js | 16.1.6 | App Router, React Server Components |
+| React | 19.2.3 | UI framework |
+| TypeScript | 5.x | Type safety (strict mode) |
+| Tailwind CSS | 4.x | Styling |
+| Supabase JS | 2.93.3 | Database, auth, realtime |
+| Framer Motion | 12.x | Animations |
+| Recharts | 3.7 | Charts & analytics |
+| jsPDF + xlsx | latest | PDF and Excel exports |
+| html5-qrcode | 2.3.8 | Camera-based ID scanning |
+| Resend | 6.x | Transactional email |
+| Lucide React | 0.563 | Icons |
+| Playwright | 1.58 | End-to-end tests |

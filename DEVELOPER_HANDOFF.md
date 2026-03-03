@@ -40,10 +40,10 @@
 
 ### What Needs to Be Built
 - 🔲 `SupabaseAdapter` — implement all methods (stub exists with TODO comments)
-- 🔲 Run Supabase migrations (SQL files provided, ready to execute)
+- 🔲 Run Supabase migrations (13 SQL files provided, ready to execute)
 - 🔲 Wire up Supabase Auth (sign up, login, password reset)
 - 🔲 Enable Supabase Realtime subscriptions
-- 🔲 Refactor UI components to use `DataClient` instead of Zustand store
+- 🔲 Refactor UI components to use `DataClient` instead of the current React Context store
 
 ---
 
@@ -112,7 +112,11 @@ npm run dev
 | Supabase JS | 2.93.3 | Database, auth, realtime |
 | Framer Motion | 12.x | Animations |
 | Recharts | 3.7 | Charts/analytics |
+| jsPDF + xlsx | latest | PDF and Excel exports |
+| html5-qrcode | 2.3.8 | Camera-based ID scanning |
+| Resend | 6.x | Transactional email |
 | Lucide React | 0.563 | Icons |
+| Playwright | 1.58 | End-to-end tests |
 
 ---
 
@@ -197,12 +201,21 @@ const client = getDataClient();
 
 The Supabase project already exists but needs the full schema deployed. Run these **in order** via the [Supabase SQL Editor](https://supabase.com/dashboard/project/apgussgbygxxnpvbssxs/sql/new):
 
-| # | File | What It Does | Tables/Objects |
-|---|---|---|---|
-| 1 | `migrations/001_schema.sql` | Creates all 16 tables | businesses, business_members, venues, areas, devices, occupancy_snapshots, occupancy_events, id_scans, banned_persons, patron_bans, ban_audit_logs, ban_enforcement_events, turnarounds, audit_logs, app_errors, onboarding_progress |
-| 2 | `migrations/002_indexes.sql` | Adds performance indexes | Composite indexes on high-read columns |
-| 3 | `migrations/003_rpcs.sql` | Creates stored procedures | `apply_occupancy_delta()`, `reset_area_counts()`, `reset_venue_counts()`, `get_report_summary()`, `get_hourly_traffic()`, `get_demographics()`, `fn_updated_at()` |
-| 4 | `migrations/004_rls.sql` | Enables Row Level Security | RLS policies for tenant isolation + RBAC |
+| # | File | What It Does |
+|---|---|---|
+| 001 | `001_schema.sql` | Creates all base tables (businesses, venues, areas, devices, occupancy_snapshots, occupancy_events, id_scans, banned_persons, patron_bans, ban_audit_logs, ban_enforcement_events, turnarounds, audit_logs, app_errors, onboarding_progress) |
+| 002 | `002_indexes.sql` | Adds performance indexes |
+| 003 | `003_rpcs.sql` | Creates stored procedures (`apply_occupancy_delta`, `reset_counts`, `get_report_summary`, `get_hourly_traffic`, `get_demographics`, etc.) |
+| 004 | `004_rls.sql` | Enables Row Level Security |
+| 005 | `005_fix_onboarding_rls.sql` | Fixes onboarding RLS policies |
+| 006 | `006_user_cascade_deletes.sql` | Adds cascade deletes for user removal |
+| 007 | `007_fix_report_summary.sql` | Fixes report summary RPC |
+| 008 | `008_role_migration.sql` | Migrates roles to OWNER/ADMIN/MANAGER/STAFF/ANALYST; adds `board_views` table |
+| 009 | `009_area_shifts.sql` | Adds shift_mode and auto-reset columns to areas |
+| 010 | `010_member_assignments.sql` | Adds `assigned_venue_ids` / `assigned_area_ids` to business_members |
+| 011 | `011_support_tickets.sql` | Adds `support_tickets` table |
+| 012 | `012_shifts.sql` | Adds `shifts` table; links `shift_id` to occupancy_events and id_scans |
+| 013 | `013_identity_hash.sql` | Adds `identity_token_hash` to banned_persons and id_scans |
 
 **How to run each migration:**
 1. Open the [SQL Editor](https://supabase.com/dashboard/project/apgussgbygxxnpvbssxs/sql/new)
@@ -325,7 +338,7 @@ Implement the optional subscription methods in `SupabaseAdapter`:
 
 ### Week 1: Foundation
 - [ ] Clone repo, install deps, run in demo mode
-- [ ] Run all 4 Supabase migrations
+- [ ] Run all 13 Supabase migrations (001 → 013) in order
 - [ ] Verify tables + RPCs in Supabase dashboard
 - [ ] Implement auth methods (`signUp`, `signIn`, `signOut`, `getCurrentUser`)
 - [ ] Test login flow end-to-end
@@ -356,11 +369,12 @@ Implement the optional subscription methods in `SupabaseAdapter`:
 
 ### Must-Read Files (in order)
 1. **`core/adapters/DataClient.ts`** — The interface contract. This defines every data operation. Read this first.
-2. **`core/adapters/LocalAdapter.ts`** — Working implementation using localStorage. Use as reference.
+2. **`core/adapters/LocalAdapter.ts`** — Complete working implementation (localStorage). Use as the reference for business logic when implementing Supabase equivalents.
 3. **`core/adapters/SupabaseAdapter.ts`** — Your main work file. Implement all TODO methods.
-4. **`migrations/003_rpcs.sql`** — The RPCs you'll call from the adapter. Understand these.
-5. **`docs/INTEGRATION_MAP.md`** — Maps every existing function to its DataClient replacement.
-6. **`docs/SUPABASE_IMPLEMENTATION.md`** — Deep dive on table relationships, RLS, and patterns.
+4. **`migrations/003_rpcs.sql`** — The core RPCs you'll call from the adapter. Understand these.
+5. **`migrations/012_shifts.sql`** — Updated `apply_occupancy_delta` signature (adds `shift_id`).
+6. **`docs/INTEGRATION_MAP.md`** — Maps every existing function to its DataClient replacement.
+7. **`docs/SUPABASE_IMPLEMENTATION.md`** — Deep dive on table relationships, RLS, and patterns.
 
 ### Supabase Client
 The Supabase client factory already exists:

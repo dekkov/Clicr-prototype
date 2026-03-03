@@ -190,9 +190,12 @@
 - [ ] Protected routes redirect to login if unauthenticated
 - [ ] Session persists across page refreshes
 
-### RBAC (when implemented)
+### RBAC
 - [ ] OWNER can access all settings
-- [ ] USER (door staff) can only see counter and scanner
+- [ ] ADMIN can manage team, venues, areas
+- [ ] MANAGER can create bans and reset counts
+- [ ] STAFF (door staff) can only see counter and scanner
+- [ ] ANALYST can view reports but not operate counters or manage bans
 - [ ] Non-members cannot access business data
 
 ---

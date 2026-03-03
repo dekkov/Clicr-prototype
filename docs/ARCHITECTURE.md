@@ -139,9 +139,9 @@ UI Component → useApp() → DataClient.applyOccupancyDelta()
 
 ### Integration Steps
 
-1. **Create `LocalAdapter.ts`** that wraps the existing `lib/store.tsx` logic
-2. **Implement `SupabaseAdapter.ts`** method by method using the RPCs from `/migrations/003_rpcs.sql`
-3. **Refactor `AppProvider`** to accept a `DataClient` instance instead of calling fetch/localStorage directly
+1. ✅ **`LocalAdapter.ts`** — complete. All methods implemented using localStorage.
+2. 📝 **Implement `SupabaseAdapter.ts`** method by method using the RPCs from `/migrations/003_rpcs.sql`
+3. 📝 **Refactor `AppProvider`** to accept a `DataClient` instance instead of calling fetch directly
 4. **Switch via env**: `NEXT_PUBLIC_APP_MODE=demo|production`
 
 ---
@@ -215,4 +215,4 @@ return () => supabase.removeChannel(channel);
 
 4. **Soft deletes**: Devices use `deleted_at` instead of hard DELETE, preserving historical data integrity.
 
-5. **JSON fallback**: The prototype supports both Supabase and local JSON (`data/db.json`) to allow development without cloud infrastructure.
+5. **Demo mode via LocalAdapter**: The prototype supports full offline development via `LocalAdapter` (localStorage). `data/db.json` and `lib/db.ts` have been removed — the sync route uses Supabase only in production mode.

@@ -189,7 +189,7 @@ The prototype uses `Clicr` type; production uses `Device`. Here's the mapping:
 
 ```
 □ 1. Set up Supabase project (supabase init, supabase start)
-□ 2. Run migrations: 001_schema.sql → 002_indexes.sql → 003_rpcs.sql → 004_rls.sql
+□ 2. Run migrations in order: 001_schema.sql → … → 013_identity_hash.sql (13 files total)
 □ 3. Enable Realtime on: occupancy_snapshots, occupancy_events, id_scans
 □ 4. Copy .env.example → .env.local, fill in Supabase credentials
 □ 5. Implement SupabaseAdapter.ts (all methods)

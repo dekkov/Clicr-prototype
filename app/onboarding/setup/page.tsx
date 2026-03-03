@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/store';
 import { Area, Clicr, Venue } from '@/lib/types';
-import { Building2, MapPin, Users, Check, Plus, ArrowRight, ArrowLeft, Mail, Shield, Scan, Ban, LayoutGrid, Trash2 } from 'lucide-react';
+import { Building2, MapPin, Users, Check, Plus, ArrowRight, ArrowLeft, Mail, Shield, Scan, Ban, LayoutGrid, Trash2, Pencil } from 'lucide-react';
 import { createBusinessVenueAndAreas, updateBusinessSettings } from '@/app/onboarding/setup-actions';
 import { inviteTeamMember } from '@/app/(authenticated)/settings/team-actions';
 import { createBoardView } from '@/app/(authenticated)/settings/board-actions';
@@ -59,6 +59,12 @@ export default function OnboardingSetupPage() {
     const [createdClicrs, setCreatedClicrs] = useState<Clicr[]>([]);
     const [clicrInputs, setClicrInputs] = useState<Record<string, string>>({});
 
+    // Inline-edit state
+    const [editingAreaId, setEditingAreaId] = useState<string | null>(null);
+    const [editingAreaName, setEditingAreaName] = useState('');
+    const [editingClicrId, setEditingClicrId] = useState<string | null>(null);
+    const [editingClicrName, setEditingClicrName] = useState('');
+
     // Board View step state (optional)
     const [boardViewName, setBoardViewName] = useState('');
     const [boardViewDeviceIds, setBoardViewDeviceIds] = useState<string[]>([]);
@@ -108,58 +114,41 @@ export default function OnboardingSetupPage() {
         setAreaInput({ name: '', capacity: '100' });
     };
 
-    const handleCompleteStep3 = async () => {
+    const handleSaveAreaName = (id: string) => {
+        const trimmed = editingAreaName.trim();
+        if (trimmed) setCreatedAreas(prev => prev.map(a => a.id === id ? { ...a, name: trimmed } : a));
+        setEditingAreaId(null);
+    };
+
+    const handleDeleteClicr = (id: string) => {
+        setCreatedClicrs(prev => prev.filter(c => c.id !== id));
+    };
+
+    const handleSaveClicrName = (id: string) => {
+        const trimmed = editingClicrName.trim();
+        if (trimmed) setCreatedClicrs(prev => prev.map(c => c.id === id ? { ...c, name: trimmed } : c));
+        setEditingClicrId(null);
+    };
+
+    const handleCompleteStep3 = () => {
         if (createdAreas.length === 0) return;
-        setIsLoading(true);
-        setError(null);
-        const parsedCapacity = parseInt(venueData.capacity, 10);
-        const result = await createBusinessVenueAndAreas({
-            businessName,
-            timezone,
-            logoUrl: logoUrl || undefined,
-            venue: {
-                name: venueData.name,
-                city: venueData.city || undefined,
-                state: venueData.state || undefined,
-                capacity: !isNaN(parsedCapacity) && parsedCapacity > 0 ? parsedCapacity : undefined,
-            },
-            areas: createdAreas.map(a => ({
-                name: a.name,
-                capacity: a.default_capacity ?? undefined,
-            })),
-        });
-        setIsLoading(false);
-        if (!result.success) {
-            setError(result.error);
-            return;
-        }
-        setNewBusinessId(result.businessId);
-        setVenueId(result.venueId);
-        setCreatedAreas(prev =>
-            prev.map((a, i) => ({ ...a, id: result.areaIds[i], venue_id: result.venueId } as Area))
-        );
-        await refreshState();
         setStep('CLICRS');
     };
 
     // --- STEP 4: CLICRS ---
-    const handleAddClicr = async (areaId: string) => {
+    const handleAddClicr = (areaId: string) => {
         const name = clicrInputs[areaId];
         if (!name) return;
-        setIsLoading(true);
-        const newClicrId = crypto.randomUUID();
         const clicr: Clicr = {
-            id: newClicrId,
+            id: crypto.randomUUID(),
             area_id: areaId,
             name,
             flow_mode: 'BIDIRECTIONAL',
             active: true,
             current_count: 0,
         };
-        await addClicr(clicr);
         setCreatedClicrs(prev => [...prev, clicr]);
         setClicrInputs(prev => ({ ...prev, [areaId]: '' }));
-        setIsLoading(false);
     };
 
     const CLICR_TEMPLATES: { id: string; label: string; desc: string; names: string[] }[] = [
@@ -168,8 +157,7 @@ export default function OnboardingSetupPage() {
         { id: 'busy', label: 'Busy door setup', desc: '3 counters', names: ['Front Door 1', 'Front Door 2', 'VIP Door'] },
     ];
 
-    const handleApplyTemplate = async (template: typeof CLICR_TEMPLATES[0], areaId: string) => {
-        setIsLoading(true);
+    const handleApplyTemplate = (template: typeof CLICR_TEMPLATES[0], areaId: string) => {
         const newClicrs: Clicr[] = template.names.map(name => ({
             id: crypto.randomUUID(),
             area_id: areaId,
@@ -178,39 +166,101 @@ export default function OnboardingSetupPage() {
             active: true,
             current_count: 0,
         }));
-        for (const c of newClicrs) {
-            await addClicr(c);
-        }
         setCreatedClicrs(prev => [...prev, ...newClicrs]);
-        setIsLoading(false);
+    };
+
+    const handleCompleteStep4 = () => {
+        setStep('INVITE');
     };
 
     const finish = async (opts?: { saveBanConfig?: boolean; saveScanConfig?: boolean }) => {
-        const shouldSaveBan = opts?.saveBanConfig ?? banConfigured;
         const shouldSaveScan = opts?.saveScanConfig ?? scanConfigured;
+        const shouldSaveBan = opts?.saveBanConfig ?? banConfigured;
 
-        if (newBusinessId) {
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            // Step 1: Create business + venue + areas (skip if already done — idempotency guard)
+            let batchBusinessId = newBusinessId;
+            let currentAreas = createdAreas;
+
+            if (!batchBusinessId) {
+                const parsedCapacity = parseInt(venueData.capacity, 10);
+                const result = await createBusinessVenueAndAreas({
+                    businessName,
+                    timezone,
+                    logoUrl: logoUrl || undefined,
+                    venue: {
+                        name: venueData.name,
+                        city: venueData.city || undefined,
+                        state: venueData.state || undefined,
+                        capacity: !isNaN(parsedCapacity) && parsedCapacity > 0 ? parsedCapacity : undefined,
+                    },
+                    areas: createdAreas.map(a => ({
+                        name: a.name,
+                        capacity: a.default_capacity ?? undefined,
+                    })),
+                });
+
+                if (!result.success) {
+                    setError(result.error);
+                    setIsLoading(false);
+                    return;
+                }
+
+                batchBusinessId = result.businessId;
+                setNewBusinessId(result.businessId);
+                setVenueId(result.venueId);
+
+                // Step 2: Remap temp area IDs → real DB IDs
+                currentAreas = createdAreas.map((a, i) => ({
+                    ...a,
+                    id: result.areaIds[i],
+                    venue_id: result.venueId,
+                } as Area));
+                setCreatedAreas(currentAreas);
+            }
+
+            // Build area remap: tempId → realId
+            const areaIdMap: Record<string, string> = {};
+            createdAreas.forEach((a, i) => { areaIdMap[a.id] = currentAreas[i].id; });
+
+            // Step 3: Write clicrs with remapped area_id
+            for (const c of createdClicrs) {
+                await addClicr({ ...c, area_id: areaIdMap[c.area_id] ?? c.area_id });
+            }
+
+            // Step 4: Send queued invites
+            for (const inv of invitedList) {
+                await inviteTeamMember(inv.email, inv.role, batchBusinessId);
+            }
+
+            // Step 5: Create board view if configured
+            if (boardViewCreated && boardViewName.trim() && boardViewDeviceIds.length > 0) {
+                await createBoardView(boardViewName, boardViewDeviceIds, boardViewLabels, batchBusinessId);
+            }
+
+            // Step 6: Write scan + ban settings
             const settingsPayload: Record<string, any> = {};
             if (shouldSaveScan) {
                 settingsPayload.scan_method = scanMethod;
                 settingsPayload.scan_enabled_default = scanEnabled;
             }
             if (shouldSaveBan) {
-                settingsPayload.ban_permissions = {
-                    manager: banManagerCanBan,
-                    staff: banStaffCanBan,
-                };
+                settingsPayload.ban_permissions = { manager: banManagerCanBan, staff: banStaffCanBan };
                 settingsPayload.ban_scope_default = banScopeDefault;
                 settingsPayload.ban_reason_required = banReasonRequired;
             }
-
             if (Object.keys(settingsPayload).length > 0) {
-                await updateBusinessSettings(newBusinessId, settingsPayload);
-                await refreshState();
+                await updateBusinessSettings(batchBusinessId, settingsPayload);
             }
 
+            // Step 7: Refresh state and redirect
+            await refreshState();
+
             selectBusiness({
-                id: newBusinessId,
+                id: batchBusinessId,
                 name: businessName,
                 timezone,
                 settings: {
@@ -221,8 +271,13 @@ export default function OnboardingSetupPage() {
                     ...(shouldSaveBan ? { ban_permissions: { manager: banManagerCanBan, staff: banStaffCanBan }, ban_scope_default: banScopeDefault, ban_reason_required: banReasonRequired } : {}),
                 },
             });
+
+            router.push('/dashboard');
+        } catch (e: any) {
+            console.error('[onboarding] finish error:', e);
+            setError(e.message || 'Setup failed. Please try again.');
+            setIsLoading(false);
         }
-        router.push('/dashboard');
     };
 
     return (
@@ -348,15 +403,7 @@ export default function OnboardingSetupPage() {
 
                 {/* STEP 3: AREAS */}
                 {step === 'AREAS' && (
-                    <div className="relative space-y-6 bg-slate-900/50 border border-slate-800 p-8 rounded-2xl shadow-xl">
-                        {isLoading && (
-                            <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-slate-950/80 backdrop-blur-sm">
-                                <div className="flex flex-col items-center gap-3">
-                                    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                                    <span className="text-sm text-slate-400">Creating your organization…</span>
-                                </div>
-                            </div>
-                        )}
+                    <div className="space-y-6 bg-slate-900/50 border border-slate-800 p-8 rounded-2xl shadow-xl">
                         <div className="flex items-center gap-3">
                             <MapPin className="text-primary w-6 h-6" />
                             <h2 className="text-2xl font-bold text-white">Define areas</h2>
@@ -367,27 +414,52 @@ export default function OnboardingSetupPage() {
                             <div className="space-y-2">
                                 {createdAreas.map(a => (
                                     <div key={a.id} className="flex items-center justify-between bg-slate-800/50 px-4 py-3 rounded-lg border border-slate-700">
-                                        <span className="text-white font-medium">{a.name}</span>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs text-emerald-500 font-bold flex items-center gap-1"><Check className="w-3 h-3" /> Added</span>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setCreatedAreas(prev => prev.filter(x => x.id !== a.id));
-                                                    setCreatedClicrs(prev => prev.filter(c => c.area_id !== a.id));
-                                                    setClicrInputs(prev => {
-                                                        const next = { ...prev };
-                                                        delete next[a.id];
-                                                        return next;
-                                                    });
-                                                }}
-                                                disabled={isLoading}
-                                                className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:pointer-events-none"
-                                                title="Remove area"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
+                                        {editingAreaId !== a.id ? (
+                                            <>
+                                                <span className="text-white font-medium">{a.name}</span>
+                                                <div className="flex items-center gap-1">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { setEditingAreaId(a.id); setEditingAreaName(a.name); }}
+                                                        className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+                                                        title="Rename area"
+                                                    >
+                                                        <Pencil className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setCreatedAreas(prev => prev.filter(x => x.id !== a.id));
+                                                            setCreatedClicrs(prev => prev.filter(c => c.area_id !== a.id));
+                                                            setClicrInputs(prev => { const next = { ...prev }; delete next[a.id]; return next; });
+                                                        }}
+                                                        className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                                        title="Remove area"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div className="flex items-center gap-2 w-full">
+                                                <input
+                                                    autoFocus
+                                                    type="text"
+                                                    value={editingAreaName}
+                                                    onChange={e => setEditingAreaName(e.target.value)}
+                                                    onBlur={() => handleSaveAreaName(a.id)}
+                                                    onKeyDown={e => {
+                                                        if (e.key === 'Enter') handleSaveAreaName(a.id);
+                                                        if (e.key === 'Escape') setEditingAreaId(null);
+                                                    }}
+                                                    className="flex-1 bg-slate-900 border border-primary/50 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                                                />
+                                                <button type="button" onClick={() => handleSaveAreaName(a.id)}
+                                                    className="p-1.5 rounded-lg text-emerald-400 hover:bg-emerald-500/10 transition-colors">
+                                                    <Check className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -407,9 +479,9 @@ export default function OnboardingSetupPage() {
                             <button type="button" onClick={goToPrevStep} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2">
                                 <ArrowLeft className="w-4 h-4" /> Back
                             </button>
-                            <button type="button" onClick={handleCompleteStep3} disabled={createdAreas.length === 0 || isLoading}
+                            <button type="button" onClick={handleCompleteStep3} disabled={createdAreas.length === 0}
                                 className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all disabled:opacity-50">
-                                {isLoading ? 'Creating...' : 'Next: Clicrs'}
+                                Next: Clicrs
                             </button>
                         </div>
                     </div>
@@ -444,8 +516,48 @@ export default function OnboardingSetupPage() {
                                             ))}
                                         </div>
                                         {areaClicrs.map(c => (
-                                            <div key={c.id} className="flex items-center gap-2 mb-2 text-sm text-slate-300">
-                                                <div className="w-2 h-2 rounded-full bg-emerald-500" /> {c.name}
+                                            <div key={c.id} className="flex items-center justify-between mb-2 text-sm">
+                                                {editingClicrId !== c.id ? (
+                                                    <>
+                                                        <div className="flex items-center gap-2 text-slate-300">
+                                                            <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                                                            {c.name}
+                                                        </div>
+                                                        <div className="flex items-center gap-1">
+                                                            <button type="button"
+                                                                onClick={() => { setEditingClicrId(c.id); setEditingClicrName(c.name); }}
+                                                                className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-700 transition-colors"
+                                                                title="Rename">
+                                                                <Pencil className="w-3 h-3" />
+                                                            </button>
+                                                            <button type="button"
+                                                                onClick={() => handleDeleteClicr(c.id)}
+                                                                className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                                                title="Remove">
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <div className="flex items-center gap-2 w-full">
+                                                        <input
+                                                            autoFocus
+                                                            type="text"
+                                                            value={editingClicrName}
+                                                            onChange={e => setEditingClicrName(e.target.value)}
+                                                            onBlur={() => handleSaveClicrName(c.id)}
+                                                            onKeyDown={e => {
+                                                                if (e.key === 'Enter') handleSaveClicrName(c.id);
+                                                                if (e.key === 'Escape') setEditingClicrId(null);
+                                                            }}
+                                                            className="flex-1 bg-slate-900 border border-primary/50 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                                                        />
+                                                        <button type="button" onClick={() => handleSaveClicrName(c.id)}
+                                                            className="p-1.5 rounded-lg text-emerald-400 hover:bg-emerald-500/10 transition-colors">
+                                                            <Check className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
                                         <div className="flex gap-2">
@@ -453,7 +565,7 @@ export default function OnboardingSetupPage() {
                                                 value={clicrInputs[area.id] || ''}
                                                 onChange={e => setClicrInputs(p => ({ ...p, [area.id]: e.target.value }))}
                                                 className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-1 focus:ring-primary focus:outline-none" />
-                                            <button onClick={() => handleAddClicr(area.id)} disabled={!clicrInputs[area.id] || isLoading}
+                                            <button onClick={() => handleAddClicr(area.id)} disabled={!clicrInputs[area.id]}
                                                 className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
                                                 Add
                                             </button>
@@ -466,7 +578,7 @@ export default function OnboardingSetupPage() {
                             <button type="button" onClick={goToPrevStep} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2">
                                 <ArrowLeft className="w-4 h-4" /> Back
                             </button>
-                            <button type="button" onClick={() => setStep('INVITE')} className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all">
+                            <button type="button" onClick={handleCompleteStep4} className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all">
                                 Next: Invite Team
                             </button>
                         </div>
@@ -513,22 +625,15 @@ export default function OnboardingSetupPage() {
                                 ))}
                             </div>
                             <button
-                                onClick={async () => {
-                                    if (!inviteEmail || !newBusinessId) return;
-                                    setIsLoading(true);
-                                    const result = await inviteTeamMember(inviteEmail, inviteRole, newBusinessId);
-                                    if (result.success) {
-                                        setInvitedList(prev => [...prev, { email: inviteEmail, role: inviteRole }]);
-                                        setInviteEmail('');
-                                    } else {
-                                        setError('error' in result ? result.error : 'Invite failed');
-                                    }
-                                    setIsLoading(false);
+                                onClick={() => {
+                                    if (!inviteEmail) return;
+                                    setInvitedList(prev => [...prev, { email: inviteEmail, role: inviteRole }]);
+                                    setInviteEmail('');
                                 }}
-                                disabled={!inviteEmail || isLoading}
+                                disabled={!inviteEmail}
                                 className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-sm font-medium transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                             >
-                                <Plus className="w-4 h-4" /> {isLoading ? 'Inviting...' : 'Add & Invite Another'}
+                                <Plus className="w-4 h-4" /> Add & Invite Another
                             </button>
                         </div>
 
@@ -602,19 +707,16 @@ export default function OnboardingSetupPage() {
                             </button>
                             <button
                                 type="button"
-                                onClick={async () => {
-                                    if (newBusinessId && boardViewName.trim() && boardViewDeviceIds.length > 0) {
-                                        setIsLoading(true);
-                                        const result = await createBoardView(boardViewName, boardViewDeviceIds, boardViewLabels, newBusinessId);
-                                        setIsLoading(false);
-                                        if (result.success) setBoardViewCreated(true);
+                                onClick={() => {
+                                    if (boardViewName.trim() && boardViewDeviceIds.length > 0) {
+                                        setBoardViewCreated(true);
                                         setStep('SCAN_CONFIG');
                                     }
                                 }}
-                                disabled={isLoading || !boardViewName.trim() || boardViewDeviceIds.length === 0}
+                                disabled={!boardViewName.trim() || boardViewDeviceIds.length === 0}
                                 className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all disabled:opacity-50"
                             >
-                                {isLoading ? 'Creating...' : 'Create & Next'}
+                                Create & Next
                             </button>
                         </div>
                     </div>
@@ -662,19 +764,13 @@ export default function OnboardingSetupPage() {
                             </button>
                             <button
                                 type="button"
-                                onClick={async () => {
-                                    if (newBusinessId) {
-                                        setIsLoading(true);
-                                        setScanConfigured(true);
-                                        await updateBusinessSettings(newBusinessId, { scan_method: scanMethod, scan_enabled_default: scanEnabled });
-                                        setIsLoading(false);
-                                    }
+                                onClick={() => {
+                                    setScanConfigured(true);
                                     setStep('BAN_CONFIG');
                                 }}
-                                disabled={isLoading}
-                                className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all disabled:opacity-50"
+                                className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all"
                             >
-                                {isLoading ? 'Saving...' : 'Save & Next'}
+                                Save & Next
                             </button>
                         </div>
                     </div>
@@ -733,12 +829,17 @@ export default function OnboardingSetupPage() {
                             </button>
                         </div>
 
+                        {error && <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">{error}</div>}
                         <div className="flex gap-3 pt-2 border-t border-slate-800">
-                            <button type="button" onClick={goToPrevStep} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2">
+                            <button type="button" onClick={goToPrevStep} disabled={isLoading} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50">
                                 <ArrowLeft className="w-4 h-4" /> Back
                             </button>
-                            <button type="button" onClick={() => finish({ saveBanConfig: true })} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2">
-                                <Check className="w-5 h-5" /> Save & finish setup
+                            <button type="button" onClick={() => finish({ saveBanConfig: true })} disabled={isLoading} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                                {isLoading ? (
+                                    <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Setting up…</>
+                                ) : (
+                                    <><Check className="w-5 h-5" /> Save & finish setup</>
+                                )}
                             </button>
                         </div>
                     </div>
