@@ -60,6 +60,7 @@ export default function AreasPage() {
     // Find existing VENUE_DOOR area for a given venue (only one allowed per venue)
     const getVenueDoorArea = (venueId: string) =>
         areas.find(a => a.venue_id === venueId && a.area_type === 'VENUE_DOOR' && a.is_active !== false);
+    const venueDoorExists = !!(newArea.venue_id && getVenueDoorArea(newArea.venue_id));
 
     const CLICR_TEMPLATES: { id: string; label: string; desc: string; names: string[] }[] = [
         { id: 'single', label: 'Single door', desc: '1 counter', names: ['Front Door'] },
@@ -455,29 +456,22 @@ export default function AreasPage() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium text-gray-400">Type</label>
-                                        {(() => {
-                                            const venueDoorExists = !!(newArea.venue_id && getVenueDoorArea(newArea.venue_id));
-                                            return (
-                                                <>
-                                                    <select
-                                                        value={newArea.area_type}
-                                                        onChange={e => setNewArea(prev => ({ ...prev, area_type: e.target.value as AreaType }))}
-                                                        className="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                                                    >
-                                                        {!venueDoorExists && (
-                                                            <option value="VENUE_DOOR">🚪 Venue Door</option>
-                                                        )}
-                                                        <option value="MAIN">Main</option>
-                                                        <option value="ENTRY">Entry</option>
-                                                        <option value="VIP">VIP</option>
-                                                        <option value="PATIO">Patio</option>
-                                                        <option value="BAR">Bar</option>
-                                                        <option value="EVENT_SPACE">Event Space</option>
-                                                        <option value="OTHER">Other</option>
-                                                    </select>
-                                                </>
-                                            );
-                                        })()}
+                                        <select
+                                            value={newArea.area_type}
+                                            onChange={e => setNewArea(prev => ({ ...prev, area_type: e.target.value as AreaType }))}
+                                            className="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                        >
+                                            {!venueDoorExists && (
+                                                <option value="VENUE_DOOR">🚪 Venue Door</option>
+                                            )}
+                                            <option value="MAIN">Main</option>
+                                            <option value="ENTRY">Entry</option>
+                                            <option value="VIP">VIP</option>
+                                            <option value="PATIO">Patio</option>
+                                            <option value="BAR">Bar</option>
+                                            <option value="EVENT_SPACE">Event Space</option>
+                                            <option value="OTHER">Other</option>
+                                        </select>
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium text-gray-400">Capacity</label>
