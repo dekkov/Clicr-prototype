@@ -23,6 +23,28 @@ const TIMEZONES = [
     { value: 'UTC', label: 'UTC' },
 ];
 
+const AREA_TYPE_ORDER: Record<string, number> = {
+    VENUE_DOOR: 0,
+    BAR: 1,
+    ENTRY: 2,
+    EVENT_SPACE: 3,
+    MAIN: 4,
+    OTHER: 5,
+    PATIO: 6,
+    VIP: 7,
+};
+
+const AREA_TYPE_LABELS: Record<string, string> = {
+    VENUE_DOOR: 'Venue Door',
+    BAR: 'Bar',
+    ENTRY: 'Entry',
+    EVENT_SPACE: 'Event Space',
+    MAIN: 'Main Floor',
+    OTHER: 'Other',
+    PATIO: 'Patio',
+    VIP: 'VIP',
+};
+
 export default function AreasPage() {
     const { areas, clicrs, venues, areaTraffic, activeBusiness, addArea, addClicr, resetCounts, startShift, endShift, updateArea, isLoading, currentUser, activeShiftId, activeShiftAreaId } = useApp();
     const userRole = currentUser?.role as Role | undefined;
@@ -61,28 +83,6 @@ export default function AreasPage() {
     const getVenueDoorArea = (venueId: string) =>
         areas.find(a => a.venue_id === venueId && a.area_type === 'VENUE_DOOR' && a.is_active !== false);
     const venueDoorExists = !!(newArea.venue_id && getVenueDoorArea(newArea.venue_id));
-
-    const AREA_TYPE_ORDER: Record<string, number> = {
-        VENUE_DOOR: 0,
-        BAR: 1,
-        ENTRY: 2,
-        EVENT_SPACE: 3,
-        MAIN: 4,
-        OTHER: 5,
-        PATIO: 6,
-        VIP: 7,
-    };
-
-    const AREA_TYPE_LABELS: Record<string, string> = {
-        VENUE_DOOR: 'Venue Door',
-        BAR: 'Bar',
-        ENTRY: 'Entry',
-        EVENT_SPACE: 'Event Space',
-        MAIN: 'Main Floor',
-        OTHER: 'Other',
-        PATIO: 'Patio',
-        VIP: 'VIP',
-    };
 
     const CLICR_TEMPLATES: { id: string; label: string; desc: string; names: string[] }[] = [
         { id: 'single', label: 'Single door', desc: '1 counter', names: ['Front Door'] },
@@ -298,138 +298,138 @@ export default function AreasPage() {
                                             {AREA_TYPE_LABELS[type] ?? type}
                                         </h3>
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {typeAreas.map(area => {
-                                const scopeKey = `area:${activeBusiness.id}:${area.venue_id}:${area.id}`;
-                                const traffic = areaTraffic[scopeKey] ?? { total_in: 0, total_out: 0 };
+                                            {typeAreas.map(area => {
+                                                const scopeKey = `area:${activeBusiness.id}:${area.venue_id}:${area.id}`;
+                                                const traffic = areaTraffic[scopeKey] ?? { total_in: 0, total_out: 0 };
 
-                                const areaClicrs = clicrs.filter(c => c.area_id === area.id);
-                                const deviceCount = areaClicrs.length;
+                                                const areaClicrs = clicrs.filter(c => c.area_id === area.id);
+                                                const deviceCount = areaClicrs.length;
 
-                                const liveOcc = area.current_occupancy ?? 0;
-                                const capacity = area.default_capacity ?? area.capacity_limit ?? 0;
-                                const pct = capacity > 0 ? Math.round((liveOcc / capacity) * 100) : 0;
+                                                const liveOcc = area.current_occupancy ?? 0;
+                                                const capacity = area.default_capacity ?? area.capacity_limit ?? 0;
+                                                const pct = capacity > 0 ? Math.round((liveOcc / capacity) * 100) : 0;
 
-                                return (
-                                    <div
-                                        key={area.id}
-                                        className={cn(
-                                            "border rounded-xl p-6 hover:border-gray-700 transition-colors",
-                                            area.area_type === 'VENUE_DOOR'
-                                                ? "bg-amber-950/10 border-amber-500/20"
-                                                : "bg-gray-900/50 border-gray-800"
-                                        )}
-                                    >
-                                        <div className="flex items-center justify-between mb-6">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-lg bg-purple-900/30 border border-purple-500/20 flex items-center justify-center">
-                                                    <Layers className="w-5 h-5 text-purple-400" />
-                                                </div>
-                                                <div className="text-lg">{area.name}</div>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <button
-                                                    type="button"
-                                                    className="w-8 h-8 rounded-lg hover:bg-gray-800 flex items-center justify-center transition-colors"
-                                                    aria-label="Expand"
-                                                >
-                                                    <Maximize2 className="w-4 h-4 text-purple-400" />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className="w-8 h-8 rounded-lg hover:bg-gray-800 flex items-center justify-center transition-colors"
-                                                    aria-label="Refresh"
-                                                >
-                                                    <RefreshCw className="w-4 h-4 text-gray-400" />
-                                                </button>
-                                            </div>
-                                        </div>
+                                                return (
+                                                    <div
+                                                        key={area.id}
+                                                        className={cn(
+                                                            "border rounded-xl p-6 hover:border-gray-700 transition-colors",
+                                                            area.area_type === 'VENUE_DOOR'
+                                                                ? "bg-amber-950/10 border-amber-500/20"
+                                                                : "bg-gray-900/50 border-gray-800"
+                                                        )}
+                                                    >
+                                                        <div className="flex items-center justify-between mb-6">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-10 h-10 rounded-lg bg-purple-900/30 border border-purple-500/20 flex items-center justify-center">
+                                                                    <Layers className="w-5 h-5 text-purple-400" />
+                                                                </div>
+                                                                <div className="text-lg">{area.name}</div>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <button
+                                                                    type="button"
+                                                                    className="w-8 h-8 rounded-lg hover:bg-gray-800 flex items-center justify-center transition-colors"
+                                                                    aria-label="Expand"
+                                                                >
+                                                                    <Maximize2 className="w-4 h-4 text-purple-400" />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className="w-8 h-8 rounded-lg hover:bg-gray-800 flex items-center justify-center transition-colors"
+                                                                    aria-label="Refresh"
+                                                                >
+                                                                    <RefreshCw className="w-4 h-4 text-gray-400" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
 
-                                        <div className="mb-4">
-                                            <div className="text-4xl mb-2">{liveOcc}</div>
-                                            <div className="text-sm text-gray-400 mb-4">
-                                                of {capacity || '—'} · {pct}% full
-                                            </div>
-                                            <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
-                                                <div
-                                                    className="h-full bg-emerald-500 rounded-full transition-all"
-                                                    style={{ width: `${Math.min(pct, 100)}%` }}
-                                                />
-                                            </div>
-                                        </div>
+                                                        <div className="mb-4">
+                                                            <div className="text-4xl mb-2">{liveOcc}</div>
+                                                            <div className="text-sm text-gray-400 mb-4">
+                                                                of {capacity || '—'} · {pct}% full
+                                                            </div>
+                                                            <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+                                                                <div
+                                                                    className="h-full bg-emerald-500 rounded-full transition-all"
+                                                                    style={{ width: `${Math.min(pct, 100)}%` }}
+                                                                />
+                                                            </div>
+                                                        </div>
 
-                                        <div className="flex items-center justify-between text-sm mb-3">
-                                            <div className="flex items-center gap-4">
-                                                <div className="flex items-center gap-1 text-emerald-400">
-                                                    <ArrowUp className="w-4 h-4" />
-                                                    <span>{traffic.total_in}</span>
-                                                </div>
-                                                <div className="flex items-center gap-1 text-red-400">
-                                                    <ArrowDown className="w-4 h-4" />
-                                                    <span>{traffic.total_out}</span>
-                                                </div>
-                                            </div>
-                                            <div className="text-gray-400">{deviceCount} device{deviceCount !== 1 ? 's' : ''}</div>
-                                        </div>
+                                                        <div className="flex items-center justify-between text-sm mb-3">
+                                                            <div className="flex items-center gap-4">
+                                                                <div className="flex items-center gap-1 text-emerald-400">
+                                                                    <ArrowUp className="w-4 h-4" />
+                                                                    <span>{traffic.total_in}</span>
+                                                                </div>
+                                                                <div className="flex items-center gap-1 text-red-400">
+                                                                    <ArrowDown className="w-4 h-4" />
+                                                                    <span>{traffic.total_out}</span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-gray-400">{deviceCount} device{deviceCount !== 1 ? 's' : ''}</div>
+                                                        </div>
 
-                                        <div className="flex items-center gap-2">
-                                            {area.shift_mode === 'AUTO' ? (
-                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-500/10 text-amber-400 text-[11px] font-medium border border-amber-500/20">
-                                                    <Clock className="w-3 h-3" />
-                                                    Auto {area.auto_reset_time ?? ''}
-                                                </span>
-                                            ) : canShift ? (
-                                                <div className="flex items-center gap-1">
-                                                    {activeShiftId && activeShiftAreaId === area.id ? (
-                                                        <button
-                                                            onClick={() => endShift(activeShiftId)}
-                                                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-red-500/10 hover:bg-red-500/20 text-red-400 text-[11px] font-medium border border-red-500/20 transition-colors"
-                                                        >
-                                                            <Square className="w-3 h-3" />
-                                                            End Shift
-                                                        </button>
-                                                    ) : (
-                                                        <button
-                                                            onClick={() => handleStartShift(area)}
-                                                            disabled={startingShiftAreaId === area.id}
-                                                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[11px] font-medium border border-emerald-500/20 transition-colors disabled:opacity-50"
-                                                        >
-                                                            {startingShiftAreaId === area.id ? (
-                                                                <span className="w-3 h-3 border-2 border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin" />
+                                                        <div className="flex items-center gap-2">
+                                                            {area.shift_mode === 'AUTO' ? (
+                                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-500/10 text-amber-400 text-[11px] font-medium border border-amber-500/20">
+                                                                    <Clock className="w-3 h-3" />
+                                                                    Auto {area.auto_reset_time ?? ''}
+                                                                </span>
+                                                            ) : canShift ? (
+                                                                <div className="flex items-center gap-1">
+                                                                    {activeShiftId && activeShiftAreaId === area.id ? (
+                                                                        <button
+                                                                            onClick={() => endShift(activeShiftId)}
+                                                                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-red-500/10 hover:bg-red-500/20 text-red-400 text-[11px] font-medium border border-red-500/20 transition-colors"
+                                                                        >
+                                                                            <Square className="w-3 h-3" />
+                                                                            End Shift
+                                                                        </button>
+                                                                    ) : (
+                                                                        <button
+                                                                            onClick={() => handleStartShift(area)}
+                                                                            disabled={startingShiftAreaId === area.id}
+                                                                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[11px] font-medium border border-emerald-500/20 transition-colors disabled:opacity-50"
+                                                                        >
+                                                                            {startingShiftAreaId === area.id ? (
+                                                                                <span className="w-3 h-3 border-2 border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin" />
+                                                                            ) : (
+                                                                                <Play className="w-3 h-3" />
+                                                                            )}
+                                                                            Start Shift
+                                                                        </button>
+                                                                    )}
+                                                                </div>
                                                             ) : (
-                                                                <Play className="w-3 h-3" />
+                                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-800 text-gray-500 text-[11px] font-medium border border-gray-700">
+                                                                    Manual
+                                                                </span>
                                                             )}
-                                                            Start Shift
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-800 text-gray-500 text-[11px] font-medium border border-gray-700">
-                                                    Manual
-                                                </span>
-                                            )}
-                                            {canEdit && (
-                                                <button
-                                                    onClick={() => openShiftConfig(area)}
-                                                    className="text-gray-500 hover:text-gray-300 transition-colors p-1"
-                                                    title="Configure shift mode"
-                                                >
-                                                    <Clock className="w-3.5 h-3.5" />
-                                                </button>
-                                            )}
-                                            {canAdd && (
-                                                <button
-                                                    onClick={() => setAddClicrAreaId(area.id)}
-                                                    className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
-                                                    title="Add Clicr to this area"
-                                                >
-                                                    <Plus className="w-3 h-3" />
-                                                    <Sparkles className="w-3 h-3" />
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                                                            {canEdit && (
+                                                                <button
+                                                                    onClick={() => openShiftConfig(area)}
+                                                                    className="text-gray-500 hover:text-gray-300 transition-colors p-1"
+                                                                    title="Configure shift mode"
+                                                                >
+                                                                    <Clock className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            )}
+                                                            {canAdd && (
+                                                                <button
+                                                                    onClick={() => setAddClicrAreaId(area.id)}
+                                                                    className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+                                                                    title="Add Clicr to this area"
+                                                                >
+                                                                    <Plus className="w-3 h-3" />
+                                                                    <Sparkles className="w-3 h-3" />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 ))}
