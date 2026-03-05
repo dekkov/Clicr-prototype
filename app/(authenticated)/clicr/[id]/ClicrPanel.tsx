@@ -158,9 +158,13 @@ export default function ClicrPanel({
     // Calculate aggregated stats for the ENTIRE VENUE from SNAPSHOTS
     const venueId = currentArea?.venue_id;
 
-    // Venue Occupancy = Sum of all areas in venue (Realtime)
+    // Venue Occupancy = VENUE_DOOR area only (dedicated door counter)
     const venueAreas = (areas || []).filter(a => a.venue_id === venueId);
-    const currentVenueOccupancy = venueAreas.reduce((acc, a) => acc + (a.current_occupancy || 0), 0);
+    const venueDoorArea = venueAreas.find(a => a.area_type === 'VENUE_DOOR');
+    const currentVenueOccupancy = venueDoorArea?.current_occupancy ?? 0;
+
+    // Is this clicr assigned to the venue door area?
+    const isVenueDoor = currentArea?.area_type === 'VENUE_DOOR';
     const venue = (venues || []).find(v => v.id === venueId);
 
     // Keep event-based stats for "Session" view if needed, but rely on snapshots for enforcement
@@ -663,7 +667,7 @@ export default function ClicrPanel({
     }
 
     return (
-        <div className="flex flex-col h-[100vh] bg-black relative overflow-hidden" onClick={() => { if (!isModalOpenRef.current) inputRef.current?.focus({ preventScroll: true }); }}>
+        <div className={cn("flex flex-col h-[100vh] relative overflow-hidden", isVenueDoor ? "bg-[#0d0a00]" : "bg-black")} onClick={() => { if (!isModalOpenRef.current) inputRef.current?.focus({ preventScroll: true }); }}>
             {/* Hidden Input */}
             <textarea
                 ref={inputRef as any}
@@ -679,11 +683,11 @@ export default function ClicrPanel({
                 {/* 1. Header */}
                 <header className="flex justify-between items-start pt-8 pb-4 px-6 shrink-0">
                     <div>
-                        <h2 className="text-slate-500 font-bold text-[10px] uppercase tracking-[0.2em] mb-1">
+                        <h2 className={cn("font-bold text-[10px] uppercase tracking-[0.2em] mb-1", isVenueDoor ? "text-amber-500" : "text-slate-500")}>
                             {venue?.name || 'VENUE'}
                         </h2>
                         <div className="flex items-center gap-2">
-                            <h1 className="text-white font-bold text-2xl tracking-tight">
+                            <h1 className={cn("font-bold text-2xl tracking-tight", isVenueDoor ? "text-amber-300" : "text-white")}>
                                 {clicr.name}
                             </h1>
                             <button onClick={() => {
@@ -707,6 +711,9 @@ export default function ClicrPanel({
                             </button>
                         </div>
                     </div>
+                    {isVenueDoor && (
+                        <p className="text-[10px] text-amber-600 uppercase tracking-widest mt-0.5">Venue Occupancy Counter</p>
+                    )}
                     {/* Status Dot + End Shift */}
                     <div className="flex gap-4 items-center">
                         {activeShiftId && activeShiftAreaId === clicr?.area_id && (
@@ -786,7 +793,7 @@ export default function ClicrPanel({
                     <ActionButton
                         label="GUEST IN"
                         onClick={handleGuestIn}
-                        className="h-24 md:h-28 text-lg"
+                        className={cn("h-24 md:h-28 text-lg", isVenueDoor && "bg-amber-600 hover:bg-amber-500 active:bg-amber-700")}
                         icon={<div className="mb-[-4px]"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4V20M4 12H20" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg></div>}
                     />
 

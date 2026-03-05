@@ -124,8 +124,11 @@ export default function DashboardPage() {
         [scanEvents, todayStart]
     );
 
+    // Venue occupancy = VENUE_DOOR areas only (one per venue)
     const liveOccupancy = useMemo(
-        () => areas.reduce((sum, a) => sum + (a.current_occupancy ?? 0), 0),
+        () => areas
+            .filter(a => a.area_type === 'VENUE_DOOR')
+            .reduce((sum, a) => sum + (a.current_occupancy ?? 0), 0),
         [areas]
     );
 
