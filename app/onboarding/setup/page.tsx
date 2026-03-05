@@ -4,13 +4,12 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/store';
 import { Area, Clicr, Venue } from '@/lib/types';
-import { Building2, MapPin, Users, Check, Plus, ArrowRight, ArrowLeft, Mail, Shield, Scan, Ban, LayoutGrid, Trash2, Pencil } from 'lucide-react';
+import { Building2, MapPin, Users, Check, Plus, ArrowRight, ArrowLeft, Mail, Shield, Scan, Ban, Trash2, Pencil } from 'lucide-react';
 import { createBusinessVenueAndAreas, updateBusinessSettings } from '@/app/onboarding/setup-actions';
 import { inviteTeamMember } from '@/app/(authenticated)/settings/team-actions';
-import { createBoardView } from '@/app/(authenticated)/settings/board-actions';
 import type { Role } from '@/lib/types';
 
-type Step = 'BUSINESS' | 'VENUE' | 'AREAS' | 'CLICRS' | 'INVITE' | 'BOARD_VIEW' | 'SCAN_CONFIG' | 'BAN_CONFIG';
+type Step = 'BUSINESS' | 'VENUE' | 'AREAS' | 'CLICRS' | 'INVITE' | 'SCAN_CONFIG' | 'BAN_CONFIG';
 
 export default function OnboardingSetupPage() {
     const router = useRouter();
@@ -65,13 +64,7 @@ export default function OnboardingSetupPage() {
     const [editingClicrId, setEditingClicrId] = useState<string | null>(null);
     const [editingClicrName, setEditingClicrName] = useState('');
 
-    // Board View step state (optional)
-    const [boardViewName, setBoardViewName] = useState('');
-    const [boardViewDeviceIds, setBoardViewDeviceIds] = useState<string[]>([]);
-    const [boardViewLabels, setBoardViewLabels] = useState<Record<string, string>>({});
-    const [boardViewCreated, setBoardViewCreated] = useState(false);
-
-    const STEP_LABELS: Step[] = ['BUSINESS', 'VENUE', 'AREAS', 'CLICRS', 'INVITE', 'BOARD_VIEW', 'SCAN_CONFIG', 'BAN_CONFIG'];
+    const STEP_LABELS: Step[] = ['BUSINESS', 'VENUE', 'AREAS', 'CLICRS', 'INVITE', 'SCAN_CONFIG', 'BAN_CONFIG'];
     const currentIndex = STEP_LABELS.indexOf(step);
 
     const goToPrevStep = () => {
@@ -236,12 +229,7 @@ export default function OnboardingSetupPage() {
                 await inviteTeamMember(inv.email, inv.role, batchBusinessId);
             }
 
-            // Step 5: Create board view if configured
-            if (boardViewCreated && boardViewName.trim() && boardViewDeviceIds.length > 0) {
-                await createBoardView(boardViewName, boardViewDeviceIds, boardViewLabels, batchBusinessId);
-            }
-
-            // Step 6: Write scan + ban settings
+            // Step 5: Write scan + ban settings
             const settingsPayload: Record<string, any> = {};
             if (shouldSaveScan) {
                 settingsPayload.scan_method = scanMethod;
@@ -643,86 +631,14 @@ export default function OnboardingSetupPage() {
                             <button type="button" onClick={() => { setError(null); goToPrevStep(); }} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2">
                                 <ArrowLeft className="w-4 h-4" /> Back
                             </button>
-                            <button type="button" onClick={() => { setError(null); setStep('BOARD_VIEW'); }} className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all">
-                                Next: Board View
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                {/* STEP 6: BOARD_VIEW */}
-                {step === 'BOARD_VIEW' && (
-                    <div className="space-y-6 bg-slate-900/50 border border-slate-800 p-8 rounded-2xl shadow-xl">
-                        <div className="flex items-center gap-3">
-                            <LayoutGrid className="text-primary w-6 h-6" />
-                            <h2 className="text-2xl font-bold text-white">Create a Board View</h2>
-                        </div>
-                        <p className="text-slate-400 text-sm">Display multiple counters on one screen for TVs or door monitors.</p>
-
-                        {boardViewCreated ? (
-                            <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-4 py-3 rounded-xl">
-                                <Check className="w-5 h-5 text-emerald-500" />
-                                <span className="text-emerald-400 font-medium">Board view created</span>
-                            </div>
-                        ) : createdClicrs.length > 0 ? (
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 block">Board view name <span className="text-red-400">*</span></label>
-                                    <input type="text" value={boardViewName} onChange={e => setBoardViewName(e.target.value)}
-                                        placeholder="View name (e.g. Front Door Monitor)"
-                                        required
-                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none" />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Select counters (up to 5)</label>
-                                    <div className="space-y-2">
-                                        {createdClicrs.map(c => {
-                                            const area = createdAreas.find(a => a.id === c.area_id);
-                                            const isSelected = boardViewDeviceIds.includes(c.id);
-                                            return (
-                                                <button key={c.id} type="button" onClick={() => {
-                                                    if (isSelected) setBoardViewDeviceIds(prev => prev.filter(id => id !== c.id));
-                                                    else if (boardViewDeviceIds.length < 5) setBoardViewDeviceIds(prev => [...prev, c.id]);
-                                                }}
-                                                    className={`w-full flex items-center justify-between p-3 rounded-xl border text-left text-sm transition-all ${isSelected ? 'bg-primary/10 border-primary' : 'bg-slate-800 border-slate-700 hover:bg-slate-700'}`}>
-                                                    <span className={isSelected ? 'text-primary font-bold' : 'text-white'}>{c.name}</span>
-                                                    <span className="text-xs text-slate-500">{area?.name}</span>
-                                                    {isSelected && <Check className="w-4 h-4 text-primary" />}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <p className="text-slate-500 text-sm">Add Clicrs first to create a board view.</p>
-                        )}
-
-                        <div className="flex gap-3 pt-2 border-t border-slate-800">
-                            <button type="button" onClick={goToPrevStep} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2">
-                                <ArrowLeft className="w-4 h-4" /> Back
-                            </button>
-                            <button type="button" onClick={() => setStep('SCAN_CONFIG')} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all">
+                            <button type="button" onClick={() => { setError(null); setStep('SCAN_CONFIG'); }} className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all">
                                 Next: Scan Config
                             </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    if (boardViewName.trim() && boardViewDeviceIds.length > 0) {
-                                        setBoardViewCreated(true);
-                                        setStep('SCAN_CONFIG');
-                                    }
-                                }}
-                                disabled={!boardViewName.trim() || boardViewDeviceIds.length === 0}
-                                className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all disabled:opacity-50"
-                            >
-                                Create & Next
-                            </button>
                         </div>
                     </div>
                 )}
 
-                {/* STEP 7: SCAN_CONFIG */}
+                {/* STEP 6: SCAN_CONFIG */}
                 {step === 'SCAN_CONFIG' && (
                     <div className="space-y-6 bg-slate-900/50 border border-slate-800 p-8 rounded-2xl shadow-xl">
                         <div className="flex items-center gap-3">
