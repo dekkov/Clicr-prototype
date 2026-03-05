@@ -2,10 +2,10 @@
 import React, { useState } from 'react';
 import { useApp } from '@/lib/store';
 import { Area, AreaType, CountingMode, FlowMode, ShiftMode, Role } from '@/lib/types';
-import { Search, RefreshCw, ArrowUp, ArrowDown, Plus, ChevronDown, Sparkles, Play, Square, Clock, Layers, Maximize2 } from 'lucide-react';
+import { Search, RefreshCw, ArrowUp, ArrowDown, Plus, ChevronDown, Sparkles, Play, Square, Settings2, Layers, Maximize2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
-import { canEditVenuesAndAreas, canStartShift, canAddClicr } from '@/lib/permissions';
+import { canEditVenuesAndAreas, canStartShift, canAddClicr, hasMinRole } from '@/lib/permissions';
 
 const TIMEZONES = [
     { value: 'America/New_York', label: 'Eastern (ET)' },
@@ -46,8 +46,9 @@ const AREA_TYPE_LABELS: Record<string, string> = {
 };
 
 export default function AreasPage() {
-    const { areas, clicrs, venues, areaTraffic, activeBusiness, addArea, addClicr, resetCounts, startShift, endShift, updateArea, isLoading, currentUser, activeShiftId, activeShiftAreaId } = useApp();
+    const { areas, clicrs, venues, areaTraffic, activeBusiness, addArea, addClicr, resetCounts, startShift, endShift, updateArea, deleteArea, isLoading, currentUser, activeShiftId, activeShiftAreaId } = useApp();
     const userRole = currentUser?.role as Role | undefined;
+    const canDelete = hasMinRole(userRole, 'ADMIN');
     const canEdit = canEditVenuesAndAreas(userRole);
     const canShift = canStartShift(userRole);
     const canAdd = canAddClicr(userRole);
@@ -55,12 +56,21 @@ export default function AreasPage() {
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isAddingArea, setIsAddingArea] = useState(false);
     const [startingShiftAreaId, setStartingShiftAreaId] = useState<string | null>(null);
-    const [editShiftAreaId, setEditShiftAreaId] = useState<string | null>(null);
-    const [editShiftMode, setEditShiftMode] = useState<ShiftMode>('MANUAL');
-    const [editAutoTime, setEditAutoTime] = useState('09:00');
-    const [editAutoTz, setEditAutoTz] = useState(() => {
+    const [configAreaId, setConfigAreaId] = useState<string | null>(null);
+    const [configName, setConfigName] = useState('');
+    const [configCapacity, setConfigCapacity] = useState(0);
+    const [configAreaType, setConfigAreaType] = useState<AreaType>('MAIN');
+    const [configCountingMode, setConfigCountingMode] = useState<CountingMode>('BOTH');
+    const [configShiftMode, setConfigShiftMode] = useState<ShiftMode>('MANUAL');
+    const [configAutoTime, setConfigAutoTime] = useState('09:00');
+    const [configAutoTz, setConfigAutoTz] = useState(() => {
         try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return 'UTC'; }
     });
+    const [isSavingConfig, setIsSavingConfig] = useState(false);
+    const [isDeletingArea, setIsDeletingArea] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState(false);
+    const configArea = configAreaId ? areas.find(a => a.id === configAreaId) : undefined;
+    const isVenueDoor = configArea?.area_type === 'VENUE_DOOR';
     const [newArea, setNewArea] = useState<Partial<Area> & { venue_id: string }>({
         venue_id: '',
         name: '',
@@ -167,24 +177,45 @@ export default function AreasPage() {
         setStartingShiftAreaId(null);
     };
 
-    const openShiftConfig = (area: Area) => {
-        setEditShiftAreaId(area.id);
-        setEditShiftMode(area.shift_mode ?? 'MANUAL');
-        setEditAutoTime(area.auto_reset_time ?? '09:00');
-        setEditAutoTz(area.auto_reset_timezone ?? ((() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return 'UTC'; } })()));
+    const openConfigModal = (area: Area) => {
+        setConfigAreaId(area.id);
+        setConfigName(area.name);
+        setConfigCapacity(area.default_capacity ?? (area as any).capacity_limit ?? 0);
+        setConfigAreaType(area.area_type);
+        setConfigCountingMode(area.counting_mode);
+        setConfigShiftMode(area.shift_mode ?? 'MANUAL');
+        setConfigAutoTime(area.auto_reset_time ?? '09:00');
+        setConfigAutoTz(area.auto_reset_timezone ?? ((() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return 'UTC'; } })()));
     };
 
-    const handleSaveShiftConfig = async () => {
-        if (!editShiftAreaId) return;
-        const area = areas.find(a => a.id === editShiftAreaId);
+    const handleSaveConfig = async () => {
+        if (!configAreaId) return;
+        const area = areas.find(a => a.id === configAreaId);
         if (!area) return;
+        setIsSavingConfig(true);
         await updateArea({
             ...area,
-            shift_mode: editShiftMode,
-            auto_reset_time: editShiftMode === 'AUTO' ? editAutoTime : undefined,
-            auto_reset_timezone: editShiftMode === 'AUTO' ? editAutoTz : undefined,
+            name: configName.trim() || area.name,
+            default_capacity: configCapacity,
+            capacity_max: configCapacity,
+            area_type: configAreaType,
+            counting_mode: configCountingMode,
+            shift_mode: configShiftMode,
+            auto_reset_time: configShiftMode === 'AUTO' ? configAutoTime : undefined,
+            auto_reset_timezone: configShiftMode === 'AUTO' ? configAutoTz : undefined,
         });
-        setEditShiftAreaId(null);
+        setIsSavingConfig(false);
+        setConfigAreaId(null);
+        setConfirmDelete(false);
+    };
+
+    const handleDeleteArea = async () => {
+        if (!configAreaId) return;
+        setIsDeletingArea(true);
+        await deleteArea(configAreaId);
+        setIsDeletingArea(false);
+        setConfigAreaId(null);
+        setConfirmDelete(false);
     };
 
     if (!activeBusiness && !isLoading) {
@@ -375,7 +406,7 @@ export default function AreasPage() {
                                                         <div className="flex items-center gap-2">
                                                             {area.shift_mode === 'AUTO' ? (
                                                                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-500/10 text-amber-400 text-[11px] font-medium border border-amber-500/20">
-                                                                    <Clock className="w-3 h-3" />
+                                                                    <Settings2 className="w-3 h-3" />
                                                                     Auto {area.auto_reset_time ?? ''}
                                                                 </span>
                                                             ) : canShift ? (
@@ -410,11 +441,11 @@ export default function AreasPage() {
                                                             )}
                                                             {canEdit && (
                                                                 <button
-                                                                    onClick={() => openShiftConfig(area)}
+                                                                    onClick={() => openConfigModal(area)}
                                                                     className="text-gray-500 hover:text-gray-300 transition-colors p-1"
-                                                                    title="Configure shift mode"
+                                                                    title="Configure area"
                                                                 >
-                                                                    <Clock className="w-3.5 h-3.5" />
+                                                                    <Settings2 className="w-3.5 h-3.5" />
                                                                 </button>
                                                             )}
                                                             {canAdd && (
@@ -706,92 +737,151 @@ export default function AreasPage() {
                 )}
             </AnimatePresence>
 
-            {/* Edit Shift Config Modal */}
+            {/* Configure Area Modal */}
             <AnimatePresence>
-                {editShiftAreaId && (
+                {configAreaId && (
                     <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-                        onClick={() => setEditShiftAreaId(null)}
-                    >
-                        <motion.div
-                            initial={{ scale: 0.95, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.95, opacity: 0 }}
-                            className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-md shadow-xl"
-                            onClick={e => e.stopPropagation()}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+                            onClick={() => { setConfigAreaId(null); setConfirmDelete(false); }}
                         >
-                            <h2 className="text-xl font-bold mb-1">Shift Configuration</h2>
-                            <p className="text-sm text-gray-400 mb-4">
-                                {areas.find(a => a.id === editShiftAreaId)?.name}
-                            </p>
-                            <div className="space-y-4">
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-gray-400">Shift Mode</label>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {(['MANUAL', 'AUTO'] as ShiftMode[]).map(mode => (
-                                            <button
-                                                key={mode}
-                                                type="button"
-                                                onClick={() => setEditShiftMode(mode)}
-                                                className={cn(
-                                                    "px-3 py-2 rounded-lg text-sm font-medium border transition-colors",
-                                                    editShiftMode === mode
-                                                        ? "bg-primary/20 text-primary border-primary/50"
-                                                        : "bg-gray-950 border-gray-800 text-gray-400 hover:bg-gray-900"
-                                                )}
-                                            >
-                                                {mode === 'MANUAL' ? 'Manual Start' : 'Auto (Scheduled)'}
-                                            </button>
-                                        ))}
+                            <motion.div
+                                initial={{ scale: 0.95, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0.95, opacity: 0 }}
+                                className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-lg shadow-xl"
+                                onClick={e => e.stopPropagation()}
+                            >
+                                <h2 className="text-xl font-bold mb-1">Configure Area</h2>
+                                <p className="text-sm text-gray-400 mb-4">{configArea?.name}</p>
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-gray-400">Name</label>
+                                        <input
+                                            type="text"
+                                            value={configName}
+                                            onChange={e => setConfigName(e.target.value)}
+                                            className="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                        />
                                     </div>
-                                </div>
-                                {editShiftMode === 'AUTO' && (
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="space-y-1">
-                                            <label className="text-[11px] font-bold text-amber-400 uppercase tracking-widest">Reset Time</label>
-                                            <input
-                                                type="time"
-                                                value={editAutoTime}
-                                                onChange={e => setEditAutoTime(e.target.value)}
-                                                className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[11px] font-bold text-amber-400 uppercase tracking-widest">Timezone</label>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-gray-400">Capacity</label>
+                                        <input
+                                            type="number"
+                                            value={configCapacity || ''}
+                                            onChange={e => setConfigCapacity(parseInt(e.target.value) || 0)}
+                                            className="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                            placeholder="0 for unlimited"
+                                        />
+                                    </div>
+                                    {!isVenueDoor && (
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-gray-400">Type</label>
                                             <select
-                                                value={editAutoTz}
-                                                onChange={e => setEditAutoTz(e.target.value)}
-                                                className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 appearance-none"
+                                                value={configAreaType}
+                                                onChange={e => setConfigAreaType(e.target.value as AreaType)}
+                                                className="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                                             >
-                                                {TIMEZONES.map(tz => (
-                                                    <option key={tz.value} value={tz.value}>{tz.label}</option>
-                                                ))}
+                                                <option value="MAIN">Main Floor</option>
+                                                <option value="ENTRY">Entry</option>
+                                                <option value="VIP">VIP</option>
+                                                <option value="PATIO">Patio</option>
+                                                <option value="BAR">Bar</option>
+                                                <option value="EVENT_SPACE">Event Space</option>
+                                                <option value="OTHER">Other</option>
                                             </select>
                                         </div>
+                                    )}
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-gray-400">Counting Mode</label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {(['MANUAL', 'AUTO_FROM_SCANS', 'BOTH'] as CountingMode[]).map(mode => (
+                                                <button key={mode} type="button"
+                                                    onClick={() => setConfigCountingMode(mode)}
+                                                    className={cn(
+                                                        "px-2 py-2 rounded-lg text-xs font-medium border transition-colors",
+                                                        configCountingMode === mode
+                                                            ? "bg-purple-900/30 text-purple-400 border-purple-500/50"
+                                                            : "bg-gray-950 border-gray-800 text-gray-400 hover:bg-gray-900"
+                                                    )}
+                                                >{mode.replace(/_/g, ' ')}</button>
+                                            ))}
+                                        </div>
                                     </div>
-                                )}
-                                <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-800">
-                                    <button
-                                        type="button"
-                                        onClick={() => setEditShiftAreaId(null)}
-                                        className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={handleSaveShiftConfig}
-                                        className="px-6 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg font-bold shadow-lg shadow-primary/20"
-                                    >
-                                        Save
-                                    </button>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-gray-400">Shift Mode</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {(['MANUAL', 'AUTO'] as ShiftMode[]).map(mode => (
+                                                <button key={mode} type="button"
+                                                    onClick={() => setConfigShiftMode(mode)}
+                                                    className={cn(
+                                                        "px-3 py-2 rounded-lg text-xs font-medium border transition-colors",
+                                                        configShiftMode === mode
+                                                            ? "bg-purple-900/30 text-purple-400 border-purple-500/50"
+                                                            : "bg-gray-950 border-gray-800 text-gray-400 hover:bg-gray-900"
+                                                    )}
+                                                >{mode === 'MANUAL' ? 'Manual Start' : 'Auto (Scheduled)'}</button>
+                                            ))}
+                                        </div>
+                                        {configShiftMode === 'AUTO' && (
+                                            <div className="grid grid-cols-2 gap-2 mt-2">
+                                                <div className="space-y-1">
+                                                    <label className="text-[11px] font-bold text-amber-400 uppercase tracking-widest">Time</label>
+                                                    <input type="time" value={configAutoTime}
+                                                        onChange={e => setConfigAutoTime(e.target.value)}
+                                                        className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[11px] font-bold text-amber-400 uppercase tracking-widest">Timezone</label>
+                                                    <select value={configAutoTz}
+                                                        onChange={e => setConfigAutoTz(e.target.value)}
+                                                        className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none">
+                                                        {TIMEZONES.map(tz => (
+                                                            <option key={tz.value} value={tz.value}>{tz.label}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-800">
+                                        {canDelete && !isVenueDoor ? (
+                                            !confirmDelete ? (
+                                                <button type="button" onClick={() => setConfirmDelete(true)}
+                                                    className="px-4 py-2 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 text-sm font-medium transition-colors">
+                                                    Delete Area
+                                                </button>
+                                            ) : (
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs text-red-400">Are you sure?</span>
+                                                    <button type="button" onClick={() => setConfirmDelete(false)}
+                                                        className="px-3 py-1.5 rounded-lg text-gray-400 hover:text-white border border-gray-700 text-xs font-medium transition-colors">
+                                                        Cancel
+                                                    </button>
+                                                    <button type="button" onClick={handleDeleteArea} disabled={isDeletingArea}
+                                                        className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-medium transition-colors disabled:opacity-50">
+                                                        {isDeletingArea ? 'Deleting...' : 'Confirm'}
+                                                    </button>
+                                                </div>
+                                            )
+                                        ) : <span />}
+                                        <div className="flex gap-3">
+                                            <button type="button" onClick={() => { setConfigAreaId(null); setConfirmDelete(false); }}
+                                                className="px-4 py-2 text-gray-400 hover:text-white transition-colors">
+                                                Cancel
+                                            </button>
+                                            <button type="button" onClick={handleSaveConfig} disabled={isSavingConfig}
+                                                className="px-6 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg font-bold shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center gap-2">
+                                                {isSavingConfig && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                                                {isSavingConfig ? 'Saving...' : 'Save'}
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
+                            </motion.div>
                         </motion.div>
-                    </motion.div>
                 )}
             </AnimatePresence>
         </div>
