@@ -62,6 +62,28 @@ export default function AreasPage() {
         areas.find(a => a.venue_id === venueId && a.area_type === 'VENUE_DOOR' && a.is_active !== false);
     const venueDoorExists = !!(newArea.venue_id && getVenueDoorArea(newArea.venue_id));
 
+    const AREA_TYPE_ORDER: Record<string, number> = {
+        VENUE_DOOR: 0,
+        BAR: 1,
+        ENTRY: 2,
+        EVENT_SPACE: 3,
+        MAIN: 4,
+        OTHER: 5,
+        PATIO: 6,
+        VIP: 7,
+    };
+
+    const AREA_TYPE_LABELS: Record<string, string> = {
+        VENUE_DOOR: 'Venue Door',
+        BAR: 'Bar',
+        ENTRY: 'Entry',
+        EVENT_SPACE: 'Event Space',
+        MAIN: 'Main Floor',
+        OTHER: 'Other',
+        PATIO: 'Patio',
+        VIP: 'VIP',
+    };
+
     const CLICR_TEMPLATES: { id: string; label: string; desc: string; names: string[] }[] = [
         { id: 'single', label: 'Single door', desc: '1 counter', names: ['Front Door'] },
         { id: 'entry_exit', label: 'Entry + Exit pair', desc: '2 counters', names: ['Entry Door', 'Exit Door'] },
@@ -258,8 +280,25 @@ export default function AreasPage() {
                     <section key={venue.id} className="space-y-8">
                         <h2 className="text-xl mb-4">{venue.name}</h2>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {venueAreas.map(area => {
+                        <div className="space-y-6">
+                            {Object.entries(
+                                venueAreas.reduce<Record<string, typeof venueAreas>>((acc, area) => {
+                                    if (!acc[area.area_type]) acc[area.area_type] = [];
+                                    acc[area.area_type].push(area);
+                                    return acc;
+                                }, {})
+                            )
+                                .sort(([a], [b]) => (AREA_TYPE_ORDER[a] ?? 99) - (AREA_TYPE_ORDER[b] ?? 99))
+                                .map(([type, typeAreas]) => (
+                                    <div key={type}>
+                                        <h3 className={cn(
+                                            "text-xs font-bold uppercase tracking-widest mb-3",
+                                            type === 'VENUE_DOOR' ? "text-amber-500" : "text-gray-500"
+                                        )}>
+                                            {AREA_TYPE_LABELS[type] ?? type}
+                                        </h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {typeAreas.map(area => {
                                 const scopeKey = `area:${activeBusiness.id}:${area.venue_id}:${area.id}`;
                                 const traffic = areaTraffic[scopeKey] ?? { total_in: 0, total_out: 0 };
 
@@ -273,21 +312,19 @@ export default function AreasPage() {
                                 return (
                                     <div
                                         key={area.id}
-                                        className="bg-gray-900/50 border border-gray-800 rounded-xl p-6 hover:border-gray-700 transition-colors"
+                                        className={cn(
+                                            "border rounded-xl p-6 hover:border-gray-700 transition-colors",
+                                            area.area_type === 'VENUE_DOOR'
+                                                ? "bg-amber-950/10 border-amber-500/20"
+                                                : "bg-gray-900/50 border-gray-800"
+                                        )}
                                     >
                                         <div className="flex items-center justify-between mb-6">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 rounded-lg bg-purple-900/30 border border-purple-500/20 flex items-center justify-center">
                                                     <Layers className="w-5 h-5 text-purple-400" />
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-lg">{area.name}</span>
-                                                    {area.area_type === 'VENUE_DOOR' && (
-                                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 uppercase tracking-wider">
-                                                            Venue Door
-                                                        </span>
-                                                    )}
-                                                </div>
+                                                <div className="text-lg">{area.name}</div>
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <button
@@ -393,6 +430,9 @@ export default function AreasPage() {
                                     </div>
                                 );
                             })}
+                                        </div>
+                                    </div>
+                                ))}
                         </div>
                     </section>
                 ))
