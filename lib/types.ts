@@ -89,7 +89,7 @@ export type Venue = {
     active?: boolean; // map to status === 'ACTIVE'
 };
 
-export type AreaType = 'ENTRY' | 'MAIN' | 'PATIO' | 'VIP' | 'BAR' | 'EVENT_SPACE' | 'OTHER';
+export type AreaType = 'ENTRY' | 'MAIN' | 'PATIO' | 'VIP' | 'BAR' | 'EVENT_SPACE' | 'OTHER' | 'VENUE_DOOR';
 export type CountingMode = 'MANUAL' | 'AUTO_FROM_SCANS' | 'BOTH';
 
 export type ShiftMode = 'AUTO' | 'MANUAL';
