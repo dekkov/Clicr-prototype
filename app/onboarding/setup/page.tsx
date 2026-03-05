@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/store';
-import { Area, Clicr, Venue } from '@/lib/types';
+import { Area, AreaType, Clicr, Venue } from '@/lib/types';
 import { Building2, MapPin, Users, Check, Plus, ArrowRight, ArrowLeft, Mail, Shield, Scan, Ban, Trash2, Pencil } from 'lucide-react';
 import { createBusinessVenueAndAreas, updateBusinessSettings } from '@/app/onboarding/setup-actions';
 import { inviteTeamMember } from '@/app/(authenticated)/settings/team-actions';
@@ -52,7 +52,10 @@ export default function OnboardingSetupPage() {
 
     // Areas step state
     const [createdAreas, setCreatedAreas] = useState<Area[]>([]);
-    const [areaInput, setAreaInput] = useState({ name: '', capacity: '100' });
+    const [areaInput, setAreaInput] = useState({ name: '', capacity: '100', area_type: 'MAIN' });
+    const [venueDoorName, setVenueDoorName] = useState('Venue Counter');
+    const [isEditingVenueDoor, setIsEditingVenueDoor] = useState(false);
+    const [editingVenueDoorName, setEditingVenueDoorName] = useState('');
 
     // Clicrs step state
     const [createdClicrs, setCreatedClicrs] = useState<Clicr[]>([]);
@@ -96,7 +99,7 @@ export default function OnboardingSetupPage() {
             venue_id: '', // set after batch create
             name: areaInput.name,
             default_capacity: !isNaN(parsedAreaCap) && parsedAreaCap > 0 ? parsedAreaCap : null,
-            area_type: 'MAIN',
+            area_type: areaInput.area_type as AreaType,
             counting_mode: 'BOTH',
             is_active: true,
             created_at: new Date().toISOString(),
@@ -104,7 +107,7 @@ export default function OnboardingSetupPage() {
             current_count: 0,
         } as Area;
         setCreatedAreas(prev => [...prev, area]);
-        setAreaInput({ name: '', capacity: '100' });
+        setAreaInput({ name: '', capacity: '100', area_type: 'MAIN' });
     };
 
     const handleSaveAreaName = (id: string) => {
@@ -124,7 +127,6 @@ export default function OnboardingSetupPage() {
     };
 
     const handleCompleteStep3 = () => {
-        if (createdAreas.length === 0) return;
         setStep('CLICRS');
     };
 
@@ -190,9 +192,11 @@ export default function OnboardingSetupPage() {
                         state: venueData.state || undefined,
                         capacity: !isNaN(parsedCapacity) && parsedCapacity > 0 ? parsedCapacity : undefined,
                     },
+                    venueDoorName,
                     areas: createdAreas.map(a => ({
                         name: a.name,
                         capacity: a.default_capacity ?? undefined,
+                        area_type: a.area_type,
                     })),
                 });
 
@@ -207,9 +211,11 @@ export default function OnboardingSetupPage() {
                 setVenueId(result.venueId);
 
                 // Step 2: Remap temp area IDs → real DB IDs
+                // result.areaIds[0] is the venueDoorId — skip it, user areas start at index 1
+                const userAreaIds = result.areaIds.slice(1);
                 currentAreas = createdAreas.map((a, i) => ({
                     ...a,
-                    id: result.areaIds[i],
+                    id: userAreaIds[i],
                     venue_id: result.venueId,
                 } as Area));
                 setCreatedAreas(currentAreas);
@@ -398,6 +404,47 @@ export default function OnboardingSetupPage() {
                         </div>
                         <p className="text-slate-400 text-sm">Add zones like Main Floor, VIP, Patio. You can add more later.</p>
                         {error && <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">{error}</div>}
+                        {/* Venue Counter — auto-created, name-only editable */}
+                        <div className="flex items-center justify-between bg-amber-500/5 border border-amber-500/20 px-4 py-3 rounded-lg">
+                            {!isEditingVenueDoor ? (
+                                <>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-amber-300 font-medium">{venueDoorName}</span>
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded-full">
+                                            Venue Counter
+                                        </span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setIsEditingVenueDoor(true); setEditingVenueDoorName(venueDoorName); }}
+                                        className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+                                        title="Rename"
+                                    >
+                                        <Pencil className="w-3.5 h-3.5" />
+                                    </button>
+                                </>
+                            ) : (
+                                <div className="flex items-center gap-2 w-full">
+                                    <input
+                                        autoFocus
+                                        type="text"
+                                        value={editingVenueDoorName}
+                                        onChange={e => setEditingVenueDoorName(e.target.value)}
+                                        onBlur={() => { if (editingVenueDoorName.trim()) setVenueDoorName(editingVenueDoorName.trim()); setIsEditingVenueDoor(false); }}
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter') { if (editingVenueDoorName.trim()) setVenueDoorName(editingVenueDoorName.trim()); setIsEditingVenueDoor(false); }
+                                            if (e.key === 'Escape') setIsEditingVenueDoor(false);
+                                        }}
+                                        className="flex-1 bg-slate-900 border border-primary/50 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                                    />
+                                    <button type="button"
+                                        onClick={() => { if (editingVenueDoorName.trim()) setVenueDoorName(editingVenueDoorName.trim()); setIsEditingVenueDoor(false); }}
+                                        className="p-1.5 rounded-lg text-emerald-400 hover:bg-emerald-500/10 transition-colors">
+                                        <Check className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                         {createdAreas.length > 0 && (
                             <div className="space-y-2">
                                 {createdAreas.map(a => (
@@ -405,6 +452,7 @@ export default function OnboardingSetupPage() {
                                         {editingAreaId !== a.id ? (
                                             <>
                                                 <span className="text-white font-medium">{a.name}</span>
+                                                <span className="text-xs text-slate-500 ml-1.5">{(a.area_type || 'main').replace(/_/g, ' ').toLowerCase()}</span>
                                                 <div className="flex items-center gap-1">
                                                     <button
                                                         type="button"
@@ -456,6 +504,19 @@ export default function OnboardingSetupPage() {
                             <input type="text" placeholder="Area name (e.g. Main Floor)" value={areaInput.name}
                                 onChange={e => setAreaInput(p => ({ ...p, name: e.target.value }))}
                                 className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none text-sm" />
+                            <select
+                                value={areaInput.area_type}
+                                onChange={e => setAreaInput(p => ({ ...p, area_type: e.target.value }))}
+                                className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none text-sm"
+                            >
+                                <option value="MAIN">Main Floor</option>
+                                <option value="ENTRY">Entry</option>
+                                <option value="VIP">VIP</option>
+                                <option value="PATIO">Patio</option>
+                                <option value="BAR">Bar</option>
+                                <option value="EVENT_SPACE">Event Space</option>
+                                <option value="OTHER">Other</option>
+                            </select>
                             <input type="number" value={areaInput.capacity} onChange={e => setAreaInput(p => ({ ...p, capacity: e.target.value }))}
                                 className="w-24 bg-slate-950 border border-slate-800 rounded-xl px-3 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none text-sm" />
                             <button onClick={handleAddArea} disabled={!areaInput.name}
@@ -467,8 +528,8 @@ export default function OnboardingSetupPage() {
                             <button type="button" onClick={goToPrevStep} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2">
                                 <ArrowLeft className="w-4 h-4" /> Back
                             </button>
-                            <button type="button" onClick={handleCompleteStep3} disabled={createdAreas.length === 0}
-                                className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all disabled:opacity-50">
+                            <button type="button" onClick={handleCompleteStep3}
+                                className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all">
                                 Next: Clicrs
                             </button>
                         </div>
