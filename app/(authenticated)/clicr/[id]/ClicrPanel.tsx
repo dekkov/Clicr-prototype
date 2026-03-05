@@ -146,6 +146,7 @@ export default function ClicrPanel({
 
     // Calculate total area occupancy from SNAPSHOT (Source of Truth)
     const currentArea = (areas || []).find(a => a.id === clicr?.area_id);
+    const isVenueDoor = currentArea?.area_type === 'VENUE_DOOR';
     const lastOccupancyRef = useRef<number | null>(null);
 
     if (currentArea?.current_occupancy !== undefined) {
@@ -158,9 +159,10 @@ export default function ClicrPanel({
     // Calculate aggregated stats for the ENTIRE VENUE from SNAPSHOTS
     const venueId = currentArea?.venue_id;
 
-    // Venue Occupancy = Sum of all areas in venue (Realtime)
+    // Venue Occupancy = VENUE_DOOR area's count only (dedicated door counter)
     const venueAreas = (areas || []).filter(a => a.venue_id === venueId);
-    const currentVenueOccupancy = venueAreas.reduce((acc, a) => acc + (a.current_occupancy || 0), 0);
+    const venueDoorArea = venueAreas.find(a => a.area_type === 'VENUE_DOOR');
+    const currentVenueOccupancy = venueDoorArea?.current_occupancy ?? 0;
     const venue = (venues || []).find(v => v.id === venueId);
 
     // Keep event-based stats for "Session" view if needed, but rely on snapshots for enforcement
@@ -197,14 +199,6 @@ export default function ClicrPanel({
 
     const [showConfigModal, setShowConfigModal] = useState(false);
 
-    // --- GUEST IN MODAL ---
-    const [showGuestInModal, setShowGuestInModal] = useState(false);
-    const [guestDraft, setGuestDraft] = useState<{
-        name: string;
-        dob: string;
-        gender: 'M' | 'F' | 'OTHER' | 'DECLINE' | null;
-    }>({ name: '', dob: '', gender: null });
-
     // Classification Mode State
     const [classifyMode, setClassifyMode] = useState(false);
     const [showScanBreakdown, setShowScanBreakdown] = useState(false);
@@ -218,16 +212,16 @@ export default function ClicrPanel({
     // Track modal state via ref to avoid listener re-binding
     const isModalOpenRef = useRef(false);
     useEffect(() => {
-        isModalOpenRef.current = showBulkModal || showConfigModal || showGuestInModal;
-    }, [showBulkModal, showConfigModal, showGuestInModal]);
+        isModalOpenRef.current = showBulkModal || showConfigModal;
+    }, [showBulkModal, showConfigModal]);
 
     // Force focus when modals close
     useEffect(() => {
-        if (!showBulkModal && !showConfigModal && !showGuestInModal) {
+        if (!showBulkModal && !showConfigModal) {
             const timer = setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 50);
             return () => clearTimeout(timer);
         }
-    }, [showBulkModal, showConfigModal, showGuestInModal]);
+    }, [showBulkModal, showConfigModal]);
 
     // Focus management for hardware scanner
     useEffect(() => {
@@ -260,14 +254,14 @@ export default function ClicrPanel({
 
     useEffect(() => {
         const handleBlur = () => {
-            if (!showBulkModal && !showConfigModal && !showGuestInModal) {
+            if (!showBulkModal && !showConfigModal) {
                 setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 100);
             }
         };
         const inputEl = inputRef.current;
         inputEl?.addEventListener('blur', handleBlur);
         return () => inputEl?.removeEventListener('blur', handleBlur);
-    }, [showBulkModal, showConfigModal, showGuestInModal]);
+    }, [showBulkModal, showConfigModal]);
 
 
     const [editName, setEditName] = useState('');
@@ -391,43 +385,15 @@ export default function ClicrPanel({
 
         if (navigator.vibrate) navigator.vibrate(50);
 
-        // Parse name into first/last
-        const nameTrimmed = guestDraft.name.trim();
-        const spaceIdx = nameTrimmed.indexOf(' ');
-        const firstName = spaceIdx >= 0 ? nameTrimmed.slice(0, spaceIdx) : nameTrimmed;
-        const lastName = spaceIdx >= 0 ? nameTrimmed.slice(spaceIdx + 1) : undefined;
-
-        // Convert YYYY-MM-DD (from date input) to YYYYMMDD
-        const formattedDob = guestDraft.dob ? guestDraft.dob.replace(/-/g, '') : undefined;
-
         recordEvent({
             venue_id: venueId,
             area_id: clicr.area_id,
             clicr_id: clicr.id,
             delta: 1,
             flow_type: 'IN',
-            gender: guestDraft.gender ?? undefined,
-            first_name: firstName || undefined,
-            last_name: lastName || undefined,
-            dob: formattedDob,
             event_type: 'TAP',
             idempotency_key: Math.random().toString(36)
         });
-
-        recordScan({
-            venue_id: venueId,
-            scan_result: 'ACCEPTED',
-            age: 21,
-            age_band: '21+',
-            sex: guestDraft.gender === 'M' ? 'M' : guestDraft.gender === 'F' ? 'F' : 'U',
-            zip_code: '00000',
-            first_name: firstName || undefined,
-            last_name: lastName || undefined,
-            dob: formattedDob,
-        });
-
-        setGuestDraft({ name: '', dob: '', gender: null });
-        setShowGuestInModal(false);
     };
 
     const handleGuestOut = () => {
@@ -699,7 +665,10 @@ export default function ClicrPanel({
     }
 
     return (
-        <div className="flex flex-col h-[100vh] bg-black relative overflow-hidden" onClick={() => { if (!isModalOpenRef.current) inputRef.current?.focus({ preventScroll: true }); }}>
+        <div className={cn(
+            "flex flex-col h-[100vh] relative overflow-hidden",
+            isVenueDoor ? "bg-[#0d0a00]" : "bg-black"
+        )} onClick={() => { if (!isModalOpenRef.current) inputRef.current?.focus({ preventScroll: true }); }}>
             {/* Hidden Input */}
             <textarea
                 ref={inputRef as any}
@@ -715,12 +684,18 @@ export default function ClicrPanel({
                 {/* 1. Header */}
                 <header className="flex justify-between items-start pt-8 pb-4 px-6 shrink-0">
                     <div>
-                        <h2 className="text-slate-500 font-bold text-[10px] uppercase tracking-[0.2em] mb-1">
+                        <h2 className={cn(
+                            "font-bold text-[10px] uppercase tracking-[0.2em] mb-1",
+                            isVenueDoor ? "text-amber-500" : "text-slate-500"
+                        )}>
                             {venue?.name || 'VENUE'}
                         </h2>
                         <div className="flex items-center gap-2">
-                            <h1 className="text-white font-bold text-2xl tracking-tight">
-                                {clicr.name}
+                            <h1 className={cn(
+                                "font-bold text-2xl tracking-tight",
+                                isVenueDoor ? "text-amber-300" : "text-white"
+                            )}>
+                                {isVenueDoor ? '🚪 ' : ''}{clicr.name}
                             </h1>
                             <button onClick={() => {
                                 setEditName(clicr.name);
@@ -742,6 +717,9 @@ export default function ClicrPanel({
                                 <Settings2 className="w-4 h-4" />
                             </button>
                         </div>
+                        {isVenueDoor && (
+                            <p className="text-[10px] text-amber-600 uppercase tracking-widest mt-0.5">Venue Occupancy Counter</p>
+                        )}
                     </div>
                     {/* Status Dot + End Shift */}
                     <div className="flex gap-4 items-center">
@@ -770,6 +748,9 @@ export default function ClicrPanel({
                                 : undefined
                         }
                     />
+                    {isVenueDoor && (
+                        <p className="text-xs text-amber-600 uppercase tracking-widest mt-2">Total in building</p>
+                    )}
                 </div>
 
                 {/* 3. Stats Row & Turnarounds */}
@@ -821,8 +802,8 @@ export default function ClicrPanel({
                 <div className="flex flex-col gap-3 px-6 pb-8 shrink-0">
                     <ActionButton
                         label="GUEST IN"
-                        onClick={() => setShowGuestInModal(true)}
-                        className="h-24 md:h-28 text-lg"
+                        onClick={handleGuestIn}
+                        className={cn("h-24 md:h-28 text-lg", isVenueDoor && "bg-amber-600 hover:bg-amber-500")}
                         icon={<div className="mb-[-4px]"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4V20M4 12H20" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg></div>}
                     />
 
@@ -947,100 +928,6 @@ export default function ClicrPanel({
                             </div>
                         </motion.div>
                     </div>
-                )}
-            </AnimatePresence>
-
-            {/* GUEST IN MODAL */}
-            <AnimatePresence>
-                {showGuestInModal && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end justify-center"
-                        onClick={() => {
-                            setGuestDraft({ name: '', dob: '', gender: null });
-                            setShowGuestInModal(false);
-                        }}
-                    >
-                        <motion.div
-                            initial={{ y: '100%' }}
-                            animate={{ y: 0 }}
-                            exit={{ y: '100%' }}
-                            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                            className="w-full max-w-lg bg-[#0f1117] rounded-t-3xl p-6 pb-10 space-y-5"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <div className="w-10 h-1 bg-slate-700 rounded-full mx-auto mb-2" />
-                            <h2 className="text-white font-bold text-xl tracking-tight">Guest Check-In</h2>
-
-                            {/* Name */}
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Name (optional)</label>
-                                <input
-                                    type="text"
-                                    value={guestDraft.name}
-                                    onChange={(e) => setGuestDraft(prev => ({ ...prev, name: e.target.value }))}
-                                    placeholder="e.g. John Smith"
-                                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white font-medium focus:outline-none focus:border-blue-500 transition-colors"
-                                />
-                            </div>
-
-                            {/* DOB */}
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Date of Birth (optional)</label>
-                                <input
-                                    type="date"
-                                    value={guestDraft.dob}
-                                    onChange={(e) => setGuestDraft(prev => ({ ...prev, dob: e.target.value }))}
-                                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white font-medium focus:outline-none focus:border-blue-500 transition-colors"
-                                />
-                            </div>
-
-                            {/* Gender */}
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Gender (optional)</label>
-                                <div className="grid grid-cols-4 gap-2">
-                                    {(['M', 'F', 'OTHER', 'DECLINE'] as const).map((g) => (
-                                        <button
-                                            key={g}
-                                            onClick={() => setGuestDraft(prev => ({
-                                                ...prev,
-                                                gender: prev.gender === g ? null : g
-                                            }))}
-                                            className={cn(
-                                                "py-3 rounded-xl text-sm font-bold transition-all border",
-                                                guestDraft.gender === g
-                                                    ? "bg-blue-600 border-blue-500 text-white"
-                                                    : "bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-500"
-                                            )}
-                                        >
-                                            {g}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Actions */}
-                            <div className="grid grid-cols-2 gap-3 pt-1">
-                                <button
-                                    onClick={() => {
-                                        setGuestDraft({ name: '', dob: '', gender: null });
-                                        setShowGuestInModal(false);
-                                    }}
-                                    className="py-4 rounded-xl text-slate-400 bg-slate-900 hover:bg-slate-800 font-semibold text-sm transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleGuestIn}
-                                    className="py-4 rounded-xl bg-white text-black font-bold text-sm hover:bg-slate-100 shadow-lg transition-all active:scale-95"
-                                >
-                                    Check In
-                                </button>
-                            </div>
-                        </motion.div>
-                    </motion.div>
                 )}
             </AnimatePresence>
 

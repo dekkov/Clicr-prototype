@@ -64,6 +64,7 @@ type AppContextType = AppState & {
     updateVenue: (venue: Venue) => Promise<void>;
     addArea: (area: Area) => Promise<void>;
     updateArea: (area: Area) => Promise<boolean>;
+    deleteArea: (areaId: string) => Promise<void>;
 
     // Devices
     addClicr: (clicr: Clicr) => Promise<{ success: boolean; error?: string }>;
@@ -661,6 +662,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setState(prev => ({ ...prev, venues: [...prev.venues, venue] }));
         try {
             await authFetch({ action: 'ADD_VENUE', payload: venue });
+            // Auto-create the venue's dedicated occupancy counter
+            const venueDoorArea: Area = {
+                id: crypto.randomUUID(),
+                venue_id: venue.id,
+                business_id: venue.business_id,
+                name: 'Venue Counter',
+                area_type: 'VENUE_DOOR',
+                counting_mode: 'BOTH',
+                is_active: true,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            };
+            setState(prev => ({ ...prev, areas: [...prev.areas, venueDoorArea] }));
+            await authFetch({ action: 'ADD_AREA', payload: venueDoorArea });
         } catch (error) { console.error("Failed to add venue", error); }
     };
 
@@ -712,6 +727,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             if (originalArea) setState(prev => ({ ...prev, areas: prev.areas.map(a => a.id === area.id ? originalArea : a) }));
             return false;
         }
+    };
+
+    const deleteArea = async (areaId: string) => {
+        setState(prev => ({ ...prev, areas: prev.areas.filter(a => a.id !== areaId) }));
+        try {
+            await authFetch({ action: 'DELETE_AREA', payload: { id: areaId } });
+        } catch (error) { console.error("Failed to delete area", error); }
     };
 
     // --- DEVICES ---
@@ -1030,7 +1052,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
 
     return (
-        <AppContext.Provider value={{ ...state, recordEvent, recordScan, resetCounts, startShift, endShift, addUser, updateUser, removeUser, updateBusiness, addClicr, updateClicr, deleteClicr, addVenue, updateVenue, addArea, updateArea, addDevice, updateDevice, addCapacityOverride, addVenueAuditLog, addBan, revokeBan, createPatronBan, updatePatronBan, recordBanEnforcement, recordTurnaround, refreshTrafficStats, businesses: state.businesses, activeBusiness: state.activeBusiness, activeVenueId: state.activeVenueId, selectBusiness, selectVenue, clearBusiness, refreshState, setPollingPaused } as AppContextType}>
+        <AppContext.Provider value={{ ...state, recordEvent, recordScan, resetCounts, startShift, endShift, addUser, updateUser, removeUser, updateBusiness, addClicr, updateClicr, deleteClicr, addVenue, updateVenue, addArea, updateArea, deleteArea, addDevice, updateDevice, addCapacityOverride, addVenueAuditLog, addBan, revokeBan, createPatronBan, updatePatronBan, recordBanEnforcement, recordTurnaround, refreshTrafficStats, businesses: state.businesses, activeBusiness: state.activeBusiness, activeVenueId: state.activeVenueId, selectBusiness, selectVenue, clearBusiness, refreshState, setPollingPaused } as AppContextType}>
             {children}
         </AppContext.Provider>
     );
