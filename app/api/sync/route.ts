@@ -48,11 +48,14 @@ async function hydrateData(data: DBData): Promise<DBData> {
                 parent_area_id: a.parent_area_id,
                 current_occupancy: a.current_occupancy ?? 0,
                 last_reset_at: a.last_reset_at || undefined,
-                area_type: 'MAIN',
-                counting_mode: 'MANUAL',
-                is_active: true,
+                area_type: a.area_type || 'MAIN',
+                counting_mode: a.counting_mode || 'MANUAL',
+                is_active: a.is_active ?? true,
+                shift_mode: a.shift_mode || 'MANUAL',
+                auto_reset_time: a.auto_reset_time || undefined,
+                auto_reset_timezone: a.auto_reset_timezone || undefined,
                 created_at: a.created_at || new Date().toISOString(),
-                updated_at: new Date().toISOString()
+                updated_at: a.updated_at || new Date().toISOString()
             }));
         }
 
@@ -557,7 +560,18 @@ export async function POST(request: Request) {
                 await supabaseAdmin.from('areas').update({
                     name: areaPayload.name,
                     capacity_max: areaPayload.default_capacity ?? areaPayload.capacity_max,
+                    area_type: areaPayload.area_type,
+                    counting_mode: areaPayload.counting_mode,
+                    shift_mode: areaPayload.shift_mode ?? 'MANUAL',
+                    auto_reset_time: areaPayload.auto_reset_time ?? null,
+                    auto_reset_timezone: areaPayload.auto_reset_timezone ?? null,
                 }).eq('id', areaPayload.id);
+                break;
+            }
+
+            case 'DELETE_AREA': {
+                const { id } = payload as { id: string };
+                await supabaseAdmin.from('areas').delete().eq('id', id);
                 break;
             }
 
