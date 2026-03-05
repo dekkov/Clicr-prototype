@@ -289,6 +289,7 @@ export default function AreasPage() {
                                 }, {})
                             )
                                 .sort(([a], [b]) => (AREA_TYPE_ORDER[a] ?? 99) - (AREA_TYPE_ORDER[b] ?? 99))
+                                .map(([type, typeAreas]) => [type, [...typeAreas].sort((a, b) => a.name.localeCompare(b.name))] as const)
                                 .map(([type, typeAreas]) => (
                                     <div key={type}>
                                         <h3 className={cn(
