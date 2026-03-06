@@ -168,6 +168,7 @@ const INTENSITY_CLASSES = [
     'bg-purple-600/80',
     'bg-purple-500',
 ];
+const EVENING_HOURS = [18, 19, 20, 21, 22, 23, 0, 1, 2, 3];
 
 const PeakTimesHeatmap = ({ data, loading }: { data: HeatmapData; loading: boolean }) => {
     const maxVal = useMemo(() => {
@@ -423,7 +424,6 @@ const LiveVenues = ({ data, onViewAll }: {
 // --- Chart Helpers ---
 
 function buildHourlyData(events: CountEvent[]) {
-    const EVENING_HOURS = [18,19,20,21,22,23,0,1,2,3];
     const buckets: Record<number, { entries: number; exits: number }> = {};
     EVENING_HOURS.forEach(h => { buckets[h] = { entries: 0, exits: 0 }; });
 
@@ -443,7 +443,6 @@ function buildHourlyData(events: CountEvent[]) {
 }
 
 function buildOccupancyOverTime(events: CountEvent[]) {
-    const EVENING_HOURS = [18,19,20,21,22,23,0,1,2,3];
     const buckets: Record<number, number> = {};
     EVENING_HOURS.forEach(h => { buckets[h] = 0; });
 
@@ -765,13 +764,6 @@ export default function DashboardPage() {
     }
 
     // Badge styling helpers
-    const badgeClass: Record<string, string> = {
-        ENTRY: 'bg-slate-700 text-slate-200',
-        EXIT: 'bg-amber-900/60 text-amber-300',
-        ID_ACCEPTED: 'bg-emerald-900/60 text-emerald-300',
-        ID_DENIED: 'bg-red-900/60 text-red-300',
-    };
-
     const badgeLabel: Record<string, string> = {
         ENTRY: 'ENTRY',
         EXIT: 'EXIT',
