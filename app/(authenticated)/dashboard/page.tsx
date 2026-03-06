@@ -9,8 +9,13 @@ import {
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { GettingStartedChecklist } from './_components/GettingStartedChecklist';
-import type { IDScanEvent } from '@/lib/types';
+import type { IDScanEvent, CountEvent } from '@/lib/types';
 import type { HeatmapData } from '@/app/api/reports/heatmap/route';
+import {
+    BarChart, Bar, AreaChart, Area,
+    XAxis, YAxis, CartesianGrid, Tooltip,
+    ResponsiveContainer, ReferenceLine
+} from 'recharts';
 
 // --- Inline sub-components ---
 
@@ -94,6 +99,98 @@ const GenderBreakdown = ({ scanEvents }: { scanEvents: IDScanEvent[] }) => {
         </div>
     );
 };
+
+const HourlyTraffic = ({ data }: { data: { hour: string; entries: number; exits: number }[] }) => (
+    <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">
+        <div className="flex items-center gap-2 mb-1">
+            <TrendingUp className="w-4 h-4 text-gray-400" />
+            <span className="text-lg">Hourly Traffic</span>
+        </div>
+        <p className="text-xs text-gray-500 mb-4">Entries vs. exits by hour</p>
+        <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={data} barGap={2}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                <XAxis dataKey="hour" tick={{ fill: '#6b7280', fontSize: 11 }} />
+                <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} />
+                <Tooltip contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8 }} />
+                <Bar dataKey="entries" fill="#10b981" radius={[3,3,0,0]} />
+                <Bar dataKey="exits" fill="#ef4444" radius={[3,3,0,0]} />
+            </BarChart>
+        </ResponsiveContainer>
+        <div className="flex gap-4 mt-2 text-xs text-gray-500">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-emerald-500" /> Entries</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-red-500" /> Exits</span>
+        </div>
+    </div>
+);
+
+const OccupancyOverTime = ({ data, peak }: { data: { hour: string; occupancy: number }[]; peak: number }) => (
+    <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">
+        <div className="flex items-center gap-2 mb-1">
+            <TrendingUp className="w-4 h-4 text-gray-400" />
+            <span className="text-lg">Occupancy Over Time</span>
+        </div>
+        <p className="text-xs text-gray-500 mb-4">Net occupancy by hour · peak marker shown</p>
+        <ResponsiveContainer width="100%" height={200}>
+            <AreaChart data={data}>
+                <defs>
+                    <linearGradient id="occGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
+                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                    </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                <XAxis dataKey="hour" tick={{ fill: '#6b7280', fontSize: 11 }} />
+                <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} />
+                <Tooltip contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8 }} />
+                <ReferenceLine y={peak} stroke="#a78bfa" strokeDasharray="4 4" label={{ value: 'Peak', fill: '#a78bfa', fontSize: 10 }} />
+                <Area type="monotone" dataKey="occupancy" stroke="#6366f1" fill="url(#occGrad)" strokeWidth={2} />
+            </AreaChart>
+        </ResponsiveContainer>
+    </div>
+);
+
+// --- Chart Helpers ---
+
+function buildHourlyData(events: CountEvent[]) {
+    const EVENING_HOURS = [18,19,20,21,22,23,0,1,2,3];
+    const buckets: Record<number, { entries: number; exits: number }> = {};
+    EVENING_HOURS.forEach(h => { buckets[h] = { entries: 0, exits: 0 }; });
+
+    events.forEach(e => {
+        const hour = new Date(e.timestamp).getHours();
+        if (buckets[hour] !== undefined) {
+            if (e.delta > 0) buckets[hour].entries += e.delta;
+            else buckets[hour].exits += Math.abs(e.delta);
+        }
+    });
+
+    return EVENING_HOURS.map(h => ({
+        hour: h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`,
+        entries: buckets[h].entries,
+        exits: buckets[h].exits,
+    }));
+}
+
+function buildOccupancyOverTime(events: CountEvent[]) {
+    const EVENING_HOURS = [18,19,20,21,22,23,0,1,2,3];
+    const buckets: Record<number, number> = {};
+    EVENING_HOURS.forEach(h => { buckets[h] = 0; });
+
+    events.forEach(e => {
+        const hour = new Date(e.timestamp).getHours();
+        if (buckets[hour] !== undefined) buckets[hour] += e.delta;
+    });
+
+    let running = 0;
+    return EVENING_HOURS.map(h => {
+        running = Math.max(0, running + buckets[h]);
+        return {
+            hour: h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`,
+            occupancy: running,
+        };
+    });
+}
 
 // --- Helpers ---
 
@@ -267,6 +364,13 @@ export default function DashboardPage() {
             .sort((a, b) => b.ts - a.ts)
             .slice(0, 20);
     }, [todayEvents]);
+
+    const hourlyData = useMemo(() => buildHourlyData(todayEvents), [todayEvents]);
+    const occupancyData = useMemo(() => buildOccupancyOverTime(todayEvents), [todayEvents]);
+    const peakOccupancyValue = useMemo(
+        () => Math.max(0, ...occupancyData.map(d => d.occupancy)),
+        [occupancyData]
+    );
 
     const areaMap = useMemo(() => {
         const m: Record<string, string> = {};
@@ -490,6 +594,12 @@ export default function DashboardPage() {
 
             {/* Gender Breakdown */}
             <GenderBreakdown scanEvents={todayScanEvents} />
+
+            {/* Hourly Traffic + Occupancy Over Time */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <HourlyTraffic data={hourlyData} />
+                <OccupancyOverTime data={occupancyData} peak={peakOccupancyValue} />
+            </div>
         </div>
     );
 }
