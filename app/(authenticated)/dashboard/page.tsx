@@ -9,6 +9,8 @@ import {
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { GettingStartedChecklist } from './_components/GettingStartedChecklist';
+import type { IDScanEvent } from '@/lib/types';
+import type { HeatmapData } from '@/app/api/reports/heatmap/route';
 
 // --- Inline sub-components ---
 
@@ -52,6 +54,47 @@ const AgeBand = ({ band, count, max }: { band: string; count: number; max: numbe
     </div>
 );
 
+const GenderBreakdown = ({ scanEvents }: { scanEvents: IDScanEvent[] }) => {
+    const accepted = scanEvents.filter(s => s.scan_result === 'ACCEPTED');
+    const total = accepted.length;
+    const male = accepted.filter(s => s.sex?.toUpperCase().startsWith('M')).length;
+    const female = accepted.filter(s => s.sex?.toUpperCase().startsWith('F')).length;
+    const unknown = total - male - female;
+
+    const malePct = total > 0 ? Math.round((male / total) * 100) : 0;
+    const femalePct = total > 0 ? Math.round((female / total) * 100) : 0;
+    const unknownPct = total > 0 ? 100 - malePct - femalePct : 0;
+
+    return (
+        <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">
+            <div className="flex items-center gap-2 mb-1">
+                <Users className="w-4 h-4 text-gray-400" />
+                <span className="text-lg">Gender Breakdown</span>
+            </div>
+            <p className="text-xs text-gray-500 mb-4">Based on accepted ID scans</p>
+            <div className="flex h-4 rounded-full overflow-hidden mb-3">
+                <div className="bg-blue-500 transition-all" style={{ width: `${malePct}%` }} />
+                <div className="bg-pink-500 transition-all" style={{ width: `${femalePct}%` }} />
+                <div className="bg-gray-600 transition-all" style={{ width: `${unknownPct}%` }} />
+            </div>
+            <div className="flex items-center gap-6 text-sm">
+                <span className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />
+                    Male <span className="text-white ml-1">{malePct}%</span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-pink-500 inline-block" />
+                    Female <span className="text-white ml-1">{femalePct}%</span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-gray-500 inline-block" />
+                    Unknown <span className="text-white ml-1">{unknownPct}%</span>
+                </span>
+            </div>
+        </div>
+    );
+};
+
 // --- Helpers ---
 
 function getTodayStart(): number {
@@ -86,6 +129,17 @@ export default function DashboardPage() {
     } = useApp();
 
     const [isResetting, setIsResetting] = useState(false);
+
+    const [heatmapData, setHeatmapData] = useState<HeatmapData>({});
+    const [heatmapLoading, setHeatmapLoading] = useState(true);
+
+    useEffect(() => {
+        fetch('/api/reports/heatmap')
+            .then(r => r.json())
+            .then(d => setHeatmapData(d.heatmap ?? {}))
+            .catch(() => setHeatmapData({}))
+            .finally(() => setHeatmapLoading(false));
+    }, []);
 
     // Analyst sees only Reports — redirect from Dashboard
     useEffect(() => {
@@ -433,6 +487,9 @@ export default function DashboardPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Gender Breakdown */}
+            <GenderBreakdown scanEvents={todayScanEvents} />
         </div>
     );
 }
