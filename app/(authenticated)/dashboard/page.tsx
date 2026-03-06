@@ -233,6 +233,44 @@ const PeakTimesHeatmap = ({ data, loading }: { data: HeatmapData; loading: boole
     );
 };
 
+const LocationDistribution = ({ data }: { data: { state: string; count: number }[] }) => (
+    <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">
+        <div className="text-lg mb-1">Location Distribution</div>
+        <p className="text-xs text-gray-500 mb-4">Top states from accepted ID scans</p>
+        {data.length === 0 ? (
+            <p className="text-xs text-gray-600 italic">No scan data tonight.</p>
+        ) : (
+            <ResponsiveContainer width="100%" height={data.length * 36 + 20}>
+                <BarChart data={data} layout="vertical" margin={{ left: 8, right: 16 }}>
+                    <XAxis type="number" tick={{ fill: '#6b7280', fontSize: 11 }} />
+                    <YAxis type="category" dataKey="state" tick={{ fill: '#9ca3af', fontSize: 12 }} width={70} />
+                    <Tooltip contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8 }} />
+                    <Bar dataKey="count" fill="#6366f1" radius={[0,3,3,0]} />
+                </BarChart>
+            </ResponsiveContainer>
+        )}
+    </div>
+);
+
+const VenueContribution = ({ data }: { data: { name: string; count: number }[] }) => (
+    <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">
+        <div className="text-lg mb-1">Venue Contribution</div>
+        <p className="text-xs text-gray-500 mb-4">Entries by venue</p>
+        {data.length === 0 ? (
+            <p className="text-xs text-gray-600 italic">No entry data tonight.</p>
+        ) : (
+            <ResponsiveContainer width="100%" height={data.length * 52 + 20}>
+                <BarChart data={data} layout="vertical" margin={{ left: 8, right: 16 }}>
+                    <XAxis type="number" tick={{ fill: '#6b7280', fontSize: 11 }} />
+                    <YAxis type="category" dataKey="name" tick={{ fill: '#9ca3af', fontSize: 12 }} width={100} />
+                    <Tooltip contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8 }} />
+                    <Bar dataKey="count" fill="#6366f1" radius={[0,3,3,0]} />
+                </BarChart>
+            </ResponsiveContainer>
+        )}
+    </div>
+);
+
 // --- Chart Helpers ---
 
 function buildHourlyData(events: CountEvent[]) {
@@ -488,6 +526,27 @@ export default function DashboardPage() {
         return groups;
     }, [liveEventLog, venueNameMap]);
 
+    const locationData = useMemo(() => {
+        const counts: Record<string, number> = {};
+        todayScanEvents
+            .filter(s => s.scan_result === 'ACCEPTED' && s.state)
+            .forEach(s => { counts[s.state!] = (counts[s.state!] ?? 0) + 1; });
+        return Object.entries(counts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 8)
+            .map(([state, count]) => ({ state, count }));
+    }, [todayScanEvents]);
+
+    const venueContribData = useMemo(() => {
+        const counts: Record<string, number> = {};
+        todayEvents
+            .filter(e => e.delta > 0 && e.venue_id)
+            .forEach(e => { counts[e.venue_id] = (counts[e.venue_id] ?? 0) + e.delta; });
+        return Object.entries(counts)
+            .sort((a, b) => b[1] - a[1])
+            .map(([venueId, count]) => ({ name: venueNameMap[venueId] ?? 'Unknown', count }));
+    }, [todayEvents, venueNameMap]);
+
     // --- Render: No businesses (new user / redirecting to onboarding) ---
     if (!isLoading && businesses.length === 0) {
         return (
@@ -686,6 +745,12 @@ export default function DashboardPage() {
 
             {/* Peak Times Heatmap */}
             <PeakTimesHeatmap data={heatmapData} loading={heatmapLoading} />
+
+            {/* Location Distribution + Venue Contribution */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <LocationDistribution data={locationData} />
+                <VenueContribution data={venueContribData} />
+            </div>
         </div>
     );
 }
