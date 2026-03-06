@@ -271,6 +271,95 @@ const VenueContribution = ({ data }: { data: { name: string; count: number }[] }
     </div>
 );
 
+const TrafficFlow = ({
+    totalEntries, totalScans, accepted, denied, banned, netOcc, areaDistrib,
+}: {
+    totalEntries: number; totalScans: number; accepted: number;
+    denied: number; banned: number; netOcc: number;
+    areaDistrib: { name: string; count: number; pct: number }[];
+}) => {
+    const max = Math.max(totalEntries, 1);
+    const funnelRows = [
+        { label: 'Total Entries', value: totalEntries, color: 'bg-indigo-500', textColor: 'text-white' },
+        { label: 'IDs Scanned', value: totalScans, color: 'bg-indigo-400', textColor: 'text-white' },
+        { label: 'Accepted', value: accepted, color: 'bg-emerald-500', textColor: 'text-emerald-300' },
+        { label: 'Denied', value: denied, color: 'bg-orange-500', textColor: 'text-orange-300' },
+        { label: 'Banned', value: banned, color: 'bg-red-500', textColor: 'text-red-300' },
+        { label: 'Net Occupancy', value: netOcc, color: 'bg-cyan-500', textColor: 'text-cyan-300' },
+    ];
+    return (
+        <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">
+            <div className="text-lg mb-1">Traffic Flow</div>
+            <p className="text-xs text-gray-500 mb-4">Where your traffic is concentrated</p>
+
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Processing Funnel</p>
+            <div className="space-y-2 mb-6">
+                {funnelRows.map(row => (
+                    <div key={row.label} className="flex items-center gap-3">
+                        <div className="w-28 text-xs text-gray-400 shrink-0">{row.label}</div>
+                        <div className="flex-1 h-6 bg-gray-800 rounded overflow-hidden">
+                            <div
+                                className={cn('h-full rounded transition-all', row.color)}
+                                style={{ width: `${(row.value / max) * 100}%` }}
+                            />
+                        </div>
+                        <div className={cn('w-8 text-right text-sm font-medium', row.textColor)}>{row.value}</div>
+                    </div>
+                ))}
+            </div>
+
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Area Distribution</p>
+            <div className="space-y-2">
+                {areaDistrib.length === 0 && <p className="text-xs text-gray-600 italic">No entries yet.</p>}
+                {areaDistrib.map(a => (
+                    <div key={a.name} className="flex items-center gap-3">
+                        <div className="w-28 text-xs text-gray-400 truncate shrink-0">{a.name}</div>
+                        <div className="flex-1 h-5 bg-gray-800 rounded overflow-hidden">
+                            <div className="h-full bg-purple-600 rounded" style={{ width: `${a.pct}%` }} />
+                        </div>
+                        <div className="w-10 text-right text-xs text-gray-400">{a.pct}%</div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+const WorkflowNode = ({ label, icon, color }: { label: string; icon: string; color: string }) => (
+    <div className={cn('px-3 py-2 rounded-lg border text-xs text-center min-w-[90px]', color)}>
+        <span className="mr-1">{icon}</span>{label}
+    </div>
+);
+
+const OperationalWorkflow = () => (
+    <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">
+        <div className="text-lg mb-1">Operational Workflow</div>
+        <p className="text-xs text-gray-500 mb-6">How the system updates in real time</p>
+        <div className="flex flex-col items-center gap-3 select-none">
+            <div className="flex items-center gap-2">
+                <WorkflowNode label="ID Scan" icon="🪪" color="border-gray-600 bg-gray-800 text-gray-200" />
+                <span className="text-gray-600">→</span>
+                <WorkflowNode label="Verify" icon="✓" color="border-emerald-800 bg-emerald-900/30 text-emerald-300" />
+                <span className="text-gray-600">→</span>
+                <WorkflowNode label="Ban Check" icon="🛡" color="border-amber-800 bg-amber-900/30 text-amber-300" />
+            </div>
+            <div className="text-gray-600 text-lg">↓</div>
+            <div className="flex items-center gap-8">
+                <WorkflowNode label="✓ Accept" icon="" color="border-emerald-700 bg-emerald-900/40 text-emerald-300" />
+                <WorkflowNode label="✗ Deny" icon="" color="border-red-700 bg-red-900/40 text-red-300" />
+            </div>
+            <div className="text-gray-600 text-lg">↓</div>
+            <div className="flex items-center gap-2">
+                <WorkflowNode label="Add to Count" icon="📊" color="border-blue-800 bg-blue-900/30 text-blue-300" />
+                <span className="text-gray-600">→</span>
+                <WorkflowNode label="Event Log" icon="📋" color="border-purple-800 bg-purple-900/30 text-purple-300" />
+                <span className="text-gray-600">→</span>
+                <WorkflowNode label="Reports" icon="📈" color="border-indigo-800 bg-indigo-900/30 text-indigo-300" />
+            </div>
+        </div>
+    </div>
+);
+
 // --- Chart Helpers ---
 
 function buildHourlyData(events: CountEvent[]) {
@@ -547,6 +636,21 @@ export default function DashboardPage() {
             .map(([venueId, count]) => ({ name: venueNameMap[venueId] ?? 'Unknown', count }));
     }, [todayEvents, venueNameMap]);
 
+    const areaDistribData = useMemo(() => {
+        const counts: Record<string, number> = {};
+        todayEvents
+            .filter(e => e.delta > 0 && e.area_id)
+            .forEach(e => { counts[e.area_id] = (counts[e.area_id] ?? 0) + e.delta; });
+        const totalIn = Object.values(counts).reduce((s, v) => s + v, 0);
+        return Object.entries(counts)
+            .sort((a, b) => b[1] - a[1])
+            .map(([areaId, count]) => ({
+                name: areaMap[areaId] ?? 'Unknown',
+                count,
+                pct: totalIn > 0 ? Math.round((count / totalIn) * 100) : 0,
+            }));
+    }, [todayEvents, areaMap]);
+
     // --- Render: No businesses (new user / redirecting to onboarding) ---
     if (!isLoading && businesses.length === 0) {
         return (
@@ -750,6 +854,20 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <LocationDistribution data={locationData} />
                 <VenueContribution data={venueContribData} />
+            </div>
+
+            {/* Traffic Flow + Operational Workflow */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <TrafficFlow
+                    totalEntries={totalEntries}
+                    totalScans={totalScans}
+                    accepted={totalScans - deniedCount}
+                    denied={deniedCount}
+                    banned={activeBansCount}
+                    netOcc={liveOccupancy}
+                    areaDistrib={areaDistribData}
+                />
+                <OperationalWorkflow />
             </div>
         </div>
     );
