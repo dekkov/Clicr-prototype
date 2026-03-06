@@ -4,12 +4,12 @@ import React, { useMemo, useEffect, useState } from 'react';
 import { useApp } from '@/lib/store';
 import {
     Users, TrendingUp, ScanLine, ShieldBan,
-    Calendar, RefreshCw, Download
+    Calendar, RefreshCw, Download, MapPin
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { GettingStartedChecklist } from './_components/GettingStartedChecklist';
-import type { IDScanEvent, CountEvent } from '@/lib/types';
+import type { IDScanEvent, CountEvent, Venue } from '@/lib/types';
 import type { HeatmapData } from '@/app/api/reports/heatmap/route';
 import {
     BarChart, Bar, AreaChart, Area,
@@ -360,6 +360,66 @@ const OperationalWorkflow = () => (
     </div>
 );
 
+const LiveVenues = ({ data, onViewAll }: {
+    data: { venue: Venue; occupancy: number; capacity: number | null; pctFull: number | null; venueEntries: number; venueExits: number; areaCount: number }[];
+    onViewAll: () => void;
+}) => {
+    if (data.length === 0) return null;
+    return (
+        <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-gray-400" />
+                    <span className="text-lg">Live Venues</span>
+                </div>
+                <button
+                    onClick={onViewAll}
+                    className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
+                >
+                    View all →
+                </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {data.map(({ venue, occupancy, capacity, pctFull, venueEntries, venueExits, areaCount }) => (
+                    <div key={venue.id} className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-4">
+                        <div className="flex items-start justify-between mb-2">
+                            <div>
+                                <p className="font-medium text-white">{venue.name}</p>
+                                <p className="text-xs text-gray-500 mt-0.5">{areaCount} area{areaCount !== 1 ? 's' : ''}</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-2xl font-semibold text-white">{occupancy}</p>
+                                {capacity && <p className="text-xs text-gray-500">of {capacity}</p>}
+                            </div>
+                        </div>
+                        {pctFull !== null && (
+                            <div className="mb-3">
+                                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                    <span>{pctFull}% full</span>
+                                </div>
+                                <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                                    <div
+                                        className={cn(
+                                            'h-full rounded-full transition-all',
+                                            pctFull >= 90 ? 'bg-red-500' :
+                                            pctFull >= 75 ? 'bg-amber-500' : 'bg-emerald-500'
+                                        )}
+                                        style={{ width: `${Math.min(100, pctFull)}%` }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                        <div className="flex gap-3 text-xs">
+                            <span className="text-emerald-400">+{venueEntries}</span>
+                            <span className="text-red-400">-{venueExits}</span>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
 // --- Chart Helpers ---
 
 function buildHourlyData(events: CountEvent[]) {
@@ -651,6 +711,23 @@ export default function DashboardPage() {
             }));
     }, [todayEvents, areaMap]);
 
+    const liveVenuesData = useMemo(() => {
+        return venues.map(venue => {
+            const venueAreas = areas.filter(a => a.venue_id === venue.id);
+            const doorArea = venueAreas.find(a => a.area_type === 'VENUE_DOOR');
+            const occupancy = doorArea?.current_occupancy ?? 0;
+            const capacity = venue.total_capacity ?? null;
+            const pctFull = capacity && capacity > 0 ? Math.round((occupancy / capacity) * 100) : null;
+
+            const venueEvents = todayEvents.filter(e => e.venue_id === venue.id);
+            const venueEntries = venueEvents.filter(e => e.delta > 0).reduce((s, e) => s + e.delta, 0);
+            const venueExits = venueEvents.filter(e => e.delta < 0).reduce((s, e) => s + Math.abs(e.delta), 0);
+            const areaCount = venueAreas.filter(a => a.area_type !== 'VENUE_DOOR' && a.is_active).length;
+
+            return { venue, occupancy, capacity, pctFull, venueEntries, venueExits, areaCount };
+        });
+    }, [venues, areas, todayEvents]);
+
     // --- Render: No businesses (new user / redirecting to onboarding) ---
     if (!isLoading && businesses.length === 0) {
         return (
@@ -869,6 +946,9 @@ export default function DashboardPage() {
                 />
                 <OperationalWorkflow />
             </div>
+
+            {/* Live Venues */}
+            <LiveVenues data={liveVenuesData} onViewAll={() => router.push('/areas')} />
         </div>
     );
 }
