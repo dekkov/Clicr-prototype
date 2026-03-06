@@ -229,7 +229,7 @@ function BusinessSelector() {
                         <>
                             <div className="border-t border-gray-700" />
                             <Link
-                                href="/onboarding/setup"
+                                href="/businesses/new"
                                 onClick={() => setOpen(false)}
                                 className="w-full flex items-center gap-2.5 px-3 py-2.5 transition-colors text-left text-gray-400 hover:bg-gray-800/60 hover:text-white"
                             >

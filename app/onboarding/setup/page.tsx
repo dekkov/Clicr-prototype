@@ -17,7 +17,6 @@ export default function OnboardingSetupPage() {
 
     // Do NOT redirect based on businesses.length — that caused a race: after step 1, refreshState
     // populates businesses and we'd redirect before the user could continue to step 2.
-    // "Add New Business" from sidebar also uses this flow; both need to complete the wizard.
 
     const [step, setStep] = useState<Step>('BUSINESS');
     const [isLoading, setIsLoading] = useState(false);
