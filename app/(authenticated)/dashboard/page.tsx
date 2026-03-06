@@ -150,6 +150,89 @@ const OccupancyOverTime = ({ data, peak }: { data: { hour: string; occupancy: nu
     </div>
 );
 
+const HEATMAP_HOURS = [8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,0,1,2];
+const HEATMAP_HOUR_LABELS = ['8a','9a','10a','11a','12p','1p','2p','3p','4p','5p','6p','7p','8p','9p','10p','11p','12a','1a','2a'];
+const HEATMAP_DAYS = [
+    { label: 'Mon', jsDay: 1 },
+    { label: 'Tue', jsDay: 2 },
+    { label: 'Wed', jsDay: 3 },
+    { label: 'Thu', jsDay: 4 },
+    { label: 'Fri', jsDay: 5 },
+    { label: 'Sat', jsDay: 6 },
+    { label: 'Sun', jsDay: 0 },
+];
+const INTENSITY_CLASSES = [
+    'bg-gray-800',
+    'bg-purple-900/60',
+    'bg-purple-700/60',
+    'bg-purple-600/80',
+    'bg-purple-500',
+];
+
+const PeakTimesHeatmap = ({ data, loading }: { data: HeatmapData; loading: boolean }) => {
+    const maxVal = useMemo(() => {
+        let m = 1;
+        Object.values(data).forEach(hours =>
+            Object.values(hours).forEach(v => { if (v > m) m = v; })
+        );
+        return m;
+    }, [data]);
+
+    const intensityClass = (count: number) => {
+        if (count === 0) return INTENSITY_CLASSES[0];
+        const ratio = count / maxVal;
+        if (ratio < 0.25) return INTENSITY_CLASSES[1];
+        if (ratio < 0.5) return INTENSITY_CLASSES[2];
+        if (ratio < 0.75) return INTENSITY_CLASSES[3];
+        return INTENSITY_CLASSES[4];
+    };
+
+    return (
+        <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">
+            <div className="flex items-center gap-2 mb-1">
+                <Calendar className="w-4 h-4 text-gray-400" />
+                <span className="text-lg">Peak Times Heatmap</span>
+            </div>
+            <p className="text-xs text-gray-500 mb-4">Entry density by day × hour (all time)</p>
+            {loading ? (
+                <div className="h-40 animate-pulse bg-gray-800/50 rounded-lg" />
+            ) : (
+                <div className="overflow-x-auto">
+                    <div className="min-w-[600px]">
+                        <div className="flex mb-1 ml-10">
+                            {HEATMAP_HOUR_LABELS.map(h => (
+                                <div key={h} className="flex-1 text-center text-[10px] text-gray-500">{h}</div>
+                            ))}
+                        </div>
+                        {HEATMAP_DAYS.map(({ label, jsDay }) => (
+                            <div key={label} className="flex items-center gap-1 mb-1">
+                                <div className="w-9 text-xs text-gray-500 text-right pr-1">{label}</div>
+                                {HEATMAP_HOURS.map(h => {
+                                    const count = data[jsDay]?.[h] ?? 0;
+                                    return (
+                                        <div
+                                            key={h}
+                                            className={cn('flex-1 h-6 rounded-sm transition-colors', intensityClass(count))}
+                                            title={`${label} ${HEATMAP_HOUR_LABELS[HEATMAP_HOURS.indexOf(h)]}: ${count} entries`}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        ))}
+                        <div className="flex items-center justify-end gap-1 mt-2">
+                            <span className="text-[10px] text-gray-500 mr-1">Less</span>
+                            {INTENSITY_CLASSES.map((cls, i) => (
+                                <div key={i} className={cn('w-4 h-4 rounded-sm', cls)} />
+                            ))}
+                            <span className="text-[10px] text-gray-500 ml-1">More</span>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
 // --- Chart Helpers ---
 
 function buildHourlyData(events: CountEvent[]) {
@@ -600,6 +683,9 @@ export default function DashboardPage() {
                 <HourlyTraffic data={hourlyData} />
                 <OccupancyOverTime data={occupancyData} peak={peakOccupancyValue} />
             </div>
+
+            {/* Peak Times Heatmap */}
+            <PeakTimesHeatmap data={heatmapData} loading={heatmapLoading} />
         </div>
     );
 }
