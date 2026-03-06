@@ -662,6 +662,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setState(prev => ({ ...prev, venues: [...prev.venues, venue] }));
         try {
             await authFetch({ action: 'ADD_VENUE', payload: venue });
+            // Auto-create the venue's dedicated occupancy counter
+            const venueDoorArea: Area = {
+                id: crypto.randomUUID(),
+                venue_id: venue.id,
+                business_id: venue.business_id,
+                name: 'Venue Counter',
+                area_type: 'VENUE_DOOR',
+                counting_mode: 'BOTH',
+                is_active: true,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            };
+            setState(prev => ({ ...prev, areas: [...prev.areas, venueDoorArea] }));
+            await authFetch({ action: 'ADD_AREA', payload: venueDoorArea });
         } catch (error) { console.error("Failed to add venue", error); }
     };
 
