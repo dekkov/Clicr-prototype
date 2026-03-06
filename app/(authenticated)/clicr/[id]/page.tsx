@@ -8,9 +8,5 @@ export default function ClicrPage() {
     const { id } = useParams();
     const clicrId = typeof id === 'string' ? id : undefined;
 
-    return (
-        <div className="h-[100vh] bg-black">
-            <ClicrPanel clicrId={clicrId} className="h-full" />
-        </div>
-    );
+    return <ClicrPanel clicrId={clicrId} />;
 }

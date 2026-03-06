@@ -1,9 +1,23 @@
 "use client";
 
-import React, { useEffect, useState, useRef, useCallback } from 'react';
-
+import React, { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+    ArrowLeft, Wifi, WifiOff, ScanLine, XCircle, Zap,
+    RefreshCw, Settings2, Bug, RotateCcw, Scan
+} from 'lucide-react';
 import { useApp } from '@/lib/store';
 import { cn } from '@/lib/utils';
+import type { IDScanEvent } from '@/lib/types';
+import { parseAAMVA } from '@/lib/aamva';
+import { evaluateScan } from '@/lib/scan-service';
+import { Html5Qrcode } from 'html5-qrcode';
+import { getVenueCapacityRules } from '@/lib/capacity';
+import { ScannerResult } from '@/lib/ui/components/ScannerResult';
+import { useAreaShift } from '@/lib/useAreaShift';
+
+type Mode = 'count' | 'scan';
 
 /** Isolated config modal body — receives only a ref so it never re-renders when parent updates (fixes focus loss) */
 const ConfigModalBody = React.memo(function ConfigModalBody({
@@ -79,50 +93,34 @@ const ConfigModalBody = React.memo(function ConfigModalBody({
     );
 }, (prev, next) => prev.configRef === next.configRef);
 
-import { motion, AnimatePresence } from 'framer-motion';
-import { Settings2, Plus, Minus, XCircle, Check, Zap, Bug, RefreshCw } from 'lucide-react';
-import { IDScanEvent } from '@/lib/types';
-import { parseAAMVA } from '@/lib/aamva';
-import { evaluateScan } from '@/lib/scan-service';
-import { Html5Qrcode } from 'html5-qrcode';
-import { getVenueCapacityRules } from '@/lib/capacity';
-import { tokens } from '@/lib/ui/tokens';
-import { MetricCard, ActionButton, OccupancyDisplay } from '@/lib/ui/components/ClicrComponents';
-import { ScannerResult, ScanStatus } from '@/lib/ui/components/ScannerResult';
-import { METRICS } from '@/lib/core/metrics';
-import { getTodayWindow } from '@/lib/core/time';
-import { useAreaShift } from '@/lib/useAreaShift';
-
 // Mock data generator for simulation
 const generateMockID = () => {
-    const isUnderage = Math.random() < 0.15; // 15% chance of underage
+    const isUnderage = Math.random() < 0.15;
     const age = isUnderage ? Math.floor(Math.random() * (20 - 16 + 1) + 16) : Math.floor(Math.random() * (65 - 21 + 1) + 21);
     const sex = Math.random() > 0.5 ? 'M' : 'F';
     const zip = Math.floor(Math.random() * 90000 + 10000).toString();
-
     let age_band = '21-25';
     if (age < 21) age_band = 'Under 21';
     else if (age > 25 && age <= 30) age_band = '26-30';
     else if (age > 30 && age <= 40) age_band = '31-40';
     else if (age > 40) age_band = '41+';
-
     return { age, sex, zip, age_band };
 };
-
 
 export default function ClicrPanel({
     clicrId,
     className,
 }: {
-    clicrId?: string,
-    className?: string,
+    clicrId?: string;
+    className?: string;
 }) {
+    const router = useRouter();
     const {
         clicrs, areas, events, venues,
         recordEvent, recordScan, recordTurnaround,
         resetCounts, endShift, isLoading, patrons, patronBans, updateClicr, debug, currentUser,
-        turnarounds, trafficSessionStart, activeShiftId, activeShiftAreaId,
-        setPollingPaused
+        turnarounds, activeShiftId, activeShiftAreaId,
+        setPollingPaused, areaTraffic, refreshTrafficStats
     } = useApp();
 
     const id = clicrId;
@@ -130,12 +128,69 @@ export default function ClicrPanel({
     const lastClicrRef = useRef<any>(null);
     if (rawClicr) lastClicrRef.current = rawClicr;
     const clicr = rawClicr || lastClicrRef.current;
+
+    // Mode: count or scan
+    const [mode, setMode] = useState<Mode>('count');
+
+    // Scan state
+    const [addToCountOnAccept, setAddToCountOnAccept] = useState(true);
+    const [manualScanInput, setManualScanInput] = useState('');
+    const [lastScan, setLastScan] = useState<IDScanEvent | null>(null);
     const [showCameraScanner, setShowCameraScanner] = useState(false);
-
-    // Flashlight State (Moved to top to avoid Hook Rule violation)
     const [torchOn, setTorchOn] = useState(false);
+    const [classifyMode, setClassifyMode] = useState(false);
+    const [pendingScan, setPendingScan] = useState<IDScanEvent | null>(null);
 
-    // cleanup torch on unmount
+    // Hardware scanner input (keyboard wedge)
+    const [scannerInput, setScannerInput] = useState('');
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    // Modal state
+    const [showBulkModal, setShowBulkModal] = useState(false);
+    const [bulkValue, setBulkValue] = useState(0);
+    const [showConfigModal, setShowConfigModal] = useState(false);
+    const [showDebug, setShowDebug] = useState(false);
+    const [generatingToken, setGeneratingToken] = useState(false);
+
+    const isModalOpenRef = useRef(false);
+    useEffect(() => {
+        isModalOpenRef.current = showBulkModal || showConfigModal;
+    }, [showBulkModal, showConfigModal]);
+
+    // Area + venue data
+    const currentArea = (areas || []).find(a => a.id === clicr?.area_id);
+    const lastOccupancyRef = useRef<number | null>(null);
+    if (currentArea?.current_occupancy !== undefined) {
+        lastOccupancyRef.current = currentArea.current_occupancy;
+    }
+    const totalAreaCount = currentArea?.current_occupancy ?? lastOccupancyRef.current ?? 0;
+
+    const venueId = currentArea?.venue_id;
+    const venueAreas = (areas || []).filter(a => a.venue_id === venueId);
+    const venueDoorArea = venueAreas.find(a => a.area_type === 'VENUE_DOOR');
+    const currentVenueOccupancy = venueDoorArea?.current_occupancy ?? 0;
+    const isVenueDoor = currentArea?.area_type === 'VENUE_DOOR';
+    const venue = (venues || []).find(v => v.id === venueId);
+
+    const scopeKey = (venue?.business_id && venueId && clicr?.area_id)
+        ? `area:${venue.business_id}:${venueId}:${clicr.area_id}`
+        : null;
+    const areaStats = scopeKey ? (areaTraffic || {})[scopeKey] : null;
+    const globalIn = areaStats?.total_in ?? 0;
+    const globalOut = areaStats?.total_out ?? 0;
+
+    useEffect(() => {
+        if (!venueId || !venue?.business_id || !clicr?.area_id) return;
+        refreshTrafficStats?.(venueId, clicr.area_id);
+    }, [venueId, venue?.business_id, clicr?.area_id, events]);
+
+    // Capacity
+    const capacity = currentArea?.capacity_max ?? null;
+    const capacityPercent = capacity && capacity > 0
+        ? Math.min(100, Math.round((totalAreaCount / capacity) * 100))
+        : null;
+
+    // Torch cleanup
     useEffect(() => {
         return () => {
             if ((window as any).localStream) {
@@ -144,115 +199,43 @@ export default function ClicrPanel({
         };
     }, []);
 
-    // Calculate total area occupancy from SNAPSHOT (Source of Truth)
-    const currentArea = (areas || []).find(a => a.id === clicr?.area_id);
-    const lastOccupancyRef = useRef<number | null>(null);
+    // Area shift management
+    useAreaShift(currentArea);
 
-    if (currentArea?.current_occupancy !== undefined) {
-        lastOccupancyRef.current = currentArea.current_occupancy;
-    }
-
-    // Prevents flash to 0 if data momentarily disappears during sync
-    const totalAreaCount = currentArea?.current_occupancy ?? lastOccupancyRef.current;
-
-    // Calculate aggregated stats for the ENTIRE VENUE from SNAPSHOTS
-    const venueId = currentArea?.venue_id;
-
-    // Venue Occupancy = VENUE_DOOR area only (dedicated door counter)
-    const venueAreas = (areas || []).filter(a => a.venue_id === venueId);
-    const venueDoorArea = venueAreas.find(a => a.area_type === 'VENUE_DOOR');
-    const currentVenueOccupancy = venueDoorArea?.current_occupancy ?? 0;
-
-    // Is this clicr assigned to the venue door area?
-    const isVenueDoor = currentArea?.area_type === 'VENUE_DOOR';
-    const venue = (venues || []).find(v => v.id === venueId);
-
-    // Keep event-based stats for "Session" view if needed, but rely on snapshots for enforcement
-    const venueEvents = (events || []).filter(e => e.venue_id === venueId);
-
-    /**
-     * TRAFFIC STATS (IN / OUT)
-     * - Source: occupancy_events (via RPC)
-     * - Scope: Filtered by Area if device is assigned, else Venue.
-     */
-    const { areaTraffic, refreshTrafficStats } = useApp();
-    const scopeKey = (venue?.business_id && venueId && clicr?.area_id)
-        ? `area:${venue.business_id}:${venueId}:${clicr.area_id}`
-        : null;
-
-    // Subscribe to store updates
-    const areaStats = scopeKey ? (areaTraffic || {})[scopeKey] : null;
+    // Load classify mode from localStorage
+    useEffect(() => {
+        const saved = localStorage.getItem(`clicr_classify_mode_${id}`);
+        if (saved === 'true') setClassifyMode(true);
+    }, [id, clicr, showConfigModal]);
 
     useEffect(() => {
-        if (!venueId || !venue?.business_id || !clicr?.area_id) return;
+        if (!showConfigModal) setPollingPaused?.(false);
+    }, [showConfigModal, setPollingPaused]);
 
-        // Fetch on mount and whenever events change (e.g. from tap route or polling)
-        refreshTrafficStats?.(venueId, clicr.area_id);
-    }, [venueId, venue?.business_id, clicr?.area_id, events]); // Re-run when events update
-
-    const globalIn = areaStats?.total_in;
-    const globalOut = areaStats?.total_out;
-
-    // DEBUG PANEL STATE
-    const [showDebug, setShowDebug] = useState(false);
-
-    const [showBulkModal, setShowBulkModal] = useState(false);
-    const [bulkValue, setBulkValue] = useState(0);
-
-    const [showConfigModal, setShowConfigModal] = useState(false);
-
-    // Classification Mode State
-    const [classifyMode, setClassifyMode] = useState(false);
-    const [showScanBreakdown, setShowScanBreakdown] = useState(false);
-    const [pendingScan, setPendingScan] = useState<IDScanEvent | null>(null);
-
-    // Scanner State
-    const [lastScan, setLastScan] = useState<IDScanEvent | null>(null);
-    const [scannerInput, setScannerInput] = useState('');
-    const inputRef = useRef<HTMLInputElement>(null);
-
-    // Track modal state via ref to avoid listener re-binding
-    const isModalOpenRef = useRef(false);
+    // Hardware scanner focus management
     useEffect(() => {
-        isModalOpenRef.current = showBulkModal || showConfigModal;
-    }, [showBulkModal, showConfigModal]);
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (isModalOpenRef.current) return;
+            const target = e.target as HTMLElement;
+            if (target.tagName === 'INPUT' && target !== inputRef.current) return;
+            if (document.activeElement !== inputRef.current) {
+                inputRef.current?.focus({ preventScroll: true });
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        const timer = setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 100);
+        return () => {
+            clearTimeout(timer);
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, []);
 
-    // Force focus when modals close
     useEffect(() => {
         if (!showBulkModal && !showConfigModal) {
             const timer = setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 50);
             return () => clearTimeout(timer);
         }
     }, [showBulkModal, showConfigModal]);
-
-    // Focus management for hardware scanner
-    useEffect(() => {
-        // Global keydown listener to catch hardware scans even if focus is lost
-        const handleKeyDown = (e: KeyboardEvent) => {
-            // Check ref to see if we should ignore (modal open)
-            if (isModalOpenRef.current) return;
-
-            // Ignore if user is typing in a real input field (like bulk modal)
-            const target = e.target as HTMLElement;
-            if (target.tagName === 'INPUT' && target !== inputRef.current) return;
-
-            // If input is not focused, refocus it and append the key
-            if (document.activeElement !== inputRef.current) {
-                inputRef.current?.focus({ preventScroll: true });
-            }
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-
-        // Initial focus
-        const timer = setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 100);
-
-        return () => {
-            clearTimeout(timer);
-            window.removeEventListener('keydown', handleKeyDown);
-        };
-
-    }, []); // Run once on mount! Stable listener.
 
     useEffect(() => {
         const handleBlur = () => {
@@ -265,8 +248,24 @@ export default function ClicrPanel({
         return () => inputEl?.removeEventListener('blur', handleBlur);
     }, [showBulkModal, showConfigModal]);
 
+    // Hardware scan debounce
+    useEffect(() => {
+        if (!scannerInput) return;
+        const timeout = setTimeout(() => {
+            if (scannerInput.length > 10) {
+                try {
+                    const parsed = parseAAMVA(scannerInput);
+                    if (parsed.firstName || parsed.idNumber || parsed.city) {
+                        processScan(parsed);
+                        setScannerInput('');
+                    }
+                } catch { }
+            }
+        }, 300);
+        return () => clearTimeout(timeout);
+    }, [scannerInput]);
 
-    const [editName, setEditName] = useState('');
+    // Config modal ref
     const configModalRef = useRef<{
         initialName: string;
         clicrId: string;
@@ -279,51 +278,10 @@ export default function ClicrPanel({
         onClassifyToggle: (newVal: boolean) => void;
         onCopy: () => void;
     } | null>(null);
-    const [generatingToken, setGeneratingToken] = useState(false);
-    const [copied, setCopied] = useState(false);
-
-    const TIMEZONES = [
-        { value: 'America/New_York', label: 'Eastern (ET)' },
-        { value: 'America/Chicago', label: 'Central (CT)' },
-        { value: 'America/Denver', label: 'Mountain (MT)' },
-        { value: 'America/Los_Angeles', label: 'Pacific (PT)' },
-        { value: 'America/Phoenix', label: 'Arizona (no DST)' },
-        { value: 'America/Anchorage', label: 'Alaska (AKT)' },
-        { value: 'Pacific/Honolulu', label: 'Hawaii (HT)' },
-        { value: 'Europe/London', label: 'London (GMT/BST)' },
-        { value: 'Europe/Paris', label: 'Paris / Berlin (CET)' },
-        { value: 'Asia/Dubai', label: 'Dubai (GST)' },
-        { value: 'Asia/Singapore', label: 'Singapore (SGT)' },
-        { value: 'Asia/Tokyo', label: 'Tokyo (JST)' },
-        { value: 'Australia/Sydney', label: 'Sydney (AEST)' },
-        { value: 'UTC', label: 'UTC' },
-    ];
-
-    // Area-level shift management (auto-reset moved from device to area)
-    useAreaShift(currentArea);
-
-    // Load from local storage or Server on mount/update
-    useEffect(() => {
-        // Load Classify Mode
-        const savedClassify = localStorage.getItem(`clicr_classify_mode_${id}`);
-        if (savedClassify === 'true') {
-            setClassifyMode(true);
-        }
-
-    }, [id, clicr, showConfigModal]);
-
-    useEffect(() => {
-        if (!showConfigModal) setPollingPaused?.(false);
-    }, [showConfigModal, setPollingPaused]);
-
 
     const saveConfig = async (name: string) => {
         if (clicr) {
-            await updateClicr({
-                ...clicr,
-                name: name,
-                button_config: { ...(clicr.button_config ?? {}) }
-            });
+            await updateClicr({ ...clicr, name, button_config: { ...(clicr.button_config ?? {}) } });
         }
         setShowConfigModal(false);
         setPollingPaused?.(false);
@@ -334,71 +292,43 @@ export default function ClicrPanel({
         setGeneratingToken(true);
         try {
             const token = Math.random().toString(36).slice(2, 10);
-            await updateClicr({
-                ...clicr,
-                button_config: { ...(clicr.button_config ?? {}), tap_token: token },
-            });
+            await updateClicr({ ...clicr, button_config: { ...(clicr.button_config ?? {}), tap_token: token } });
         } finally {
             setGeneratingToken(false);
         }
     };
 
-    // ...
-
-    // if (isLoading) return <div className="p-8 text-white">Connecting...</div>;
-    // if (!clicr) return <div className="p-8 text-white">Clicr not found</div>;
-
-    const handleBulkSubmit = () => {
+    // --- COUNT HANDLERS ---
+    const handleIn = (gender: 'M' | 'F') => {
         if (!clicr || !venueId) return;
-        if (bulkValue !== 0) {
-            recordEvent({
-                venue_id: venueId,
-                area_id: clicr.area_id,
-                clicr_id: clicr.id,
-                delta: bulkValue,
-                // Always attribute corrections to 'IN' flow as requested
-                flow_type: 'IN',
-                event_type: 'BULK',
-                idempotency_key: Math.random().toString(36)
-            });
-            setBulkValue(0);
-            setShowBulkModal(false);
-        }
-    };
-
-    const handleGuestIn = () => {
-        if (!clicr || !venueId) return;
-
-        // Capacity enforcement
-        const { maxCapacity: maxCap, mode } = getVenueCapacityRules(venue);
-        if (maxCap > 0 && currentVenueOccupancy >= maxCap) {
-            if (mode === 'HARD_STOP') {
-                alert("CAPACITY REACHED: Entry Blocked (Hard Stop Active)");
+        const { maxCapacity, mode: capMode } = getVenueCapacityRules(venue);
+        if (maxCapacity > 0 && currentVenueOccupancy >= maxCapacity) {
+            if (capMode === 'HARD_STOP') {
+                alert("CAPACITY REACHED: Entry Blocked");
                 if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
                 return;
             }
-            if (mode === 'MANAGER_OVERRIDE' || mode === 'HARD_BLOCK' as any) {
+            if (capMode === 'MANAGER_OVERRIDE' || capMode === 'HARD_BLOCK' as any) {
                 if (!window.confirm("WARNING: Capacity Reached. Authorize Override?")) return;
             }
-            if (mode === 'WARN_ONLY') {
+            if (capMode === 'WARN_ONLY') {
                 if (navigator.vibrate) navigator.vibrate([50, 50, 50, 50]);
             }
         }
-
         if (navigator.vibrate) navigator.vibrate(50);
-
         recordEvent({
             venue_id: venueId,
             area_id: clicr.area_id,
             clicr_id: clicr.id,
             delta: 1,
             flow_type: 'IN',
+            gender,
             event_type: 'TAP',
-            idempotency_key: Math.random().toString(36)
+            idempotency_key: Math.random().toString(36),
         });
     };
 
-    const handleGuestOut = () => {
+    const handleOut = (gender: 'M' | 'F') => {
         if (!clicr || !venueId) return;
         if (navigator.vibrate) navigator.vibrate(50);
         recordEvent({
@@ -407,16 +337,15 @@ export default function ClicrPanel({
             clicr_id: clicr.id,
             delta: -1,
             flow_type: 'OUT',
+            gender,
             event_type: 'TAP',
-            idempotency_key: Math.random().toString(36)
+            idempotency_key: Math.random().toString(36),
         });
     };
 
-    // Reset Logic
     const handleReset = async (silent = false) => {
         if (!silent && !window.confirm('Reset all counts to zero? This cannot be undone.')) return;
         if (!venueId) return;
-
         try {
             await resetCounts(venueId);
             setBulkValue(0);
@@ -425,17 +354,14 @@ export default function ClicrPanel({
             await refreshTrafficStats?.(venueId, clicr.area_id);
         } catch (e) {
             console.error("Reset failed", e);
-            if (!silent) alert("Failed to reset. Please try again or check connection.");
+            if (!silent) alert("Failed to reset. Please try again.");
         }
     };
 
-    // --- ADVANCED SCANNER LOGIC ---
-    // (Hooks moved to top)
-
-    // Unified Scan Processor (The Brain)
+    // --- SCAN LOGIC ---
     const processScan = async (parsed: ReturnType<typeof parseAAMVA>, rawData?: string) => {
         if (!venueId) return;
-        // 1. API Verification (Preferred for Hardware Scans)
+
         if (rawData) {
             try {
                 const res = await fetch('/api/verify-id', {
@@ -445,47 +371,48 @@ export default function ClicrPanel({
                         scan_data: rawData,
                         business_id: venue?.business_id,
                         venue_id: venueId,
-                        area_id: clicr?.area_id
-                    })
+                        area_id: clicr?.area_id,
+                    }),
                 });
-
                 const json = await res.json();
-
                 if (json.success) {
-                    const { status, message, age, dob, name } = json.data;
-
+                    const { status, message, age } = json.data;
                     const scanEvent: any = {
-                        venue_id: venueId || '',
+                        venue_id: venueId,
                         scan_result: status,
-                        age: age,
+                        age,
                         age_band: age >= 21 ? '21+' : 'Under 21',
-                        sex: 'U', // API enhancement needed for Sex if crucial
+                        sex: 'U',
                         zip_code: '00000',
                         uiMessage: message,
-                        timestamp: Date.now()
+                        timestamp: Date.now(),
                     };
-
                     setLastScan(scanEvent);
-
-                    // Haptic Feedback
                     if (status === 'ACCEPTED') {
                         if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+                        if (addToCountOnAccept && clicr?.area_id && clicr?.id) {
+                            recordEvent({
+                                venue_id: venueId,
+                                area_id: clicr.area_id,
+                                clicr_id: clicr.id,
+                                delta: 1,
+                                flow_type: 'IN',
+                                event_type: 'SCAN',
+                                idempotency_key: Math.random().toString(36),
+                            });
+                        }
                     } else {
                         if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
                     }
                     setShowCameraScanner(false);
-                    return; // API handled everything
+                    return;
                 }
             } catch (e) {
-                console.error("API Scan Failed, falling back to local", e);
+                console.error("API Scan failed, falling back to local", e);
             }
         }
 
-        // 2. Fallback (Simulation or API Failure or Manual Parsing)
-        // We use the NEW scan-service logic here
         const result = evaluateScan(parsed, patrons, patronBans, venueId);
-
-        // ... Local Logic (Same as before) ...
         const scanEvent: Omit<IDScanEvent, 'id' | 'timestamp'> = {
             venue_id: venueId,
             scan_result: result.status === 'ACCEPTED' ? 'ACCEPTED' : 'DENIED',
@@ -499,32 +426,13 @@ export default function ClicrPanel({
             id_number: parsed.idNumber || undefined,
             issuing_state: parsed.state || undefined,
             address_street: parsed.addressStreet || undefined,
-            city: parsed.city || undefined
+            city: parsed.city || undefined,
         };
-
         recordScan(scanEvent);
-
-        setLastScan({
-            ...scanEvent,
-            id: 'temp',
-            timestamp: Date.now(),
-            uiMessage: result.message
-        } as any);
+        setLastScan({ ...scanEvent, id: 'temp', timestamp: Date.now(), uiMessage: result.message } as any);
 
         if (result.status === 'ACCEPTED') {
-            if (classifyMode) {
-                setPendingScan({ ...scanEvent, id: 'temp_pending', timestamp: Date.now() } as any);
-                if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
-            } else {
-                // Check Capacity Locally if fallback
-                if (venue) {
-                    const maxCap = venue.default_capacity_total || 0;
-                    if (maxCap > 0 && currentVenueOccupancy >= maxCap) {
-                        alert("CAPACITY REACHED");
-                        return;
-                    }
-                }
-
+            if (addToCountOnAccept) {
                 if (!clicr?.area_id || !clicr?.id) return;
                 recordEvent({
                     venue_id: venueId,
@@ -532,11 +440,13 @@ export default function ClicrPanel({
                     clicr_id: clicr.id,
                     delta: 1,
                     flow_type: 'IN',
-                    gender: parsed.sex || 'M',
+                    gender: parsed.sex as 'M' | 'F' | undefined,
                     event_type: 'SCAN',
-                    idempotency_key: Math.random().toString(36)
+                    idempotency_key: Math.random().toString(36),
                 });
                 if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+            } else {
+                if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
             }
         } else {
             if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
@@ -544,68 +454,64 @@ export default function ClicrPanel({
         setShowCameraScanner(false);
     };
 
-    // Hardware Scanner Input Handler (Keyboard Wedge)
     const handleHardwareSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!scannerInput) return;
         try {
-            console.log("Processing Hardware Scan...");
             const parsed = parseAAMVA(scannerInput);
-            processScan(parsed, scannerInput); // Pass Raw String!
-        } catch (err) {
-            console.error("Scan Parse Error", err);
+            processScan(parsed, scannerInput);
+        } catch {
             alert("Failed to parse ID. Please try again.");
         }
         setScannerInput('');
     };
 
-    // Simulation Handler
+    const handleManualScanProcess = () => {
+        if (!manualScanInput.trim()) return;
+        try {
+            const parsed = parseAAMVA(manualScanInput);
+            processScan(parsed, manualScanInput);
+        } catch {
+            alert("Failed to parse scan data. Please check the input.");
+        }
+        setManualScanInput('');
+    };
+
     const handleSimulateScan = () => {
-        // Create a random mock ID but structurally correct for parsing helper
         const mock = generateMockID();
-        // Since we need ParsedID structure, let's just make a fake one compatible with logic
         const fakeParsed = {
-            firstName: 'Sim',
-            lastName: 'User',
+            firstName: 'Sim', lastName: 'User',
             dateOfBirth: mock.age < 21 ? '20100101' : '19900101',
             sex: mock.sex as any,
             postalCode: mock.zip,
             expirationDate: '20300101',
             age: mock.age,
             isExpired: false,
-            // ... fields needed for ban check logic
             idNumber: `SIM${Math.floor(Math.random() * 10000)}`,
             state: 'CA',
-            addressStreet: null, city: null, eyeColor: null, hairColor: null, height: null, weight: null
+            addressStreet: null, city: null, eyeColor: null, hairColor: null, height: null, weight: null,
         };
         processScan(fakeParsed);
     };
 
     const handleCameraScan = (decodedText: string) => {
         try {
-            console.log("Camera Scan Success");
             const parsed = parseAAMVA(decodedText);
             processScan(parsed, decodedText);
-        } catch (e) {
-            console.error("Camera scan invalid data", e);
-        }
+        } catch { }
     };
 
-    // Flashlight Toggle Function
     const toggleTorch = async () => {
         try {
             if (torchOn) {
-                // Turn OFF
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
                 const track = stream.getVideoTracks()[0];
                 await track.applyConstraints({ advanced: [{ torch: false }] as any });
-                track.stop(); // Stop stream to release camera
+                track.stop();
                 setTorchOn(false);
             } else {
-                // Turn ON
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
                 const track = stream.getVideoTracks()[0];
-                // Check if torch is supported
                 const capabilities = track.getCapabilities() as any;
                 if (!capabilities.torch) {
                     alert("Flashlight not supported on this device.");
@@ -613,62 +519,42 @@ export default function ClicrPanel({
                     return;
                 }
                 await track.applyConstraints({ advanced: [{ torch: true }] as any });
-                // We must keep the track alive for torch to stay on? 
-                // Usually yes. We'll store it in a ref if strictly needed, but let's see if simple track active works.
-                // Actually, stopping the track turns off the torch usually.
-                // So we need to KEEP the stream active. 
-                // But we don't want to show the video element if we just want the torch.
-                // So we just hold the stream in a ref.
-                (window as any).localStream = stream; // Hacky globals or just let it float? better use Ref.
+                (window as any).localStream = stream;
                 setTorchOn(true);
             }
-        } catch (err) {
-            console.error("Flashlight error", err);
-            alert("Could not access flashlight. Ensure camera permissions are granted.");
+        } catch {
+            alert("Could not access flashlight.");
             setTorchOn(false);
         }
     };
 
-    // Debounce Scanner Input (Wait for scanner to finish dumping string)
-    useEffect(() => {
-        if (!scannerInput) return;
-        const timeout = setTimeout(() => {
-            if (scannerInput.length > 10) { // Minimal length check
-                console.log("Processing Hardware Scan (Debounced)...");
-                try {
-                    const parsed = parseAAMVA(scannerInput);
-                    // Only process if we actually got something useful
-                    if (parsed.firstName || parsed.idNumber || parsed.city) {
-                        processScan(parsed);
-                        setScannerInput(''); // Clear after success
-                    }
-                } catch (err) {
-                    // Silent fail if it's just garbage input, otherwise alert?
-                    // console.warn("Parse attempt failed", err);
-                }
-            }
-        }, 300); // 300ms wait after last character
-        return () => clearTimeout(timeout);
-    }, [scannerInput]);
+    // --- LOADING / NOT FOUND ---
+    if (isLoading) return (
+        <div className="min-h-screen bg-[#0a0b0f] flex items-center justify-center text-slate-500 animate-pulse">
+            Connecting...
+        </div>
+    );
 
-    if (isLoading) return <div className="min-h-screen bg-black flex items-center justify-center text-slate-500 animate-pulse">Connecting...</div>;
+    if (!clicr) return (
+        <div className="min-h-screen bg-[#0a0b0f] flex flex-col items-center justify-center text-slate-400 gap-4">
+            <div className="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
+            <div className="text-sm">Syncing device state...</div>
+        </div>
+    );
 
-    // Robust check: If clicr missing but we have ID, maybe wait a bit or show helpful error
-    if (!clicr) {
-        // Fallback: This might happen during a hard sync or if the device was just added/removed.
-        return (
-            <div className="min-h-screen bg-black flex flex-col items-center justify-center text-slate-400 gap-4">
-                <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                <div className="text-sm">Syncing Device State...</div>
-                {/* Hidden debug info just in case */}
-                <div className="hidden">ID: {id}</div>
-            </div>
-        );
-    }
+    const showOutButtons = clicr.direction_mode !== 'in_only' && clicr.flow_mode !== 'IN_ONLY';
+    const debugAny = debug as any;
+    // debug is boolean in store; treat any loaded, non-loading state as connected.
+    // In demo mode there is no Supabase WS — show "Demo" instead of Offline.
+    const isDemoMode = process.env.NEXT_PUBLIC_APP_MODE === 'demo';
+    const isRealtimeConnected = isDemoMode ? false : (debugAny?.realtimeStatus === 'SUBSCRIBED' || !!debug);
 
     return (
-        <div className={cn("flex flex-col h-[100vh] relative overflow-hidden", isVenueDoor ? "bg-[#0d0a00]" : "bg-black")} onClick={() => { if (!isModalOpenRef.current) inputRef.current?.focus({ preventScroll: true }); }}>
-            {/* Hidden Input */}
+        <div
+            className={cn("flex flex-col min-h-screen bg-[#0a0b0f] text-white", className)}
+            onClick={() => { if (!isModalOpenRef.current) inputRef.current?.focus({ preventScroll: true }); }}
+        >
+            {/* Hidden hardware scanner input */}
             <textarea
                 ref={inputRef as any}
                 value={scannerInput}
@@ -677,140 +563,337 @@ export default function ClicrPanel({
                 autoComplete="off"
             />
 
-            {/* UI LAYER - PIXEL MATCH */}
-            <div className="flex flex-col h-full relative z-10">
+            {/* ── TOPBAR ─────────────────────────────────────────── */}
+            <header className="flex items-center px-4 pt-6 pb-3 shrink-0">
+                {/* Left slot — same w-[90px] as tabs row */}
+                <div className="w-[90px] flex justify-start">
+                    <button
+                        onClick={() => router.back()}
+                        className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors p-1 -ml-1"
+                    >
+                        <ArrowLeft className="w-5 h-5" />
+                        <span className="text-sm font-medium">Back</span>
+                    </button>
+                </div>
 
-                {/* 1. Header */}
-                <header className="flex justify-between items-start pt-8 pb-4 px-6 shrink-0">
-                    <div>
-                        <h2 className={cn("font-bold text-[10px] uppercase tracking-[0.2em] mb-1", isVenueDoor ? "text-amber-500" : "text-slate-500")}>
-                            {venue?.name || 'VENUE'}
-                        </h2>
-                        <div className="flex items-center gap-2">
-                            <h1 className={cn("font-bold text-2xl tracking-tight", isVenueDoor ? "text-amber-300" : "text-white")}>
-                                {clicr.name}
-                            </h1>
-                            <button onClick={() => {
-                                setEditName(clicr.name);
-                                configModalRef.current = {
-                                    initialName: clicr.name,
-                                    clicrId: clicr.id,
-                                    hasTapToken: !!clicr.button_config?.tap_token,
-                                    tapToken: clicr.button_config?.tap_token ?? '',
-                                    initialClassifyMode: classifyMode,
-                                    onSave: (n) => saveConfig(n),
-                                    onCancel: () => { setShowConfigModal(false); setPollingPaused?.(false); },
-                                    onGenerateToken: generateTapToken,
-                                    onClassifyToggle: (newVal) => { setClassifyMode(newVal); localStorage.setItem(`clicr_classify_mode_${clicr.id}`, String(newVal)); },
-                                    onCopy: async () => { try { await navigator.clipboard.writeText(`${window.location.origin}/tap/${clicr.button_config!.tap_token}`); } catch {} },
-                                };
-                                setPollingPaused?.(true);
-                                setShowConfigModal(true);
-                            }} className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 active:bg-slate-700 transition-colors">
-                                <Settings2 className="w-4 h-4" />
-                            </button>
-                        </div>
+                {/* Center: Name + breadcrumb */}
+                <div className="flex-1 text-center">
+                    <div className="flex items-center justify-center gap-1.5">
+                        <ScanLine className="w-4 h-4 text-indigo-400 shrink-0" />
+                        <h1 className="text-base font-bold text-white leading-none truncate">{clicr.name}</h1>
                     </div>
-                    {isVenueDoor && (
-                        <p className="text-[10px] text-amber-600 uppercase tracking-widest mt-0.5">Venue Occupancy Counter</p>
-                    )}
-                    {/* Status Dot + End Shift */}
-                    <div className="flex gap-4 items-center">
-                        {activeShiftId && activeShiftAreaId === clicr?.area_id && (
-                            <button
-                                onClick={() => endShift(activeShiftId)}
-                                className="px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs font-bold border border-red-500/30 transition-colors"
-                            >
-                                End Shift
-                            </button>
-                        )}
-                        <div className={cn("w-2.5 h-2.5 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.6)]",
-                            isLoading ? "bg-yellow-500" : "bg-[#00C853]"
+                    <p className="text-xs text-slate-500 mt-0.5 truncate">
+                        {currentArea?.name}{venue ? ` · ${venue.name}` : ''}
+                    </p>
+                </div>
+
+                {/* Right slot — same w-[90px] as tabs row */}
+                <div className="w-[90px] flex justify-end">
+                    <button
+                        onClick={() => {
+                            setShowConfigModal(true);
+                            setPollingPaused?.(true);
+                            configModalRef.current = {
+                                initialName: clicr.name,
+                                clicrId: clicr.id,
+                                hasTapToken: !!clicr.button_config?.tap_token,
+                                tapToken: clicr.button_config?.tap_token ?? '',
+                                initialClassifyMode: classifyMode,
+                                onSave: saveConfig,
+                                onCancel: () => { setShowConfigModal(false); setPollingPaused?.(false); },
+                                onGenerateToken: generateTapToken,
+                                onClassifyToggle: (v) => { setClassifyMode(v); localStorage.setItem(`clicr_classify_mode_${clicr.id}`, String(v)); },
+                                onCopy: async () => { try { await navigator.clipboard.writeText(`${window.location.origin}/tap/${clicr.button_config!.tap_token}`); } catch { } },
+                            };
+                        }}
+                        className="p-1.5 text-slate-500 hover:text-slate-300 hover:bg-slate-800 rounded-lg transition-colors"
+                    >
+                        <Settings2 className="w-4 h-4" />
+                    </button>
+                </div>
+            </header>
+
+            {/* ── MODE TABS + STATUS PILLS ───────────────────────── */}
+            <div className="flex items-center px-4 pb-4 shrink-0">
+                {/* Left slot — fixed width, left-aligned pill */}
+                <div className="w-[90px] flex justify-start">
+                    <div className={cn(
+                        "flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap",
+                        isDemoMode
+                            ? "bg-slate-800/60 text-slate-400 border border-slate-700/50"
+                            : isRealtimeConnected
+                                ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                                : "bg-slate-800/60 text-slate-500 border border-slate-700/50"
+                    )}>
+                        <div className={cn(
+                            "w-1.5 h-1.5 rounded-full shrink-0",
+                            isDemoMode ? "bg-slate-500" : isRealtimeConnected ? "bg-emerald-400 animate-pulse" : "bg-slate-500"
                         )} />
+                        {isDemoMode ? 'Demo' : isRealtimeConnected ? 'Realtime' : 'Offline'}
                     </div>
-                </header>
-
-                {/* 2. Main Occupancy */}
-                <div className="flex-1 flex flex-col items-center justify-center min-h-0">
-                    <OccupancyDisplay
-                        count={totalAreaCount ?? 0}
-                        capacity={(currentArea?.capacity_max || venue?.default_capacity_total) || undefined}
-                        percent={
-                            (currentArea?.capacity_max || venue?.default_capacity_total)
-                                ? Math.round((totalAreaCount || 0) / (currentArea?.capacity_max || venue?.default_capacity_total || 1) * 100)
-                                : undefined
-                        }
-                    />
                 </div>
 
-                {/* 3. Stats Row & Turnarounds */}
-                <div className="flex flex-col gap-2 px-6 mb-6 shrink-0">
-                    <div className="grid grid-cols-3 gap-3">
-                        <MetricCard label="TOTAL IN" value={globalIn || 0} />
-                        <MetricCard label="NET" value={totalAreaCount || 0} />
-                        <MetricCard label="TOTAL OUT" value={globalOut || 0} />
-                    </div>
-
-                    {/* Turnaround & Adjusted Net Row (P0) */}
-                    <div className="grid grid-cols-3 gap-3">
+                {/* Center: Count / Scan tabs — flex-1 + flex center keeps it always in the middle */}
+                <div className="flex-1 flex justify-center">
+                    <div className="flex bg-slate-900/60 border border-slate-800 rounded-full p-1 gap-1">
                         <button
-                            onClick={() => handleReset()}
-                            className="bg-slate-900/50 rounded-lg p-2 flex flex-col items-center justify-center border border-white/5 active:bg-slate-800 transition-colors gap-1"
+                            onClick={() => setMode('count')}
+                            className={cn(
+                                "flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold transition-all",
+                                mode === 'count'
+                                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20"
+                                    : "text-slate-400 hover:text-white"
+                            )}
                         >
-                            <RefreshCw className="w-3 h-3 text-slate-600" />
-                            <span className="text-[9px] text-slate-600 font-bold uppercase tracking-wider">Reset</span>
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M12 4V20M4 12H20" />
+                            </svg>
+                            Count
                         </button>
-                        <div className="bg-slate-900/50 rounded-lg p-2 flex flex-col items-center justify-center border border-white/5 cursor-pointer" onClick={() => setShowScanBreakdown(!showScanBreakdown)}>
-                            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">NET (ADJ)</span>
-                            {/* Placeholder logic until store updates propagate */}
-                            <span className="text-white font-mono font-bold">
-                                {(totalAreaCount || 0) - ((turnarounds || []).filter((t: any) => t.area_id === clicr.area_id).reduce((a, b) => a + b.count, 0) || 0)}
-                            </span>
-                        </div>
-                        <div className="bg-slate-900/50 rounded-lg p-2 flex flex-col items-center justify-center border border-white/5 active:bg-slate-800 transition-colors cursor-pointer"
-                            onClick={() => {
-                                if (navigator.vibrate) navigator.vibrate(50);
-                                recordTurnaround?.(venueId || '', clicr.area_id, clicr.id, 1);
-                            }}
+                        <button
+                            onClick={() => setMode('scan')}
+                            className={cn(
+                                "flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold transition-all",
+                                mode === 'scan'
+                                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20"
+                                    : "text-slate-400 hover:text-white"
+                            )}
                         >
-                            <span className="text-[10px] text-purple-400 font-bold uppercase tracking-wider">TURNAROUND</span>
-                            <span className="text-purple-300 font-mono font-bold">+</span>
-                        </div>
+                            <Scan className="w-3.5 h-3.5" />
+                            Scan
+                        </button>
                     </div>
-
-                    {/* Scan Breakdown (P0) */}
-                    {showScanBreakdown && (
-                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="bg-slate-950 rounded-md border border-slate-800 p-2 text-xs text-slate-400 flex justify-between px-4 mt-1">
-                            <span>Manual: <span className="text-white font-bold">--</span></span>
-                            <span>Scans: <span className="text-white font-bold">--</span></span>
-                            <span>Turns: <span className="text-white font-bold">{(turnarounds || []).filter((t: any) => t.area_id === clicr.area_id).reduce((a, b) => a + b.count, 0)}</span></span>
-                        </motion.div>
-                    )}
                 </div>
 
-                {/* 4. Action Buttons */}
-                <div className="flex flex-col gap-3 px-6 pb-8 shrink-0">
-                    <ActionButton
-                        label="GUEST IN"
-                        onClick={handleGuestIn}
-                        className={cn("h-24 md:h-28 text-lg", isVenueDoor && "bg-amber-600 hover:bg-amber-500 active:bg-amber-700")}
-                        icon={<div className="mb-[-4px]"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4V20M4 12H20" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg></div>}
-                    />
-
-                    {/* Only show OUT if bidirectional */}
-                    {(clicr.direction_mode !== 'in_only') && (
-                        <ActionButton
-                            label="GUEST OUT"
-                            variant="out"
-                            onClick={handleGuestOut}
-                            className="h-24 md:h-28 text-lg bg-[#1E3A8A] hover:bg-[#1E40AF]"
-                            icon={<div className="mb-[-4px]"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 12H19" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg></div>}
-                        />
+                {/* Right slot — fixed width, right-aligned pill */}
+                <div className="w-[90px] flex justify-end">
+                    {!clicr.scan_enabled && (
+                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold bg-red-500/15 text-red-400 border border-red-500/30 whitespace-nowrap">
+                            <div className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
+                            No Scanner
+                        </div>
                     )}
                 </div>
             </div>
 
-            {/* SCANNER OVERLAY (Absolute z-50) */}
+            {/* ── CONTENT ────────────────────────────────────────── */}
+            <div className="flex-1 flex flex-col px-4 pb-6 gap-4 overflow-y-auto">
+
+                {/* ── OCCUPANCY CARD (always visible) ──────────────── */}
+                <div className={cn(
+                    "rounded-2xl border p-5",
+                    isVenueDoor
+                        ? "bg-amber-950/20 border-amber-500/20"
+                        : "bg-slate-900/60 border-slate-800/60"
+                )}>
+                    <p className={cn(
+                        "text-[10px] font-bold uppercase tracking-[0.2em] text-center mb-1",
+                        isVenueDoor ? "text-amber-500" : "text-slate-500"
+                    )}>
+                        {isVenueDoor ? 'Venue Occupancy' : 'Occupancy'}
+                    </p>
+
+                    <div className="text-center">
+                        <span className={cn(
+                            "text-8xl font-bold leading-none tabular-nums",
+                            isVenueDoor ? "text-amber-300" : "text-white"
+                        )}>
+                            {totalAreaCount}
+                        </span>
+                    </div>
+
+                    <p className="text-center text-slate-500 text-sm mt-1">
+                        {capacity != null
+                            ? `of ${capacity} · ${capacityPercent}% Full`
+                            : 'No capacity set'}
+                    </p>
+
+                    {/* Progress bar */}
+                    <div className="mt-3 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        {capacity != null && (
+                            <div
+                                className={cn(
+                                    "h-full rounded-full transition-all duration-500",
+                                    capacityPercent != null && capacityPercent >= 100 ? "bg-red-500" :
+                                    capacityPercent != null && capacityPercent >= 90 ? "bg-orange-500" :
+                                    capacityPercent != null && capacityPercent >= 80 ? "bg-yellow-500" :
+                                    isVenueDoor ? "bg-amber-500" : "bg-emerald-500"
+                                )}
+                                style={{ width: `${Math.min(100, capacityPercent ?? 0)}%` }}
+                            />
+                        )}
+                    </div>
+
+                    {/* IN / OUT stats */}
+                    <div className="flex justify-center gap-8 mt-3">
+                        <div className="text-center">
+                            <span className="text-xs text-slate-500 font-bold uppercase tracking-wider block">IN</span>
+                            <span className="text-emerald-400 font-bold text-lg">+{globalIn}</span>
+                        </div>
+                        <div className="text-center">
+                            <span className="text-xs text-slate-500 font-bold uppercase tracking-wider block">OUT</span>
+                            <span className="text-red-400 font-bold text-lg">-{globalOut}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* ── COUNT MODE ───────────────────────────────────── */}
+                {mode === 'count' && (
+                    <>
+                        {/* M/F Counter Grid */}
+                        <div className="grid grid-cols-2 gap-3">
+                            {/* +MALE */}
+                            <button
+                                onClick={() => handleIn('M')}
+                                className="relative overflow-hidden bg-gradient-to-br from-blue-500 to-blue-700 hover:from-blue-400 hover:to-blue-600 active:scale-[0.97] transition-all rounded-2xl border-2 border-blue-400/40 shadow-lg shadow-blue-500/20 py-8 flex flex-col items-center justify-center touch-manipulation"
+                            >
+                                <span className="text-4xl font-bold text-white leading-none drop-shadow">+</span>
+                                <span className="text-white font-bold tracking-[0.2em] text-sm mt-1">MALE</span>
+                            </button>
+
+                            {/* +FEMALE */}
+                            <button
+                                onClick={() => handleIn('F')}
+                                className="relative overflow-hidden bg-gradient-to-br from-pink-500 to-pink-700 hover:from-pink-400 hover:to-pink-600 active:scale-[0.97] transition-all rounded-2xl border-2 border-pink-400/40 shadow-lg shadow-pink-500/20 py-8 flex flex-col items-center justify-center touch-manipulation"
+                            >
+                                <span className="text-4xl font-bold text-white leading-none drop-shadow">+</span>
+                                <span className="text-white font-bold tracking-[0.2em] text-sm mt-1">FEMALE</span>
+                            </button>
+
+                            {/* -MALE */}
+                            {showOutButtons && (
+                                <button
+                                    onClick={() => handleOut('M')}
+                                    className="relative overflow-hidden bg-gradient-to-br from-blue-700 to-blue-900 hover:from-blue-600 hover:to-blue-800 active:scale-[0.97] transition-all rounded-2xl border-2 border-blue-600/40 shadow-lg shadow-blue-900/20 py-5 flex items-center justify-center touch-manipulation"
+                                >
+                                    <span className="text-3xl font-bold text-white/80 leading-none">−</span>
+                                </button>
+                            )}
+
+                            {/* -FEMALE */}
+                            {showOutButtons && (
+                                <button
+                                    onClick={() => handleOut('F')}
+                                    className="relative overflow-hidden bg-gradient-to-br from-pink-700 to-pink-900 hover:from-pink-600 hover:to-pink-800 active:scale-[0.97] transition-all rounded-2xl border-2 border-pink-600/40 shadow-lg shadow-pink-900/20 py-5 flex items-center justify-center touch-manipulation"
+                                >
+                                    <span className="text-3xl font-bold text-white/80 leading-none">−</span>
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Turnaround + Reset */}
+                        <div className="flex items-center justify-center gap-6 pt-1">
+                            <button
+                                onClick={() => {
+                                    if (navigator.vibrate) navigator.vibrate(50);
+                                    recordTurnaround?.(venueId || '', clicr.area_id, clicr.id, 1);
+                                }}
+                                className="flex items-center gap-2 px-4 py-2 rounded-xl text-slate-400 hover:text-purple-300 hover:bg-purple-500/10 transition-colors text-sm font-medium"
+                            >
+                                <RotateCcw className="w-4 h-4" />
+                                Turnaround
+                            </button>
+                            <div className="w-px h-4 bg-slate-800" />
+                            <button
+                                onClick={() => handleReset()}
+                                className="flex items-center gap-2 px-4 py-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors text-sm font-medium"
+                            >
+                                <RefreshCw className="w-4 h-4" />
+                                Reset
+                            </button>
+                        </div>
+
+                        {/* End Shift */}
+                        {activeShiftId && activeShiftAreaId === clicr?.area_id && (
+                            <button
+                                onClick={() => endShift(activeShiftId)}
+                                className="w-full py-2.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-400 text-sm font-bold border border-red-500/25 transition-colors"
+                            >
+                                End Shift
+                            </button>
+                        )}
+                    </>
+                )}
+
+                {/* ── SCAN MODE ────────────────────────────────────── */}
+                {mode === 'scan' && (
+                    <>
+                        {/* Scan Zone */}
+                        <div className="bg-slate-900/60 border border-slate-800/60 rounded-2xl p-8 flex flex-col items-center justify-center gap-3 min-h-[180px]">
+                            <div className="w-14 h-14 rounded-xl border-2 border-slate-700 flex items-center justify-center">
+                                <Scan className="w-7 h-7 text-slate-500" />
+                            </div>
+                            <div className="text-center">
+                                <p className="text-white font-semibold">Ready to Scan</p>
+                                <p className="text-slate-500 text-sm mt-0.5">Use scanner or enter data below</p>
+                            </div>
+                            <button
+                                onClick={() => setShowCameraScanner(true)}
+                                className="mt-1 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition-colors"
+                            >
+                                Open Camera
+                            </button>
+                        </div>
+
+                        {/* Manual paste input */}
+                        <div className="bg-slate-900/60 border border-slate-800/60 rounded-2xl p-4 space-y-3">
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                                Paste / Enter Scan Data
+                            </p>
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={manualScanInput}
+                                    onChange={(e) => setManualScanInput(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') handleManualScanProcess(); }}
+                                    placeholder="Paste PDF-417 or ID token..."
+                                    className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 transition-colors placeholder-slate-600"
+                                    onClick={(e) => e.stopPropagation()}
+                                />
+                                <button
+                                    onClick={handleManualScanProcess}
+                                    className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition-colors shrink-0"
+                                >
+                                    Process
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Add to Count on Accept toggle */}
+                        <div className="bg-slate-900/60 border border-slate-800/60 rounded-2xl px-4 py-3.5 flex items-center justify-between">
+                            <div>
+                                <p className="text-white font-semibold text-sm">Add to Count on Accept</p>
+                                <p className="text-slate-500 text-xs mt-0.5">Automatically adjust occupancy when ID accepted</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setAddToCountOnAccept(v => !v)}
+                                className={cn(
+                                    "w-12 h-7 rounded-full relative transition-colors shrink-0",
+                                    addToCountOnAccept ? "bg-indigo-500" : "bg-slate-700"
+                                )}
+                            >
+                                <div
+                                    className="absolute left-1 top-1 w-5 h-5 bg-white rounded-full shadow-md transition-transform"
+                                    style={{ transform: addToCountOnAccept ? "translateX(20px)" : "translateX(0)" }}
+                                />
+                            </button>
+                        </div>
+
+                        {/* Simulate scan (dev helper) */}
+                        <button
+                            onClick={handleSimulateScan}
+                            className="text-slate-600 hover:text-slate-400 text-xs text-center py-1 transition-colors"
+                        >
+                            Simulate scan
+                        </button>
+                    </>
+                )}
+            </div>
+
+            {/* ── OVERLAYS ───────────────────────────────────────── */}
+
+            {/* Scan result full-screen overlay */}
             <AnimatePresence>
                 {lastScan && (
                     <motion.div
@@ -822,7 +905,7 @@ export default function ClicrPanel({
                         <ScannerResult
                             status={
                                 lastScan.scan_result === 'ACCEPTED' ? 'ALLOWED' :
-                                    lastScan.scan_result === 'DENIED' && ((lastScan as any).uiMessage?.includes('BANNED') || (lastScan as any).reason === 'BANNED') ? 'DENIED_BANNED' :
+                                    (lastScan as any).uiMessage?.includes('BANNED') ? 'DENIED_BANNED' :
                                         'DENIED_UNDERAGE'
                             }
                             data={{
@@ -837,8 +920,7 @@ export default function ClicrPanel({
                 )}
             </AnimatePresence>
 
-
-            {/* CAMERA SCANNER MODAL */}
+            {/* Camera scanner modal */}
             <AnimatePresence>
                 {showCameraScanner && (
                     <motion.div
@@ -855,9 +937,7 @@ export default function ClicrPanel({
                                 <XCircle className="w-6 h-6" />
                             </button>
                         </div>
-
                         <CameraScanner onScan={handleCameraScan} />
-
                         <div className="absolute bottom-12 text-center text-slate-500 text-sm">
                             Align ID barcode within the frame
                         </div>
@@ -865,76 +945,20 @@ export default function ClicrPanel({
                 )}
             </AnimatePresence>
 
-            {/* Bulk Modal (Reference Design Match) */}
-            <AnimatePresence>
-                {showBulkModal && (
-                    <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-6">
-                        <motion.div
-                            initial={{ scale: 0.9, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.9, opacity: 0 }}
-                            className="bg-[#0f1218] border border-slate-800 p-6 rounded-3xl w-full max-w-sm shadow-2xl space-y-6"
-                        >
-                            <h3 className="text-xl font-bold text-white text-center">Adjust Counts</h3>
-
-                            <div className="flex items-center gap-4">
-                                <button
-                                    onClick={() => setBulkValue(v => v - 1)}
-                                    className="w-12 h-12 flex items-center justify-center bg-[#1e2330] rounded-xl text-white hover:bg-[#2a3040] active:scale-95 transition-all text-xl font-medium"
-                                >
-                                    <Minus className="w-5 h-5" />
-                                </button>
-
-                                <div className="flex-1 bg-black border border-slate-800 rounded-xl h-12 flex items-center px-4">
-                                    <input
-                                        type="number"
-                                        value={bulkValue}
-                                        onChange={(e) => setBulkValue(parseInt(e.target.value) || 0)}
-                                        className="w-full bg-transparent text-center text-xl font-bold text-white outline-none"
-                                    />
-                                </div>
-
-                                <button
-                                    onClick={() => setBulkValue(v => v + 1)}
-                                    className="w-12 h-12 flex items-center justify-center bg-[#1e2330] rounded-xl text-white hover:bg-[#2a3040] active:scale-95 transition-all text-xl font-medium"
-                                >
-                                    <Plus className="w-5 h-5" />
-                                </button>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <button
-                                    onClick={() => { setShowBulkModal(false); setBulkValue(0); }}
-                                    className="py-3 rounded-xl text-slate-400 bg-[#1e2330] hover:bg-[#2a3040] font-semibold text-sm transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleBulkSubmit}
-                                    className="py-3 rounded-xl bg-[#6366f1] text-white font-semibold text-sm hover:bg-[#4f46e5] shadow-lg shadow-indigo-500/30 transition-all active:scale-95"
-                                >
-                                    Apply
-                                </button>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
-
-            {/* CONFIG MODAL - plain div (no motion) to avoid focus loss from Framer re-renders */}
+            {/* Config modal */}
             {showConfigModal && (
                 <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-6">
                     <div className="bg-[#0f1218] border border-slate-800 p-6 rounded-3xl w-full max-w-sm shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
-                            <div>
-                                <h3 className="text-xl font-bold text-white">Clicr Settings</h3>
-                                <p className="text-slate-500 text-sm">Customize your counter interface.</p>
-                            </div>
-
-                            <ConfigModalBody configRef={configModalRef} />
+                        <div>
+                            <h3 className="text-xl font-bold text-white">Clicr Settings</h3>
+                            <p className="text-slate-500 text-sm">Customize your counter interface.</p>
+                        </div>
+                        <ConfigModalBody configRef={configModalRef} />
                     </div>
                 </div>
             )}
-            {/* DEBUG PANEL - OWNER ONLY */}
+
+            {/* Debug panel */}
             <AnimatePresence>
                 {showDebug && (
                     <motion.div
@@ -943,11 +967,15 @@ export default function ClicrPanel({
                         exit={{ x: '100%' }}
                         className="fixed inset-y-0 right-0 w-80 bg-slate-950 border-l border-slate-800 p-6 z-[200] overflow-y-auto shadow-2xl"
                     >
-                        <h3 className="text-white font-bold mb-6 flex items-center gap-2">
-                            <Bug className="w-5 h-5 text-indigo-400" />
-                            Sync Debugger
-                        </h3>
-
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-white font-bold flex items-center gap-2">
+                                <Bug className="w-5 h-5 text-indigo-400" />
+                                Sync Debugger
+                            </h3>
+                            <button onClick={() => setShowDebug(false)} className="text-slate-500 hover:text-white">
+                                <XCircle className="w-5 h-5" />
+                            </button>
+                        </div>
                         <div className="space-y-6">
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-slate-500 uppercase">Context</label>
@@ -958,7 +986,6 @@ export default function ClicrPanel({
                                     AREA: {clicr?.area_id}
                                 </div>
                             </div>
-
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-slate-500 uppercase">Snapshot Truth</label>
                                 <div className="p-4 bg-emerald-950/20 border border-emerald-500/30 rounded-lg text-emerald-400 font-mono text-2xl font-bold flex items-center justify-between">
@@ -966,41 +993,32 @@ export default function ClicrPanel({
                                     <span className="text-[10px] text-emerald-600 uppercase">Server State</span>
                                 </div>
                             </div>
-
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-slate-500 uppercase">Realtime Status</label>
                                 <div className="flex items-center gap-2">
-                                    <div className={cn("w-2 h-2 rounded-full", debug?.realtimeStatus === 'SUBSCRIBED' ? "bg-emerald-500 animate-pulse" : "bg-amber-500")} />
-                                    <span className="text-sm text-white font-mono">{debug?.realtimeStatus || 'UNKNOWN'}</span>
+                                    <div className={cn("w-2 h-2 rounded-full", isRealtimeConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500")} />
+                                    <span className="text-sm text-white font-mono">{debugAny?.realtimeStatus || 'UNKNOWN'}</span>
                                 </div>
                             </div>
-
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-slate-500 uppercase">Last 5 Writes</label>
                                 <div className="space-y-2">
-                                    {debug?.lastWrites?.map((w: any, i: number) => (
+                                    {debugAny?.lastWrites?.map((w: any, i: number) => (
                                         <div key={i} className="bg-slate-900 p-2 rounded text-[10px] font-mono border border-slate-800">
-                                            <div className={cn("font-bold mb-1", w.type === 'RPC_SUCCESS' ? "text-emerald-400" : "text-red-400")}>
-                                                {w.type}
-                                            </div>
-                                            <div className="text-slate-400 truncate">
-                                                {JSON.stringify(w.payload)}
-                                            </div>
+                                            <div className={cn("font-bold mb-1", w.type === 'RPC_SUCCESS' ? "text-emerald-400" : "text-red-400")}>{w.type}</div>
+                                            <div className="text-slate-400 truncate">{JSON.stringify(w.payload)}</div>
                                         </div>
                                     ))}
-                                    {!debug?.lastWrites?.length && <div className="text-xs text-slate-600 italic">No writes yet</div>}
+                                    {!debugAny?.lastWrites?.length && <div className="text-xs text-slate-600 italic">No writes yet</div>}
                                 </div>
                             </div>
-
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-slate-500 uppercase">Last 5 Events</label>
                                 <div className="space-y-2">
-                                    {debug?.lastEvents?.map((e: any, i: number) => (
+                                    {debugAny?.lastEvents?.map((e: any, i: number) => (
                                         <div key={i} className="bg-slate-900 p-2 rounded text-[10px] font-mono border border-slate-800">
                                             <div className="text-indigo-400 font-bold mb-1">{e.eventType}</div>
-                                            <div className="text-slate-400 break-all">
-                                                {JSON.stringify(e.new || e.old)}
-                                            </div>
+                                            <div className="text-slate-400 break-all">{JSON.stringify(e.new || e.old)}</div>
                                         </div>
                                     ))}
                                 </div>
@@ -1009,7 +1027,7 @@ export default function ClicrPanel({
                     </motion.div>
                 )}
             </AnimatePresence>
-        </div >
+        </div>
     );
 }
 
@@ -1020,33 +1038,23 @@ function CameraScanner({ onScan }: { onScan: (text: string) => void }) {
     const [status, setStatus] = useState<'INIT' | 'SCANNING' | 'ERROR'>('INIT');
 
     useEffect(() => {
-        // Init Scanner
         const config = { fps: 10, qrbox: { width: 300, height: 200 } };
         const html5QrCode = new Html5Qrcode("reader");
         scannerRef.current = html5QrCode;
-
         const startScanner = async () => {
             try {
-                // PDF417 is critical for ID cards
                 await html5QrCode.start(
                     { facingMode: "environment" },
                     config,
-                    (decodedText) => {
-                        onScan(decodedText);
-                    },
-                    (errorMessage) => {
-                        // ignore failures, they happen on every frame
-                    }
+                    (decodedText) => { onScan(decodedText); },
+                    () => { }
                 );
                 setStatus('SCANNING');
-            } catch (err) {
-                console.error("Camera Start Error", err);
+            } catch {
                 setStatus('ERROR');
             }
         };
-
         startScanner();
-
         return () => {
             if (scannerRef.current && scannerRef.current.isScanning) {
                 scannerRef.current.stop().then(() => scannerRef.current?.clear());
@@ -1057,22 +1065,14 @@ function CameraScanner({ onScan }: { onScan: (text: string) => void }) {
     const toggleTorch = async () => {
         if (!scannerRef.current) return;
         try {
-            await scannerRef.current.applyVideoConstraints({
-                advanced: [{ torch: !torch } as any]
-            });
+            await scannerRef.current.applyVideoConstraints({ advanced: [{ torch: !torch } as any] });
             setTorch(!torch);
-        } catch (err) {
-            console.error("Torch Error", err);
-            // alert("Flashlight not available on this device."); // Optional
-        }
+        } catch { }
     };
 
     return (
         <div className="relative w-full h-[400px] bg-black">
-            {/* Scanner Box */}
             <div id="reader" className="w-full h-full" />
-
-            {/* Overlay UI */}
             <div className="absolute bottom-6 left-0 right-0 flex justify-center z-10">
                 <button
                     onClick={toggleTorch}
@@ -1086,14 +1086,11 @@ function CameraScanner({ onScan }: { onScan: (text: string) => void }) {
                     {torch ? <Zap className="w-6 h-6 fill-current" /> : <Zap className="w-6 h-6" />}
                 </button>
             </div>
-
             {status === 'ERROR' && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/80 text-white p-6 text-center">
-                    <p>Camera access failed. Please ensure permissions are granted and you are on a mobile device.</p>
+                    <p>Camera access failed. Ensure permissions are granted.</p>
                 </div>
             )}
         </div>
     );
 }
-
-
