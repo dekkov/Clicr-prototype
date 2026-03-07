@@ -39,7 +39,7 @@ export default function NewAreaPage() {
         venue_id: preselectedVenueId,
         name: '',
         area_type: 'MAIN' as AreaType,
-        default_capacity: 0,
+        default_capacity: 500,
         counting_mode: 'BOTH' as CountingMode,
         shift_mode: 'MANUAL' as ShiftMode,
         auto_reset_time: '09:00',
@@ -90,8 +90,8 @@ export default function NewAreaPage() {
                 venue_id: areaData.venue_id,
                 name: areaData.name,
                 area_type: areaData.area_type,
-                default_capacity: areaData.default_capacity,
-                capacity_max: areaData.default_capacity,
+                default_capacity: areaData.default_capacity || 500,
+                capacity_max: areaData.default_capacity || 500,
                 counting_mode: areaData.counting_mode,
                 shift_mode: areaData.shift_mode,
                 auto_reset_time: areaData.shift_mode === 'AUTO' ? areaData.auto_reset_time : undefined,
@@ -205,13 +205,13 @@ export default function NewAreaPage() {
                             </select>
                         </div>
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-300">Capacity <span className="text-slate-600">(optional)</span></label>
+                            <label className="text-sm font-medium text-slate-300">Capacity</label>
                             <input
                                 type="number"
                                 value={areaData.default_capacity || ''}
                                 onChange={e => setAreaData(p => ({ ...p, default_capacity: parseInt(e.target.value) || 0 }))}
                                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none"
-                                placeholder="0 for unlimited"
+                                placeholder="500"
                             />
                         </div>
                     </div>

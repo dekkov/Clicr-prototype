@@ -26,7 +26,7 @@ export default function NewVenuePage() {
     const [createdAreas, setCreatedAreas] = useState<Area[]>([]);
 
     // Area Form
-    const [areaInput, setAreaInput] = useState({ name: '', capacity: 100 });
+    const [areaInput, setAreaInput] = useState({ name: '', capacity: 500 });
 
     // Clicr Form (Map areaId -> List of Clicr Names)
     const [clicrInputs, setClicrInputs] = useState<Record<string, string>>({});
@@ -50,7 +50,7 @@ export default function NewVenuePage() {
         if (trimmed) setCreatedAreas(prev => prev.map(a => a.id === id ? {
             ...a,
             name: trimmed,
-            default_capacity: !isNaN(parsedCap) && parsedCap > 0 ? parsedCap : 0,
+            default_capacity: !isNaN(parsedCap) && parsedCap > 0 ? parsedCap : 500,
             area_type: editingAreaType,
         } : a));
         setEditingAreaId(null);
@@ -95,7 +95,7 @@ export default function NewVenuePage() {
             current_count: 0
         } as Area;
         setCreatedAreas([...createdAreas, area]);
-        setAreaInput({ name: '', capacity: 100 });
+        setAreaInput({ name: '', capacity: 500 });
     };
 
     const nextToClicrs = () => setStep('CLICRS');
@@ -128,7 +128,7 @@ export default function NewVenuePage() {
                 name: venueData.name,
                 city: venueData.city,
                 state: venueData.state,
-                default_capacity_total: venueData.capacity,
+                default_capacity_total: venueData.capacity || 500,
                 capacity_enforcement_mode: 'WARN_ONLY',
                 status: 'ACTIVE',
                 timezone: 'America/New_York',
@@ -203,13 +203,13 @@ export default function NewVenuePage() {
                 </div>
             </div>
             <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-300">Total Capacity Limit <span className="text-slate-600">(optional)</span></label>
+                <label className="text-sm font-medium text-slate-300">Total Capacity Limit</label>
                 <input
                     type="number"
                     value={venueData.capacity}
-                    onChange={e => setVenueData({ ...venueData, capacity: parseInt(e.target.value) })}
+                    onChange={e => setVenueData({ ...venueData, capacity: parseInt(e.target.value) || 0 })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none"
-                    placeholder="0 for unlimited"
+                    placeholder="500"
                 />
             </div>
             <div className="flex gap-3">
@@ -318,7 +318,7 @@ export default function NewVenuePage() {
                             <input
                                 type="number"
                                 value={areaInput.capacity}
-                                onChange={e => setAreaInput({ ...areaInput, capacity: parseInt(e.target.value) })}
+                                onChange={e => setAreaInput({ ...areaInput, capacity: parseInt(e.target.value) || 0 })}
                                 className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-1 focus:ring-primary focus:outline-none"
                             />
                         </div>

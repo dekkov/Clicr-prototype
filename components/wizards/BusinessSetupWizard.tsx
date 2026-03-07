@@ -60,7 +60,7 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
 
     // Areas step
     const [createdAreas, setCreatedAreas] = useState<Area[]>([]);
-    const [areaInput, setAreaInput] = useState({ name: '', capacity: '100', area_type: 'MAIN' as AreaType });
+    const [areaInput, setAreaInput] = useState({ name: '', capacity: '500', area_type: 'MAIN' as AreaType });
 
     // Clicrs step
     const [createdClicrs, setCreatedClicrs] = useState<Clicr[]>([]);
@@ -110,7 +110,7 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
             id: areaId,
             venue_id: '',
             name: areaInput.name,
-            default_capacity: !isNaN(parsedCap) && parsedCap > 0 ? parsedCap : null,
+            default_capacity: !isNaN(parsedCap) && parsedCap > 0 ? parsedCap : 500,
             area_type: areaInput.area_type,
             counting_mode: 'BOTH',
             is_active: true,
@@ -119,7 +119,7 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
             current_count: 0,
         } as Area;
         setCreatedAreas(prev => [...prev, area]);
-        setAreaInput({ name: '', capacity: '100', area_type: 'MAIN' as AreaType });
+        setAreaInput({ name: '', capacity: '500', area_type: 'MAIN' as AreaType });
     };
 
     const handleSaveArea = (id: string) => {
@@ -128,7 +128,7 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
         if (trimmed) setCreatedAreas(prev => prev.map(a => a.id === id ? {
             ...a,
             name: trimmed,
-            default_capacity: !isNaN(parsedCap) && parsedCap > 0 ? parsedCap : null,
+            default_capacity: !isNaN(parsedCap) && parsedCap > 0 ? parsedCap : 500,
             area_type: editingAreaType,
         } : a));
         setEditingAreaId(null);
@@ -180,7 +180,7 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                         name: venueData.name,
                         city: venueData.city || undefined,
                         state: venueData.state || undefined,
-                        capacity: !isNaN(parsedCapacity) && parsedCapacity > 0 ? parsedCapacity : undefined,
+                        capacity: !isNaN(parsedCapacity) && parsedCapacity > 0 ? parsedCapacity : 500,
                     },
                     areas: createdAreas.map(a => ({
                         name: a.name,
@@ -362,9 +362,9 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                             </div>
                         </div>
                         <div>
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 block">Max capacity <span className="text-slate-600">(optional)</span></label>
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 block">Max capacity</label>
                             <input type="number" value={venueData.capacity} onChange={e => setVenueData(p => ({ ...p, capacity: e.target.value }))}
-                                placeholder="0 for unlimited"
+                                placeholder="500"
                                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none" />
                         </div>
                     </div>
