@@ -119,13 +119,17 @@ export default function ClicrListPage() {
                                 <select value={newClicrAreaId} onChange={e => setNewClicrAreaId(e.target.value)}
                                     className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm">
                                     <option value="">Select area...</option>
-                                    {(venues || []).map(v => (
-                                        <optgroup key={v.id} label={v.name}>
-                                            {(areas || []).filter(a => a.venue_id === v.id && a.is_active).map(a => (
-                                                <option key={a.id} value={a.id}>{a.name}</option>
-                                            ))}
-                                        </optgroup>
-                                    ))}
+                                    {(venues || []).map(v => {
+                                        const venueActiveAreas = (areas || []).filter(a => a.venue_id === v.id && a.is_active);
+                                        if (venueActiveAreas.length === 0) return null;
+                                        return (
+                                            <optgroup key={v.id} label={v.name}>
+                                                {venueActiveAreas.map(a => (
+                                                    <option key={a.id} value={a.id}>{a.name}</option>
+                                                ))}
+                                            </optgroup>
+                                        );
+                                    })}
                                 </select>
                             </div>
                             <div>

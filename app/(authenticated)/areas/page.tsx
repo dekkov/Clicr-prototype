@@ -1,5 +1,6 @@
 "use client";
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/store';
 import { Area, AreaType, CountingMode, FlowMode, ShiftMode, Role } from '@/lib/types';
 import { Search, RefreshCw, ArrowUp, ArrowDown, Plus, ChevronDown, Play, Square, Settings2, Layers, Maximize2 } from 'lucide-react';
@@ -44,6 +45,7 @@ const AREA_TYPE_LABELS: Record<string, string> = {
 };
 
 export default function AreasPage() {
+    const router = useRouter();
     const { areas, clicrs, venues, areaTraffic, activeBusiness, addArea, addClicr, resetCounts, startShift, endShift, updateArea, deleteArea, isLoading, currentUser, activeShiftId, activeShiftAreaId } = useApp();
     const userRole = currentUser?.role as Role | undefined;
     const canDelete = hasMinRole(userRole, 'ADMIN');
@@ -267,7 +269,7 @@ export default function AreasPage() {
                         </div>
                         {canEdit && (
                             <button
-                                onClick={() => setIsCreateOpen(true)}
+                                onClick={() => router.push('/areas/new')}
                                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 transition-colors whitespace-nowrap text-sm"
                             >
                                 <Plus className="w-4 h-4" />
@@ -286,7 +288,9 @@ export default function AreasPage() {
             ) : (
                 venueGroups.map(({ venue, areas: venueAreas }) => (
                     <section key={venue.id} className="space-y-8">
-                        <h2 className="text-xl mb-4">{venue.name}</h2>
+                        <div className="mb-4">
+                            <span className="text-xs font-bold uppercase tracking-widest text-sky-400 bg-sky-500/10 border border-sky-500/20 px-3 py-1.5 rounded-full">Venue — {venue.name}</span>
+                        </div>
 
                         <div className="space-y-6">
                             {Object.entries(

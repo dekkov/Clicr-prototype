@@ -32,6 +32,7 @@ async function hydrateData(data: DBData): Promise<DBData> {
                 status: v.status || 'ACTIVE',
                 capacity_enforcement_mode: v.capacity_enforcement_mode || 'WARN_ONLY',
                 total_capacity: v.capacity_max || undefined,
+                current_occupancy: v.current_occupancy ?? 0,
                 last_reset_at: v.last_reset_at || undefined,
                 created_at: v.created_at || new Date().toISOString(),
                 updated_at: v.updated_at || new Date().toISOString(),
@@ -104,11 +105,13 @@ async function hydrateData(data: DBData): Promise<DBData> {
                 if (!exists && d.device_type === 'COUNTER') {
                     data.clicrs.push({
                         id: d.id,
-                        area_id: d.area_id,
+                        area_id: d.area_id || null,
+                        venue_id: d.venue_id || undefined,
+                        is_venue_counter: d.is_venue_counter ?? false,
                         name: d.name,
                         current_count: 0,
-                        flow_mode: 'BIDIRECTIONAL',
-                        active: true,
+                        flow_mode: d.direction_mode === 'in_only' ? 'IN_ONLY' : d.direction_mode === 'out_only' ? 'OUT_ONLY' : 'BIDIRECTIONAL',
+                        active: d.status === 'ACTIVE',
                         button_config: d.button_config || {
                             left: { label: 'IN', delta: 1, color: 'green' },
                             right: { label: 'OUT', delta: -1, color: 'red' }
@@ -123,7 +126,9 @@ async function hydrateData(data: DBData): Promise<DBData> {
                     return {
                         ...c,
                         name: match.name,
-                        area_id: match.area_id || c.area_id,
+                        area_id: match.area_id ?? null,
+                        venue_id: match.venue_id || c.venue_id,
+                        is_venue_counter: match.is_venue_counter ?? c.is_venue_counter ?? false,
                         button_config: match.button_config || c.button_config
                     };
                 }
@@ -249,7 +254,10 @@ async function buildSyncResponse(
 
     const filteredVenues = hydrated.venues.filter(v => visibleVenueIds.includes(v.id));
     const filteredAreas = hydrated.areas.filter(a => visibleAreaIds.includes(a.id));
-    const filteredClicrs = hydrated.clicrs.filter(c => c.area_id && visibleAreaIds.includes(c.area_id));
+    const filteredClicrs = hydrated.clicrs.filter(c =>
+        (c.is_venue_counter && c.venue_id && visibleVenueIds.includes(c.venue_id)) ||
+        (c.area_id && visibleAreaIds.includes(c.area_id))
+    );
 
     const latestResetAt = Math.max(0, ...filteredAreas.map(a => a.last_reset_at ? new Date(a.last_reset_at).getTime() : 0));
     const filteredEvents = hydrated.events.filter(e =>
@@ -341,8 +349,10 @@ export async function POST(request: Request) {
         switch (action) {
             case 'RECORD_EVENT': {
                 const event = payload as CountEvent;
-                if (!event.area_id || typeof event.area_id !== 'string') {
-                    return NextResponse.json({ error: 'area_id is required for RECORD_EVENT' }, { status: 400 });
+                const hasAreaId = event.area_id && typeof event.area_id === 'string';
+                const hasVenueId = (event as any).venue_id && typeof (event as any).venue_id === 'string';
+                if (!hasAreaId && !hasVenueId) {
+                    return NextResponse.json({ error: 'area_id or venue_id is required for RECORD_EVENT' }, { status: 400 });
                 }
                 const banned = await isUserBanned(supabaseAdmin, event.user_id, event.venue_id);
                 if (banned) return NextResponse.json({ error: 'User is banned' }, { status: 403 });
@@ -351,31 +361,38 @@ export async function POST(request: Request) {
                 if (!eventBizId && userId) eventBizId = await getBusinessId();
                 if (!eventBizId) return NextResponse.json({ error: 'Could not resolve business_id for event' }, { status: 400 });
 
-                const { data: areaRow, error: areaErr } = await supabaseAdmin
-                    .from('areas')
-                    .select('id, business_id')
-                    .eq('id', event.area_id)
-                    .single();
-                if (areaErr || !areaRow) {
-                    return NextResponse.json({ error: 'Area not found or invalid area_id' }, { status: 400 });
-                }
-                if (areaRow.business_id !== eventBizId) {
-                    return NextResponse.json({ error: 'Area does not belong to your business' }, { status: 403 });
+                if (hasAreaId) {
+                    const { data: areaRow, error: areaErr } = await supabaseAdmin
+                        .from('areas')
+                        .select('id, business_id')
+                        .eq('id', event.area_id!)
+                        .single();
+                    if (areaErr || !areaRow) {
+                        return NextResponse.json({ error: 'Area not found or invalid area_id' }, { status: 400 });
+                    }
+                    if (areaRow.business_id !== eventBizId) {
+                        return NextResponse.json({ error: 'Area does not belong to your business' }, { status: 403 });
+                    }
                 }
 
                 const deviceId = (event as any).clicr_id;
-                // Match tap route: use 6-param signature (003_rpcs) — omit p_shift_id until 012_shifts is applied
-                const { error: rpcError } = await supabaseAdmin.rpc('apply_occupancy_delta', {
-                    p_area_id: event.area_id,
+                const rpcParams: Record<string, unknown> = {
                     p_delta: event.delta,
                     p_source: event.event_type === 'SCAN' ? 'scan' : event.event_type === 'AUTO_SCAN' ? 'auto_scan' : 'manual',
                     p_device_id: deviceId || null,
                     p_gender: event.gender || null,
-                    p_idempotency_key: event.idempotency_key || null
-                });
+                    p_idempotency_key: event.idempotency_key || null,
+                };
+                if (hasAreaId) {
+                    rpcParams.p_area_id = event.area_id;
+                } else {
+                    rpcParams.p_venue_id = (event as any).venue_id;
+                }
+                console.log('[sync] RECORD_EVENT RPC params:', JSON.stringify(rpcParams));
+                const { error: rpcError } = await supabaseAdmin.rpc('apply_occupancy_delta', rpcParams);
                 if (rpcError) {
-                    console.error('[sync] RECORD_EVENT RPC error:', rpcError);
-                    return NextResponse.json({ error: rpcError.message || 'Failed to record event' }, { status: 500 });
+                    console.error('[sync] RECORD_EVENT RPC error:', JSON.stringify(rpcError));
+                    return NextResponse.json({ error: rpcError.message || 'Failed to record event', details: rpcError }, { status: 500 });
                 }
                 break;
             }
@@ -515,9 +532,12 @@ export async function POST(request: Request) {
                 const { error } = await supabaseAdmin.from('devices').insert({
                     id: newClicr.id,
                     business_id: clicrBizId,
-                    area_id: newClicr.area_id,
+                    area_id: newClicr.area_id ?? null,
+                    venue_id: newClicr.venue_id ?? null,
+                    is_venue_counter: newClicr.is_venue_counter ?? false,
                     name: newClicr.name,
                     device_type: 'COUNTER',
+                    direction_mode: newClicr.flow_mode === 'IN_ONLY' ? 'in_only' : newClicr.flow_mode === 'OUT_ONLY' ? 'out_only' : 'bidirectional',
                     status: (newClicr.active ?? true) ? 'ACTIVE' : 'INACTIVE',
                     button_config: newClicr.button_config || { label_a: 'GUEST IN', label_b: 'GUEST OUT' }
                 });

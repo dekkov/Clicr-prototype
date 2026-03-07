@@ -16,20 +16,24 @@ ALTER TABLE devices
 ALTER TABLE occupancy_events
     ALTER COLUMN area_id DROP NOT NULL;
 
--- 4. Remove VENUE_DOOR from area_type CHECK constraint
+-- 4. Clean up existing VENUE_DOOR areas (and their events) BEFORE dropping constraint
+DELETE FROM occupancy_events WHERE area_id IN (
+    SELECT id FROM areas WHERE area_type = 'VENUE_DOOR'
+);
+DELETE FROM areas WHERE area_type = 'VENUE_DOOR';
+
+-- 5. Remove VENUE_DOOR from area_type CHECK constraint (safe now that rows are gone)
 ALTER TABLE areas
     DROP CONSTRAINT IF EXISTS areas_area_type_check;
 ALTER TABLE areas
     ADD CONSTRAINT areas_area_type_check
     CHECK (area_type IN ('ENTRY', 'MAIN', 'PATIO', 'VIP', 'BAR', 'EVENT_SPACE', 'OTHER'));
 
--- 5. Clean up existing VENUE_DOOR areas (and their events)
-DELETE FROM occupancy_events WHERE area_id IN (
-    SELECT id FROM areas WHERE area_type = 'VENUE_DOOR'
-);
-DELETE FROM areas WHERE area_type = 'VENUE_DOOR';
-
--- 6. Recreate apply_occupancy_delta to support venue-level taps and fix RLS bypass
+-- 6. Drop OLD overloads of apply_occupancy_delta before recreating
+--    CREATE OR REPLACE won't replace when param list differs — it creates a second overload.
+--    PostgREST (PGRST203) can't resolve ambiguous overloads, so we must drop the old signatures.
+DROP FUNCTION IF EXISTS apply_occupancy_delta(UUID, INTEGER, TEXT, UUID, TEXT, TEXT);
+DROP FUNCTION IF EXISTS apply_occupancy_delta(UUID, INTEGER, TEXT, UUID, TEXT, TEXT, UUID);
 CREATE OR REPLACE FUNCTION apply_occupancy_delta(
     p_area_id         UUID DEFAULT NULL,
     p_venue_id        UUID DEFAULT NULL,

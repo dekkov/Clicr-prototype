@@ -518,9 +518,9 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                         {!editingVenueCounter ? (
                             <div className="flex items-center justify-between text-sm">
                                 <div className="flex items-center gap-2 text-amber-300">
-                                    <div className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                                    <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                                     {venueCounterName}
-                                    <span className="text-xs text-amber-600">{venueCounterFlowMode === 'BIDIRECTIONAL' ? 'both' : venueCounterFlowMode === 'IN_ONLY' ? 'in only' : 'out only'}</span>
+                                    <span className="text-xs text-amber-600">Guest Flow: {venueCounterFlowMode === 'BIDIRECTIONAL' ? 'Both' : venueCounterFlowMode === 'IN_ONLY' ? 'In Only' : 'Out Only'}</span>
                                 </div>
                                 <button type="button"
                                     onClick={() => { setEditingVenueCounter(true); setEditingVCName(venueCounterName); setEditingVCFlowMode(venueCounterFlowMode); }}
@@ -570,7 +570,7 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                                                     <div className="flex items-center gap-2 text-slate-300">
                                                         <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                                                         {c.name}
-                                                        <span className="text-xs text-slate-500">{c.flow_mode === 'BIDIRECTIONAL' ? 'both' : c.flow_mode === 'IN_ONLY' ? 'in only' : 'out only'}</span>
+                                                        <span className="text-xs text-slate-500">Guest Flow: {c.flow_mode === 'BIDIRECTIONAL' ? 'Both' : c.flow_mode === 'IN_ONLY' ? 'In Only' : 'Out Only'}</span>
                                                     </div>
                                                     <div className="flex items-center gap-1">
                                                         <button type="button"

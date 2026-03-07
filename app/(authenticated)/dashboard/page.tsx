@@ -544,8 +544,10 @@ export default function DashboardPage() {
         return () => clearTimeout(timer);
     }, [todayStart]);
 
+    // Dashboard metrics only use venue counter events (area_id is null/empty).
+    // Area counter taps track area-level flow only and don't contribute to dashboard metrics.
     const todayEvents = useMemo(
-        () => events.filter((e) => e.timestamp >= todayStart),
+        () => events.filter((e) => e.timestamp >= todayStart && !e.area_id),
         [events, todayStart]
     );
 

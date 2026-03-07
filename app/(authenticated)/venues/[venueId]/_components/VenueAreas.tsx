@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/store';
 import { Area, AreaType, CountingMode, ShiftMode } from '@/lib/types';
 import {
@@ -23,6 +24,7 @@ const TIMEZONES = [
 ];
 
 export default function VenueAreas({ venueId }: { venueId: string }) {
+    const router = useRouter();
     const { areas, venues, addArea, updateArea } = useApp();
 
     // Use Standardized Metrics Selector
@@ -49,19 +51,7 @@ export default function VenueAreas({ venueId }: { venueId: string }) {
     const [isSaving, setIsSaving] = useState(false);
 
     const handleCreate = () => {
-        setEditingArea({
-            venue_id: venueId,
-            name: '',
-            area_type: 'MAIN',
-            capacity_max: 0,
-            default_capacity: 0,
-            counting_mode: 'BOTH',
-            is_active: true,
-            shift_mode: 'MANUAL',
-            auto_reset_time: '09:00',
-            auto_reset_timezone: (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return 'UTC'; } })(),
-        });
-        setIsEditModalOpen(true);
+        router.push(`/areas/new?venueId=${venueId}`);
     };
 
     const handleEdit = (summary: any) => {
