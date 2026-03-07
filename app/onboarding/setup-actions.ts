@@ -90,7 +90,6 @@ export type OnboardingBatchInput = {
     logoUrl?: string;
     venue: { name: string; city?: string; state?: string; capacity?: number };
     areas: { name: string; capacity?: number; area_type?: string }[];
-    venueDoorName?: string;
 };
 
 export type OnboardingBatchResult =
@@ -106,7 +105,7 @@ export async function createBusinessVenueAndAreas(input: OnboardingBatchInput): 
     if (!businessName) return { success: false, error: 'Business name is required' };
     const venueName = input.venue?.name?.trim();
     if (!venueName) return { success: false, error: 'Venue name is required' };
-    // 0 manually added areas is fine — Venue Counter is always auto-created
+    // 0 areas is fine — user can add areas later
 
     const timezone = input.timezone?.trim() || 'America/New_York';
     const logoUrl = input.logoUrl?.trim() || null;
@@ -148,23 +147,7 @@ export async function createBusinessVenueAndAreas(input: OnboardingBatchInput): 
             });
         if (venueError) throw venueError;
 
-        // Auto-create the venue's dedicated occupancy counter
-        const venueDoorId = crypto.randomUUID();
-        const { error: venueDoorError } = await supabaseAdmin
-            .from('areas')
-            .insert({
-                id: venueDoorId,
-                venue_id: venueId,
-                business_id: business.id,
-                name: input.venueDoorName?.trim() || 'Venue Counter',
-                capacity_max: capacity,
-                area_type: 'VENUE_DOOR',
-                counting_mode: 'BOTH',
-                is_active: true,
-            });
-        if (venueDoorError) throw venueDoorError;
-
-        const areaIds: string[] = [venueDoorId];
+        const areaIds: string[] = [];
         for (const a of input.areas) {
             const areaId = crypto.randomUUID();
             const areaCap = a.capacity != null && !isNaN(a.capacity) && a.capacity > 0 ? a.capacity : null;
