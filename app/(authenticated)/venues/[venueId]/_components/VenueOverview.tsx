@@ -10,7 +10,8 @@ import {
     Plus,
     Settings,
     LogIn,
-    LogOut
+    LogOut,
+    RotateCcw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { KpiCard } from '@/components/ui/KpiCard';
@@ -18,7 +19,7 @@ import { getVenueCapacityRules } from '@/lib/capacity';
 import { AreaChart, Area as RechartsArea, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 export default function VenueOverview({ venueId, setActiveTab }: { venueId: string, setActiveTab: (tab: any) => void }) {
-    const { venues, areas, clicrs, devices, events } = useApp();
+    const { venues, areas, clicrs, devices, events, turnarounds } = useApp();
     const venue = venues.find(v => v.id === venueId);
 
     // Filtered Data
@@ -40,6 +41,17 @@ export default function VenueOverview({ venueId, setActiveTab }: { venueId: stri
         const outs = venueAreas.reduce((sum, a) => sum + (a.current_traffic_out || 0), 0);
         return { ins, outs };
     }, [venueAreas]);
+
+    const turnaroundStats = useMemo(() => {
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const venueTurnarounds = (turnarounds || []).filter(
+            t => t.venue_id === venueId && t.timestamp >= todayStart.getTime()
+        );
+        const total = venueTurnarounds.reduce((sum, t) => sum + t.count, 0);
+        const netEntries = Math.max(0, trafficStats.ins - total);
+        return { total, netEntries };
+    }, [turnarounds, venueId, trafficStats.ins]);
 
     // Chart Data (Last 6 Hours) - Breakdown by Gender
     const chartData = useMemo(() => {
@@ -97,7 +109,7 @@ export default function VenueOverview({ venueId, setActiveTab }: { venueId: stri
     return (
         <div className="space-y-6 animate-fade-in">
             {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 <KpiCard
                     title="Live Occupancy"
                     value={currentOccupancy}
@@ -116,6 +128,13 @@ export default function VenueOverview({ venueId, setActiveTab }: { venueId: stri
                     value={trafficStats.outs}
                     icon={LogOut}
                     className="bg-slate-900/50 border-slate-800 text-amber-400"
+                />
+                <KpiCard
+                    title="Turnarounds"
+                    value={turnaroundStats.total}
+                    subtext={`Net Entries: ${turnaroundStats.netEntries}`}
+                    icon={RotateCcw}
+                    className="bg-slate-900/50 border-slate-800"
                 />
                 <div onClick={() => setActiveTab('AREAS')} className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl cursor-pointer hover:bg-slate-800/50 transition-colors">
                     <div className="flex justify-between items-start mb-2">

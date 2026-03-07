@@ -20,6 +20,7 @@ import type {
     CapacityOverride,
     VenueAuditLog,
     SupportTicket,
+    TurnaroundEvent,
 } from './types';
 
 const INITIAL_USER: User = {
@@ -42,6 +43,7 @@ export type DBData = {
     venueAuditLogs: VenueAuditLog[];
     events: CountEvent[];
     scanEvents: IDScanEvent[];
+    turnarounds: TurnaroundEvent[];
     currentUser: User;
     users: User[];
     bans: BanRecord[];
@@ -63,6 +65,7 @@ export function createInitialDBData(): DBData {
         venueAuditLogs: [],
         events: [],
         scanEvents: [],
+        turnarounds: [],
         currentUser: { ...INITIAL_USER },
         users: [],
         bans: [],

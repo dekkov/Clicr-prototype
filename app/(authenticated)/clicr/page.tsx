@@ -93,7 +93,7 @@ export default function ClicrListPage() {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {venue.venueCounterClicrs.map(clicr => (
-                                <ClicrCard key={clicr.id} clicr={clicr} area={null} isVenueCounter />
+                                <ClicrCard key={clicr.id} clicr={clicr} area={null} isVenueCounter venue={venue} />
                             ))}
                             {venue.areas.flatMap(area =>
                                 area.clicrs.map(clicr => (
@@ -217,12 +217,16 @@ function getFlowModeLabel(flowMode: string | undefined): string {
     }
 }
 
-function ClicrCard({ clicr, area, isVenueCounter }: { clicr: Clicr; area: (Area & { clicrs: Clicr[] }) | null; isVenueCounter?: boolean }) {
+function ClicrCard({ clicr, area, isVenueCounter, venue }: { clicr: Clicr; area: (Area & { clicrs: Clicr[] }) | null; isVenueCounter?: boolean; venue?: any }) {
     const flowModeLabel = getFlowModeLabel(clicr.flow_mode);
     const scanEnabled = clicr.scan_enabled;
 
-    const occupancy = area?.current_occupancy ?? 0;
-    const capacity = area?.default_capacity ?? (area as any)?.capacity_limit ?? area?.capacity_max ?? null;
+    const occupancy = isVenueCounter
+        ? (venue?.current_occupancy ?? 0)
+        : (area?.current_occupancy ?? 0);
+    const capacity = isVenueCounter
+        ? (venue?.total_capacity ?? venue?.default_capacity_total ?? venue?.capacity_max ?? null)
+        : (area?.default_capacity ?? (area as any)?.capacity_limit ?? area?.capacity_max ?? null);
     const capacityDisplay = capacity != null ? String(capacity) : '∞';
 
     const isScanner = scanEnabled;
@@ -280,7 +284,7 @@ function ClicrCard({ clicr, area, isVenueCounter }: { clicr: Clicr; area: (Area 
             </div>
 
             <div className="text-sm text-gray-400">
-                <span className="text-2xl text-white">{occupancy}</span> / {capacityDisplay} in area
+                <span className={cn("text-2xl", isVenueCounter ? "text-amber-300" : "text-white")}>{occupancy}</span> / {capacityDisplay} {isVenueCounter ? 'in venue' : 'in area'}
             </div>
         </Link>
     );

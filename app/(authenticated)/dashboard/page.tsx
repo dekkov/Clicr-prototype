@@ -276,10 +276,12 @@ const VenueContribution = ({ data }: { data: { name: string; count: number }[] }
 
 const TrafficFlow = ({
     totalEntries, totalScans, accepted, denied, banned, netOcc, areaDistrib,
+    turnarounds, netAdjusted,
 }: {
     totalEntries: number; totalScans: number; accepted: number;
     denied: number; banned: number; netOcc: number;
     areaDistrib: { name: string; count: number; pct: number }[];
+    turnarounds: number; netAdjusted: number;
 }) => {
     const max = Math.max(totalEntries, 1);
     const funnelRows = [
@@ -288,6 +290,8 @@ const TrafficFlow = ({
         { label: 'Accepted', value: accepted, color: 'bg-emerald-500', textColor: 'text-emerald-300' },
         { label: 'Denied', value: denied, color: 'bg-orange-500', textColor: 'text-orange-300' },
         { label: 'Banned', value: banned, color: 'bg-red-500', textColor: 'text-red-300' },
+        { label: 'Turnarounds', value: turnarounds, color: 'bg-amber-500', textColor: 'text-amber-300' },
+        { label: 'Net Entries', value: netAdjusted, color: 'bg-teal-500', textColor: 'text-teal-300' },
         { label: 'Net Occupancy', value: netOcc, color: 'bg-cyan-500', textColor: 'text-cyan-300' },
     ];
     return (
@@ -500,6 +504,7 @@ export default function DashboardPage() {
         scanEvents,
         currentUser,
         bans,
+        turnarounds,
         isLoading,
         resetCounts,
     } = useApp();
@@ -592,6 +597,18 @@ export default function DashboardPage() {
     const activeBansCount = useMemo(
         () => bans.filter((b) => b.status === 'ACTIVE').length,
         [bans]
+    );
+
+    const totalTurnarounds = useMemo(
+        () => (turnarounds || [])
+            .filter(t => t.timestamp >= todayStart)
+            .reduce((sum, t) => sum + t.count, 0),
+        [turnarounds, todayStart]
+    );
+
+    const netAdjusted = useMemo(
+        () => Math.max(0, totalEntries - totalTurnarounds),
+        [totalEntries, totalTurnarounds]
     );
 
     // Age distribution from accepted scans
@@ -926,6 +943,8 @@ export default function DashboardPage() {
                     banned={activeBansCount}
                     netOcc={liveOccupancy}
                     areaDistrib={areaDistribData}
+                    turnarounds={totalTurnarounds}
+                    netAdjusted={netAdjusted}
                 />
                 <OperationalWorkflow />
             </div>

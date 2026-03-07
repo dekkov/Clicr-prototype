@@ -303,6 +303,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                         clicrs: data.clicrs || [],
                         events: data.events || [],
                         scanEvents: data.scanEvents || [],
+                        turnarounds: data.turnarounds || [],
                         businesses: nextBusinesses,
                         activeBusiness: nextActive,
                         business: nextActive,

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { CountEvent, IDScanEvent, User, Clicr, Area, Venue } from '@/lib/types';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { createInitialDBData, isUserBanned, type DBData } from '@/lib/sync-data';
+import { createInitialDBData, type DBData } from '@/lib/sync-data';
 
 export const dynamic = 'force-dynamic';
 
@@ -267,6 +267,33 @@ async function buildSyncResponse(
         visibleVenueIds.includes(s.venue_id) && (!latestResetAt || s.timestamp > latestResetAt)
     );
 
+    // Turnarounds — today only, scoped to visible venues
+    let filteredTurnarounds: any[] = [];
+    if (activeBizId) {
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const { data: turnaroundRows } = await supabaseAdmin
+            .from('turnarounds')
+            .select('*')
+            .eq('business_id', activeBizId)
+            .gte('created_at', todayStart.toISOString())
+            .order('created_at', { ascending: false });
+
+        filteredTurnarounds = (turnaroundRows || [])
+            .filter((t: any) => !t.venue_id || visibleVenueIds.includes(t.venue_id))
+            .map((t: any) => ({
+                id: t.id,
+                timestamp: new Date(t.created_at).getTime(),
+                business_id: t.business_id,
+                venue_id: t.venue_id || undefined,
+                area_id: t.area_id || undefined,
+                device_id: t.device_id || undefined,
+                count: t.count,
+                reason: t.reason || undefined,
+                created_by: t.created_by,
+            }));
+    }
+
     const memberUserIds = new Set<string>([userId]);
     if (allBizIds.length > 0) {
         const { data: members } = await supabaseAdmin
@@ -310,6 +337,7 @@ async function buildSyncResponse(
         clicrs: filteredClicrs,
         events: filteredEvents,
         scanEvents: filteredScans,
+        turnarounds: filteredTurnarounds,
         users: filteredUsers,
         currentUser: user,
         teamMemberCount
@@ -353,26 +381,6 @@ export async function POST(request: Request) {
                 const hasVenueId = (event as any).venue_id && typeof (event as any).venue_id === 'string';
                 if (!hasAreaId && !hasVenueId) {
                     return NextResponse.json({ error: 'area_id or venue_id is required for RECORD_EVENT' }, { status: 400 });
-                }
-                const banned = await isUserBanned(supabaseAdmin, event.user_id, event.venue_id);
-                if (banned) return NextResponse.json({ error: 'User is banned' }, { status: 403 });
-
-                let eventBizId = event.business_id;
-                if (!eventBizId && userId) eventBizId = await getBusinessId();
-                if (!eventBizId) return NextResponse.json({ error: 'Could not resolve business_id for event' }, { status: 400 });
-
-                if (hasAreaId) {
-                    const { data: areaRow, error: areaErr } = await supabaseAdmin
-                        .from('areas')
-                        .select('id, business_id')
-                        .eq('id', event.area_id!)
-                        .single();
-                    if (areaErr || !areaRow) {
-                        return NextResponse.json({ error: 'Area not found or invalid area_id' }, { status: 400 });
-                    }
-                    if (areaRow.business_id !== eventBizId) {
-                        return NextResponse.json({ error: 'Area does not belong to your business' }, { status: 403 });
-                    }
                 }
 
                 const deviceId = (event as any).clicr_id;
