@@ -278,16 +278,29 @@ export class LocalAdapter implements DataClient {
     // ── COUNTING ────────────────────────────────────────────────────────
 
     async applyOccupancyDelta(payload: DeltaPayload): Promise<DeltaResult> {
-        const current = this.state.snapshots.get(payload.areaId) || 0;
-        const newOcc = Math.max(0, current + payload.delta);
-        this.state.snapshots.set(payload.areaId, newOcc);
+        let newOcc: number;
+
+        if (!payload.areaId && payload.venueId) {
+            // Venue counter clicr — update venue-level occupancy
+            const venue = this.state.venues.find(v => v.id === payload.venueId);
+            if (venue) {
+                (venue as any).current_occupancy = Math.max(0, ((venue as any).current_occupancy ?? 0) + payload.delta);
+            }
+            newOcc = (venue as any)?.current_occupancy ?? 0;
+        } else {
+            // Area-level tap (existing behavior)
+            const areaId = payload.areaId!;
+            const current = this.state.snapshots.get(areaId) || 0;
+            newOcc = Math.max(0, current + payload.delta);
+            this.state.snapshots.set(areaId, newOcc);
+        }
 
         const eventId = `evt_${generateId()}`;
         this.state.events.push({
             id: eventId,
             businessId: payload.businessId,
             venueId: payload.venueId,
-            areaId: payload.areaId,
+            areaId: payload.areaId ?? '',
             deviceId: payload.deviceId,
             delta: payload.delta,
             flowType: payload.delta > 0 ? 'IN' : 'OUT',

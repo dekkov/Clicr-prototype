@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/store';
-import { Venue, Area, Clicr } from '@/lib/types';
+import { Venue, Area, Clicr, FlowMode } from '@/lib/types';
 import { ArrowLeft, Check, Plus, MapPin, Building2, Users } from 'lucide-react';
 
 type Step = 'VENUE' | 'AREAS' | 'CLICRS';
@@ -29,43 +29,24 @@ export default function NewVenuePage() {
 
     // Clicr Form (Map areaId -> List of Clicr Names)
     const [clicrInputs, setClicrInputs] = useState<Record<string, string>>({});
+    const [clicrFlowModes, setClicrFlowModes] = useState<Record<string, FlowMode>>({});
     const [createdClicrs, setCreatedClicrs] = useState<Clicr[]>([]);
 
-    // --- STEP 1: CREATE VENUE ---
-    const handleCreateVenue = async (e: React.FormEvent) => {
+    // --- STEP 1: COLLECT VENUE (no network call yet) ---
+    const handleCreateVenue = (e: React.FormEvent) => {
         e.preventDefault();
         if (!activeBusiness?.id) {
             alert('Please select a business from the sidebar first.');
             return;
         }
-        setIsLoading(true);
-
         const newId = crypto.randomUUID();
-        const venue: Venue = {
-            id: newId,
-            business_id: activeBusiness.id,
-            name: venueData.name,
-            city: venueData.city,
-            state: venueData.state,
-            default_capacity_total: venueData.capacity,
-            capacity_enforcement_mode: 'WARN_ONLY',
-            status: 'ACTIVE',
-            timezone: 'America/New_York',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            active: true
-        };
-
-        await addVenue(venue);
         setVenueId(newId);
-        setIsLoading(false);
         setStep('AREAS');
     };
 
-    // --- STEP 2: ADD AREAS ---
-    const handleAddArea = async () => {
+    // --- STEP 2: COLLECT AREAS (no network call yet) ---
+    const handleAddArea = () => {
         if (!areaInput.name) return;
-        setIsLoading(true);
         const newAreaId = crypto.randomUUID();
         const area: Area = {
             id: newAreaId,
@@ -79,37 +60,64 @@ export default function NewVenuePage() {
             updated_at: new Date().toISOString(),
             current_count: 0
         } as Area;
-        await addArea(area);
         setCreatedAreas([...createdAreas, area]);
         setAreaInput({ name: '', capacity: 100 });
-        setIsLoading(false);
     };
 
     const nextToClicrs = () => setStep('CLICRS');
 
-    // --- STEP 3: ADD CLICRS ---
-    const handleAddClicr = async (areaId: string) => {
+    // --- STEP 3: COLLECT CLICRS (no network call yet) ---
+    const handleAddClicr = (areaId: string) => {
         const name = clicrInputs[areaId];
         if (!name) return;
-
-        setIsLoading(true);
-        const newClicrId = crypto.randomUUID();
         const clicr: Clicr = {
-            id: newClicrId,
+            id: crypto.randomUUID(),
             area_id: areaId,
-            name: name,
-            flow_mode: 'BIDIRECTIONAL',
+            name,
+            flow_mode: clicrFlowModes[areaId] || 'BIDIRECTIONAL',
             active: true,
-            current_count: 0
+            current_count: 0,
         };
-        await addClicr(clicr);
-        setCreatedClicrs([...createdClicrs, clicr]);
-        setClicrInputs({ ...clicrInputs, [areaId]: '' });
-        setIsLoading(false);
+        setCreatedClicrs(prev => [...prev, clicr]);
+        setClicrInputs(prev => ({ ...prev, [areaId]: '' }));
     };
 
-    const handleFinish = () => {
-        router.push('/venues');
+    // --- FINISH: BATCH COMMIT ALL ---
+    const handleFinish = async () => {
+        if (!activeBusiness?.id) return;
+        setIsLoading(true);
+
+        try {
+            const venue: Venue = {
+                id: venueId,
+                business_id: activeBusiness.id,
+                name: venueData.name,
+                city: venueData.city,
+                state: venueData.state,
+                default_capacity_total: venueData.capacity,
+                capacity_enforcement_mode: 'WARN_ONLY',
+                status: 'ACTIVE',
+                timezone: 'America/New_York',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                active: true,
+            };
+            await addVenue(venue);
+            // addVenue auto-creates venue counter clicr
+
+            for (const area of createdAreas) {
+                await addArea(area);
+            }
+
+            for (const clicr of createdClicrs) {
+                await addClicr(clicr);
+            }
+
+            router.push('/venues');
+        } catch (e: any) {
+            console.error('Failed to create venue setup:', e);
+            setIsLoading(false);
+        }
     };
 
     // --- RENDERERS ---
@@ -296,11 +304,19 @@ export default function NewVenuePage() {
                                         placeholder="Clicr Name (e.g. Door 1)"
                                         value={clicrInputs[area.id] || ''}
                                         onChange={e => setClicrInputs({ ...clicrInputs, [area.id]: e.target.value })}
+                                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddClicr(area.id); } }}
                                         className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-1 focus:ring-primary focus:outline-none"
                                     />
+                                    <select value={clicrFlowModes[area.id] || 'BIDIRECTIONAL'}
+                                        onChange={e => setClicrFlowModes(p => ({ ...p, [area.id]: e.target.value as FlowMode }))}
+                                        className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-2 text-white text-sm focus:ring-1 focus:ring-primary focus:outline-none">
+                                        <option value="BIDIRECTIONAL">Both</option>
+                                        <option value="IN_ONLY">In only</option>
+                                        <option value="OUT_ONLY">Out only</option>
+                                    </select>
                                     <button
                                         onClick={() => handleAddClicr(area.id)}
-                                        disabled={!clicrInputs[area.id] || isLoading}
+                                        disabled={!clicrInputs[area.id]}
                                         className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                                     >
                                         Add

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/store';
-import { Area, AreaType, Clicr } from '@/lib/types';
+import { Area, AreaType, Clicr, FlowMode } from '@/lib/types';
 import { Building2, MapPin, Users, Check, Plus, ArrowRight, ArrowLeft, Mail, Scan, Ban, Trash2, Pencil, X } from 'lucide-react';
 import { createBusinessVenueAndAreas, updateBusinessSettings } from '@/app/onboarding/setup-actions';
 import { inviteTeamMember } from '@/app/(authenticated)/settings/team-actions';
@@ -18,11 +18,6 @@ const STEP_DISPLAY: Record<Step, string> = {
     INVITE: 'Team', SCAN_CONFIG: 'Scan', BAN_CONFIG: 'Bans',
 };
 
-const CLICR_TEMPLATES = [
-    { id: 'single', label: 'Single door', desc: '1 counter', names: ['Front Door'] },
-    { id: 'entry_exit', label: 'Entry + Exit pair', desc: '2 counters', names: ['Entry Door', 'Exit Door'] },
-    { id: 'busy', label: 'Busy door setup', desc: '3 counters', names: ['Front Door 1', 'Front Door 2', 'VIP Door'] },
-];
 
 type Props = {
     onComplete?: () => void;
@@ -78,6 +73,15 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
     const [editingAreaType, setEditingAreaType] = useState<AreaType>('MAIN');
     const [editingClicrId, setEditingClicrId] = useState<string | null>(null);
     const [editingClicrName, setEditingClicrName] = useState('');
+    const [editingClicrFlowMode, setEditingClicrFlowMode] = useState<FlowMode>('BIDIRECTIONAL');
+    const [clicrFlowModes, setClicrFlowModes] = useState<Record<string, FlowMode>>({});
+
+    // Venue counter state
+    const [venueCounterName, setVenueCounterName] = useState('Venue Counter');
+    const [venueCounterFlowMode, setVenueCounterFlowMode] = useState<FlowMode>('BIDIRECTIONAL');
+    const [editingVenueCounter, setEditingVenueCounter] = useState(false);
+    const [editingVCName, setEditingVCName] = useState('');
+    const [editingVCFlowMode, setEditingVCFlowMode] = useState<FlowMode>('BIDIRECTIONAL');
 
     const currentIndex = STEP_LABELS.indexOf(step);
 
@@ -130,9 +134,13 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
         setEditingAreaId(null);
     };
 
-    const handleSaveClicrName = (id: string) => {
+    const handleSaveClicr = (id: string) => {
         const trimmed = editingClicrName.trim();
-        if (trimmed) setCreatedClicrs(prev => prev.map(c => c.id === id ? { ...c, name: trimmed } : c));
+        if (trimmed) setCreatedClicrs(prev => prev.map(c => c.id === id ? {
+            ...c,
+            name: trimmed,
+            flow_mode: editingClicrFlowMode,
+        } : c));
         setEditingClicrId(null);
     };
 
@@ -143,24 +151,12 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
             id: crypto.randomUUID(),
             area_id: areaId,
             name,
-            flow_mode: 'BIDIRECTIONAL',
+            flow_mode: clicrFlowModes[areaId] || 'BIDIRECTIONAL',
             active: true,
             current_count: 0,
         };
         setCreatedClicrs(prev => [...prev, clicr]);
         setClicrInputs(prev => ({ ...prev, [areaId]: '' }));
-    };
-
-    const handleApplyTemplate = (template: typeof CLICR_TEMPLATES[0], areaId: string) => {
-        const newClicrs: Clicr[] = template.names.map(name => ({
-            id: crypto.randomUUID(),
-            area_id: areaId,
-            name,
-            flow_mode: 'BIDIRECTIONAL' as const,
-            active: true,
-            current_count: 0,
-        }));
-        setCreatedClicrs(prev => [...prev, ...newClicrs]);
     };
 
     const finish = async (opts?: { saveBanConfig?: boolean; saveScanConfig?: boolean }) => {
@@ -191,6 +187,7 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                         capacity: a.default_capacity ?? undefined,
                         area_type: a.area_type,
                     })),
+                    venueCounterName,
                 });
 
                 if (!result.success) {
@@ -215,7 +212,7 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
             createdAreas.forEach((a, i) => { areaIdMap[a.id] = currentAreas[i].id; });
 
             for (const c of createdClicrs) {
-                await addClicr({ ...c, area_id: areaIdMap[c.area_id] ?? c.area_id });
+                await addClicr({ ...c, area_id: c.area_id ? (areaIdMap[c.area_id] ?? c.area_id) : null });
             }
 
             for (const inv of invitedList) {
@@ -513,21 +510,59 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                         <Users className="text-primary w-6 h-6" />
                         <h2 className="text-2xl font-bold text-white">Add Clicrs</h2>
                     </div>
-                    <p className="text-slate-400 text-sm">Name your counters per area (e.g. Front Door, Side Entrance).</p>
+                    <p className="text-slate-400 text-sm">Name your counters. The venue counter tracks overall venue occupancy.</p>
+
+                    {/* VENUE COUNTER — dedicated, non-deletable */}
+                    <div className="bg-amber-950/10 p-4 rounded-xl border border-amber-500/20">
+                        <h3 className="text-xs font-bold uppercase tracking-widest text-amber-500 mb-3">{venueData.name || 'Venue'}</h3>
+                        {!editingVenueCounter ? (
+                            <div className="flex items-center justify-between text-sm">
+                                <div className="flex items-center gap-2 text-amber-300">
+                                    <div className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                                    {venueCounterName}
+                                    <span className="text-xs text-amber-600">{venueCounterFlowMode === 'BIDIRECTIONAL' ? 'both' : venueCounterFlowMode === 'IN_ONLY' ? 'in only' : 'out only'}</span>
+                                </div>
+                                <button type="button"
+                                    onClick={() => { setEditingVenueCounter(true); setEditingVCName(venueCounterName); setEditingVCFlowMode(venueCounterFlowMode); }}
+                                    className="p-1.5 rounded-lg text-amber-600 hover:text-amber-400 hover:bg-amber-500/10 transition-colors" title="Edit">
+                                    <Pencil className="w-3 h-3" />
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col gap-2 w-full">
+                                <input autoFocus type="text" value={editingVCName}
+                                    onChange={e => setEditingVCName(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Escape') setEditingVenueCounter(false); }}
+                                    className="flex-1 bg-slate-900 border border-amber-500/30 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
+                                <select value={editingVCFlowMode} onChange={e => setEditingVCFlowMode(e.target.value as FlowMode)}
+                                    className="flex-1 bg-slate-900 border border-amber-500/30 rounded-lg px-2 py-1.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500">
+                                    <option value="BIDIRECTIONAL">Both (in + out)</option>
+                                    <option value="IN_ONLY">In only</option>
+                                    <option value="OUT_ONLY">Out only</option>
+                                </select>
+                                <div className="flex gap-2">
+                                    <button type="button" onClick={() => {
+                                        if (editingVCName.trim()) { setVenueCounterName(editingVCName.trim()); setVenueCounterFlowMode(editingVCFlowMode); }
+                                        setEditingVenueCounter(false);
+                                    }} className="flex-1 py-1 rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 text-sm font-medium transition-colors flex items-center justify-center gap-1">
+                                        <Check className="w-3.5 h-3.5" /> Save
+                                    </button>
+                                    <button type="button" onClick={() => setEditingVenueCounter(false)}
+                                        className="flex-1 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white text-sm font-medium transition-colors flex items-center justify-center gap-1">
+                                        <X className="w-3.5 h-3.5" /> Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* AREA CLICRS */}
                     <div className="space-y-4">
                         {createdAreas.map(area => {
                             const areaClicrs = createdClicrs.filter(c => c.area_id === area.id);
                             return (
                                 <div key={area.id} className="bg-slate-950/30 p-4 rounded-xl border border-slate-800">
                                     <h3 className="font-bold text-white mb-3">{area.name}</h3>
-                                    <div className="flex flex-wrap gap-2 mb-3">
-                                        {CLICR_TEMPLATES.map(t => (
-                                            <button key={t.id} type="button" onClick={() => handleApplyTemplate(t, area.id)} disabled={isLoading}
-                                                className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-white text-xs font-medium transition-colors disabled:opacity-50">
-                                                {t.label} <span className="text-slate-500">({t.desc})</span>
-                                            </button>
-                                        ))}
-                                    </div>
                                     {areaClicrs.map(c => (
                                         <div key={c.id} className="flex items-center justify-between mb-2 text-sm">
                                             {editingClicrId !== c.id ? (
@@ -535,11 +570,12 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                                                     <div className="flex items-center gap-2 text-slate-300">
                                                         <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                                                         {c.name}
+                                                        <span className="text-xs text-slate-500">{c.flow_mode === 'BIDIRECTIONAL' ? 'both' : c.flow_mode === 'IN_ONLY' ? 'in only' : 'out only'}</span>
                                                     </div>
                                                     <div className="flex items-center gap-1">
                                                         <button type="button"
-                                                            onClick={() => { setEditingClicrId(c.id); setEditingClicrName(c.name); }}
-                                                            className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-700 transition-colors" title="Rename">
+                                                            onClick={() => { setEditingClicrId(c.id); setEditingClicrName(c.name); setEditingClicrFlowMode(c.flow_mode); }}
+                                                            className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-700 transition-colors" title="Edit">
                                                             <Pencil className="w-3 h-3" />
                                                         </button>
                                                         <button type="button"
@@ -550,16 +586,27 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                                                     </div>
                                                 </>
                                             ) : (
-                                                <div className="flex items-center gap-2 w-full">
+                                                <div className="flex flex-col gap-2 w-full">
                                                     <input autoFocus type="text" value={editingClicrName}
                                                         onChange={e => setEditingClicrName(e.target.value)}
-                                                        onBlur={() => handleSaveClicrName(c.id)}
-                                                        onKeyDown={e => { if (e.key === 'Enter') handleSaveClicrName(c.id); if (e.key === 'Escape') setEditingClicrId(null); }}
+                                                        onKeyDown={e => { if (e.key === 'Escape') setEditingClicrId(null); }}
                                                         className="flex-1 bg-slate-900 border border-primary/50 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
-                                                    <button type="button" onClick={() => handleSaveClicrName(c.id)}
-                                                        className="p-1.5 rounded-lg text-emerald-400 hover:bg-emerald-500/10 transition-colors">
-                                                        <Check className="w-3.5 h-3.5" />
-                                                    </button>
+                                                    <select value={editingClicrFlowMode} onChange={e => setEditingClicrFlowMode(e.target.value as FlowMode)}
+                                                        className="flex-1 bg-slate-900 border border-primary/50 rounded-lg px-2 py-1.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-primary">
+                                                        <option value="BIDIRECTIONAL">Both (in + out)</option>
+                                                        <option value="IN_ONLY">In only</option>
+                                                        <option value="OUT_ONLY">Out only</option>
+                                                    </select>
+                                                    <div className="flex gap-2">
+                                                        <button type="button" onClick={() => handleSaveClicr(c.id)}
+                                                            className="flex-1 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 text-sm font-medium transition-colors flex items-center justify-center gap-1">
+                                                            <Check className="w-3.5 h-3.5" /> Save
+                                                        </button>
+                                                        <button type="button" onClick={() => setEditingClicrId(null)}
+                                                            className="flex-1 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white text-sm font-medium transition-colors flex items-center justify-center gap-1">
+                                                            <X className="w-3.5 h-3.5" /> Cancel
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -568,7 +615,15 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                                         <input type="text" placeholder="Clicr name (e.g. Door 1)"
                                             value={clicrInputs[area.id] || ''}
                                             onChange={e => setClicrInputs(p => ({ ...p, [area.id]: e.target.value }))}
+                                            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddClicr(area.id); } }}
                                             className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-1 focus:ring-primary focus:outline-none" />
+                                        <select value={clicrFlowModes[area.id] || 'BIDIRECTIONAL'}
+                                            onChange={e => setClicrFlowModes(p => ({ ...p, [area.id]: e.target.value as FlowMode }))}
+                                            className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-2 text-white text-sm focus:ring-1 focus:ring-primary focus:outline-none">
+                                            <option value="BIDIRECTIONAL">Both</option>
+                                            <option value="IN_ONLY">In only</option>
+                                            <option value="OUT_ONLY">Out only</option>
+                                        </select>
                                         <button onClick={() => handleAddClicr(area.id)} disabled={!clicrInputs[area.id]}
                                             className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
                                             Add
@@ -578,6 +633,7 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                             );
                         })}
                     </div>
+
                     <div className="flex gap-3 pt-2 border-t border-slate-800">
                         <button type="button" onClick={goToPrevStep} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2">
                             <ArrowLeft className="w-4 h-4" /> Back

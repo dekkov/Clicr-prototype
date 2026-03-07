@@ -249,7 +249,7 @@ async function buildSyncResponse(
 
     const filteredVenues = hydrated.venues.filter(v => visibleVenueIds.includes(v.id));
     const filteredAreas = hydrated.areas.filter(a => visibleAreaIds.includes(a.id));
-    const filteredClicrs = hydrated.clicrs.filter(c => visibleAreaIds.includes(c.area_id));
+    const filteredClicrs = hydrated.clicrs.filter(c => c.area_id && visibleAreaIds.includes(c.area_id));
 
     const latestResetAt = Math.max(0, ...filteredAreas.map(a => a.last_reset_at ? new Date(a.last_reset_at).getTime() : 0));
     const filteredEvents = hydrated.events.filter(e =>

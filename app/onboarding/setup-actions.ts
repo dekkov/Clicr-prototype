@@ -90,10 +90,11 @@ export type OnboardingBatchInput = {
     logoUrl?: string;
     venue: { name: string; city?: string; state?: string; capacity?: number };
     areas: { name: string; capacity?: number; area_type?: string }[];
+    venueCounterName?: string;
 };
 
 export type OnboardingBatchResult =
-    | { success: true; businessId: string; venueId: string; areaIds: string[] }
+    | { success: true; businessId: string; venueId: string; areaIds: string[]; venueCounterId: string }
     | { success: false; error: string };
 
 export async function createBusinessVenueAndAreas(input: OnboardingBatchInput): Promise<OnboardingBatchResult> {
@@ -167,8 +168,25 @@ export async function createBusinessVenueAndAreas(input: OnboardingBatchInput): 
             areaIds.push(areaId);
         }
 
+        // Auto-create the venue's dedicated counter clicr (device)
+        const venueCounterId = crypto.randomUUID();
+        const { error: vcError } = await supabaseAdmin
+            .from('devices')
+            .insert({
+                id: venueCounterId,
+                business_id: business.id,
+                venue_id: venueId,
+                area_id: null,
+                name: input.venueCounterName?.trim() || 'Venue Counter',
+                device_type: 'COUNTER',
+                direction_mode: 'bidirectional',
+                is_venue_counter: true,
+                status: 'ACTIVE',
+            });
+        if (vcError) throw vcError;
+
         revalidatePath('/dashboard');
-        return { success: true, businessId: business.id, venueId, areaIds };
+        return { success: true, businessId: business.id, venueId, areaIds, venueCounterId };
     } catch (e: any) {
         console.error('[setup] createBusinessVenueAndAreas error:', e);
         return { success: false, error: e.message || 'Failed to create business, venue, and areas' };

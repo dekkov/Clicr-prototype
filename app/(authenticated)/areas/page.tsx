@@ -24,7 +24,6 @@ const TIMEZONES = [
 ];
 
 const AREA_TYPE_ORDER: Record<string, number> = {
-    VENUE_DOOR: 0,
     BAR: 1,
     ENTRY: 2,
     EVENT_SPACE: 3,
@@ -35,7 +34,6 @@ const AREA_TYPE_ORDER: Record<string, number> = {
 };
 
 const AREA_TYPE_LABELS: Record<string, string> = {
-    VENUE_DOOR: 'venue door',
     BAR: 'bar',
     ENTRY: 'entry',
     EVENT_SPACE: 'event space',
@@ -70,7 +68,6 @@ export default function AreasPage() {
     const [isDeletingArea, setIsDeletingArea] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const configArea = configAreaId ? areas.find(a => a.id === configAreaId) : undefined;
-    const isVenueDoor = configArea?.area_type === 'VENUE_DOOR';
     const [newArea, setNewArea] = useState<Partial<Area> & { venue_id: string }>({
         venue_id: '',
         name: '',
@@ -89,10 +86,11 @@ export default function AreasPage() {
     const [newClicrFlow, setNewClicrFlow] = useState<FlowMode>('BIDIRECTIONAL');
     const [isAddingClicr, setIsAddingClicr] = useState(false);
 
-    // Find existing VENUE_DOOR area for a given venue (only one allowed per venue)
-    const getVenueDoorArea = (venueId: string) =>
-        areas.find(a => a.venue_id === venueId && a.area_type === 'VENUE_DOOR' && a.is_active !== false);
-    const venueDoorExists = !!(newArea.venue_id && getVenueDoorArea(newArea.venue_id));
+
+    // Cascading clicr creation state (shown after area is created)
+    const [justCreatedAreaId, setJustCreatedAreaId] = useState<string | null>(null);
+    const [cascadeClicrName, setCascadeClicrName] = useState('');
+    const [cascadeClicrFlow, setCascadeClicrFlow] = useState<FlowMode>('BIDIRECTIONAL');
 
 
     const handleAddClicr = async (e: React.FormEvent) => {
@@ -138,6 +136,7 @@ export default function AreasPage() {
         await addArea(area);
         setIsAddingArea(false);
         setIsCreateOpen(false);
+        setJustCreatedAreaId(area.id);
         setNewArea({
             venue_id: '',
             name: '',
@@ -465,12 +464,9 @@ export default function AreasPage() {
                                         <select
                                             value={newArea.venue_id}
                                             onChange={e => {
-                                                const venueId = e.target.value;
-                                                const hasDoor = !!(venueId && getVenueDoorArea(venueId));
                                                 setNewArea(prev => ({
                                                     ...prev,
-                                                    venue_id: venueId,
-                                                    area_type: prev.area_type === 'VENUE_DOOR' && hasDoor ? 'MAIN' : prev.area_type,
+                                                    venue_id: e.target.value,
                                                 }));
                                             }}
                                             required
@@ -611,6 +607,34 @@ export default function AreasPage() {
                 )}
             </AnimatePresence>
 
+            {/* Cascading Clicr Prompt — shown after area creation */}
+            {justCreatedAreaId && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900 border border-primary/20 rounded-xl p-4 shadow-xl w-full max-w-md space-y-3">
+                    <p className="text-sm text-slate-300">Add Clicrs to <span className="font-bold text-white">{areas.find(a => a.id === justCreatedAreaId)?.name}</span>?</p>
+                    <div className="flex gap-2">
+                        <input type="text" placeholder="Clicr name" value={cascadeClicrName}
+                            onChange={e => setCascadeClicrName(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter' && cascadeClicrName.trim()) { e.preventDefault(); addClicr({ id: crypto.randomUUID(), area_id: justCreatedAreaId, name: cascadeClicrName.trim(), flow_mode: cascadeClicrFlow, active: true, current_count: 0 }); setCascadeClicrName(''); } }}
+                            className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm" />
+                        <select value={cascadeClicrFlow} onChange={e => setCascadeClicrFlow(e.target.value as FlowMode)}
+                            className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-2 text-white text-sm">
+                            <option value="BIDIRECTIONAL">Both</option>
+                            <option value="IN_ONLY">In only</option>
+                            <option value="OUT_ONLY">Out only</option>
+                        </select>
+                        <button onClick={async () => {
+                            if (!cascadeClicrName.trim()) return;
+                            await addClicr({ id: crypto.randomUUID(), area_id: justCreatedAreaId, name: cascadeClicrName.trim(), flow_mode: cascadeClicrFlow, active: true, current_count: 0 });
+                            setCascadeClicrName('');
+                        }} disabled={!cascadeClicrName.trim()}
+                            className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium disabled:opacity-50">
+                            Add
+                        </button>
+                    </div>
+                    <button onClick={() => setJustCreatedAreaId(null)} className="text-xs text-slate-500 hover:text-slate-300">Done adding clicrs</button>
+                </div>
+            )}
+
             {/* Add Clicr Modal */}
             <AnimatePresence>
                 {addClicrAreaId && (
@@ -727,24 +751,22 @@ export default function AreasPage() {
                                             placeholder="0 for unlimited"
                                         />
                                     </div>
-                                    {!isVenueDoor && (
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium text-gray-400">Type</label>
-                                            <select
-                                                value={configAreaType}
-                                                onChange={e => setConfigAreaType(e.target.value as AreaType)}
-                                                className="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                                            >
-                                                <option value="MAIN">Main Floor</option>
-                                                <option value="ENTRY">Entry</option>
-                                                <option value="VIP">VIP</option>
-                                                <option value="PATIO">Patio</option>
-                                                <option value="BAR">Bar</option>
-                                                <option value="EVENT_SPACE">Event Space</option>
-                                                <option value="OTHER">Other</option>
-                                            </select>
-                                        </div>
-                                    )}
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-gray-400">Type</label>
+                                        <select
+                                            value={configAreaType}
+                                            onChange={e => setConfigAreaType(e.target.value as AreaType)}
+                                            className="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                        >
+                                            <option value="MAIN">Main Floor</option>
+                                            <option value="ENTRY">Entry</option>
+                                            <option value="VIP">VIP</option>
+                                            <option value="PATIO">Patio</option>
+                                            <option value="BAR">Bar</option>
+                                            <option value="EVENT_SPACE">Event Space</option>
+                                            <option value="OTHER">Other</option>
+                                        </select>
+                                    </div>
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium text-gray-400">Counting Mode</label>
                                         <div className="grid grid-cols-3 gap-2">
@@ -798,7 +820,7 @@ export default function AreasPage() {
                                         )}
                                     </div>
                                     <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-800">
-                                        {canDelete && !isVenueDoor ? (
+                                        {canDelete ? (
                                             !confirmDelete ? (
                                                 <button type="button" onClick={() => setConfirmDelete(true)}
                                                     className="px-4 py-2 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 text-sm font-medium transition-colors">

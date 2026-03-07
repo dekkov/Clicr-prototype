@@ -189,7 +189,7 @@ export default function BoardViewsPage() {
                                                         {device.name}
                                                     </span>
                                                     <span className="text-xs text-slate-500 ml-2">
-                                                        {getAreaName(device.area_id)}
+                                                        {getAreaName(device.area_id ?? '')}
                                                     </span>
                                                 </div>
                                                 {selectedDeviceIds.includes(device.id) && <Check className="w-4 h-4 text-primary" />}

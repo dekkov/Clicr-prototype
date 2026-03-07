@@ -68,16 +68,24 @@ export async function POST(
 
     const delta = (direction as 'IN' | 'OUT') === 'IN' ? 1 : -1;
 
-    const { error: rpcError } = await supabaseAdmin.rpc('apply_occupancy_delta', {
-        p_area_id: device.area_id,
+    // Venue counter clicrs have area_id = null, use venue_id instead
+    const rpcParams: Record<string, unknown> = {
         p_delta: delta,
         p_source: 'manual',
-        p_device_id: null,
+        p_device_id: device.id,
         p_gender: null,
-        // null = no deduplication; each tap is a distinct event.
-        // Client-side buttons are disabled during the request to prevent double-taps.
         p_idempotency_key: null,
-    });
+    };
+
+    if (device.area_id) {
+        rpcParams.p_area_id = device.area_id;
+    } else if (device.venue_id) {
+        rpcParams.p_venue_id = device.venue_id;
+    } else {
+        return NextResponse.json({ error: 'Device has no area or venue assigned' }, { status: 422 });
+    }
+
+    const { error: rpcError } = await supabaseAdmin.rpc('apply_occupancy_delta', rpcParams);
 
     if (rpcError) {
         console.error('[tap] RPC error:', rpcError);

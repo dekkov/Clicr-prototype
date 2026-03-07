@@ -165,21 +165,29 @@ export default function ClicrPanel({
     }, [showBulkModal, showConfigModal]);
 
     // Area + venue data
-    const currentArea = (areas || []).find(a => a.id === clicr?.area_id);
+    const isVenueCounter = clicr?.is_venue_counter === true;
+    const currentArea = isVenueCounter ? undefined : (areas || []).find(a => a.id === clicr?.area_id);
     const lastOccupancyRef = useRef<number | null>(null);
-    if (currentArea?.current_occupancy !== undefined) {
+
+    const venueId = isVenueCounter ? clicr?.venue_id : currentArea?.venue_id;
+    const currentVenue = (venues || []).find(v => v.id === venueId);
+    const currentVenueOccupancy = currentVenue?.current_occupancy ?? 0;
+
+    if (isVenueCounter) {
+        if (currentVenueOccupancy !== undefined) {
+            lastOccupancyRef.current = currentVenueOccupancy;
+        }
+    } else if (currentArea?.current_occupancy !== undefined) {
         lastOccupancyRef.current = currentArea.current_occupancy;
     }
-    const totalAreaCount = currentArea?.current_occupancy ?? lastOccupancyRef.current ?? 0;
+    const totalAreaCount = isVenueCounter
+        ? (currentVenueOccupancy ?? lastOccupancyRef.current ?? 0)
+        : (currentArea?.current_occupancy ?? lastOccupancyRef.current ?? 0);
 
-    const venueId = currentArea?.venue_id;
     const venueAreas = (areas || []).filter(a => a.venue_id === venueId);
-    const venueDoorArea = venueAreas.find(a => a.area_type === 'VENUE_DOOR');
-    const currentVenueOccupancy = venueDoorArea?.current_occupancy ?? 0;
-    const isVenueDoor = currentArea?.area_type === 'VENUE_DOOR';
-    const venue = (venues || []).find(v => v.id === venueId);
+    const venue = currentVenue;
 
-    const scopeKey = (venue?.business_id && venueId && clicr?.area_id)
+    const scopeKey = (!isVenueCounter && venue?.business_id && venueId && clicr?.area_id)
         ? `area:${venue.business_id}:${venueId}:${clicr.area_id}`
         : null;
     const areaStats = scopeKey ? (areaTraffic || {})[scopeKey] : null;
@@ -187,12 +195,14 @@ export default function ClicrPanel({
     const globalOut = areaStats?.total_out ?? 0;
 
     useEffect(() => {
-        if (!venueId || !venue?.business_id || !clicr?.area_id) return;
+        if (isVenueCounter || !venueId || !venue?.business_id || !clicr?.area_id) return;
         refreshTrafficStats?.(venueId, clicr.area_id);
-    }, [venueId, venue?.business_id, clicr?.area_id, events]);
+    }, [isVenueCounter, venueId, venue?.business_id, clicr?.area_id, events]);
 
     // Capacity
-    const capacity = currentArea?.capacity_max ?? null;
+    const capacity = isVenueCounter
+        ? (currentVenue?.total_capacity ?? currentVenue?.default_capacity_total ?? null)
+        : (currentArea?.capacity_max ?? null);
     const capacityPercent = capacity && capacity > 0
         ? Math.min(100, Math.round((totalAreaCount / capacity) * 100))
         : null;
@@ -358,7 +368,7 @@ export default function ClicrPanel({
             setBulkValue(0);
             setLastScan(null);
             setScannerInput('');
-            await refreshTrafficStats?.(venueId, clicr.area_id);
+            if (clicr.area_id) await refreshTrafficStats?.(venueId, clicr.area_id);
         } catch (e) {
             console.error("Reset failed", e);
             if (!silent) alert("Failed to reset. Please try again.");
@@ -689,21 +699,21 @@ export default function ClicrPanel({
                 {/* ── OCCUPANCY CARD (always visible) ──────────────── */}
                 <div className={cn(
                     "rounded-2xl border p-5",
-                    isVenueDoor
+                    isVenueCounter
                         ? "bg-amber-950/20 border-amber-500/20"
                         : "bg-slate-900/60 border-slate-800/60"
                 )}>
                     <p className={cn(
                         "text-[10px] font-bold uppercase tracking-[0.2em] text-center mb-1",
-                        isVenueDoor ? "text-amber-500" : "text-slate-500"
+                        isVenueCounter ? "text-amber-500" : "text-slate-500"
                     )}>
-                        {isVenueDoor ? 'Venue Occupancy' : 'Occupancy'}
+                        {isVenueCounter ? 'Venue Occupancy' : 'Occupancy'}
                     </p>
 
                     <div className="text-center">
                         <span className={cn(
                             "text-8xl font-bold leading-none tabular-nums",
-                            isVenueDoor ? "text-amber-300" : "text-white"
+                            isVenueCounter ? "text-amber-300" : "text-white"
                         )}>
                             {totalAreaCount}
                         </span>
@@ -724,7 +734,7 @@ export default function ClicrPanel({
                                     capacityPercent != null && capacityPercent >= 100 ? "bg-red-500" :
                                     capacityPercent != null && capacityPercent >= 90 ? "bg-orange-500" :
                                     capacityPercent != null && capacityPercent >= 80 ? "bg-yellow-500" :
-                                    isVenueDoor ? "bg-amber-500" : "bg-emerald-500"
+                                    isVenueCounter ? "bg-amber-500" : "bg-emerald-500"
                                 )}
                                 style={{ width: `${Math.min(100, capacityPercent ?? 0)}%` }}
                             />
@@ -793,7 +803,7 @@ export default function ClicrPanel({
                             <button
                                 onClick={() => {
                                     if (navigator.vibrate) navigator.vibrate(50);
-                                    recordTurnaround?.(venueId || '', clicr.area_id, clicr.id, 1);
+                                    if (clicr.area_id) recordTurnaround?.(venueId || '', clicr.area_id, clicr.id, 1);
                                 }}
                                 className="flex items-center gap-2 px-4 py-2 rounded-xl text-slate-400 hover:text-purple-300 hover:bg-purple-500/10 transition-colors text-sm font-medium"
                             >
