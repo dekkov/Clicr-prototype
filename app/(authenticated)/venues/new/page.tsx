@@ -335,13 +335,15 @@ export default function NewVenuePage() {
                 <div className="pt-4 border-t border-slate-800 flex justify-between">
                     <button
                         onClick={handleFinish}
-                        className="px-6 py-3 text-slate-400 hover:text-white transition-colors text-sm font-medium"
+                        disabled={isLoading}
+                        className="px-6 py-3 text-slate-400 hover:text-white transition-colors text-sm font-medium disabled:opacity-50"
                     >
                         Skip for now
                     </button>
                     <button
                         onClick={nextToClicrs}
-                        className="px-8 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl shadow-lg shadow-primary/25 transition-all"
+                        disabled={isLoading}
+                        className="px-8 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl shadow-lg shadow-primary/25 transition-all disabled:opacity-50"
                     >
                         Next: Configure Clicrs
                     </button>
@@ -452,14 +454,17 @@ export default function NewVenuePage() {
                 <div className="pt-4 border-t border-slate-800 flex justify-between">
                     <button
                         onClick={handleFinish}
-                        className="px-6 py-3 text-slate-400 hover:text-white transition-colors text-sm font-medium"
+                        disabled={isLoading}
+                        className="px-6 py-3 text-slate-400 hover:text-white transition-colors text-sm font-medium disabled:opacity-50"
                     >
                         Skip for now
                     </button>
                     <button
                         onClick={handleFinish}
-                        className="px-8 py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl shadow-lg shadow-green-500/20 transition-all flex items-center gap-2"
+                        disabled={isLoading}
+                        className="px-8 py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl shadow-lg shadow-green-500/20 transition-all flex items-center gap-2 disabled:opacity-50"
                     >
+                        {isLoading && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
                         <Check className="w-5 h-5" /> Finish Setup
                     </button>
                 </div>

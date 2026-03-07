@@ -40,7 +40,9 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
     // Invite step
     const [inviteEmail, setInviteEmail] = useState('');
     const [inviteRole, setInviteRole] = useState<Role>('STAFF');
-    const [invitedList, setInvitedList] = useState<{ email: string; role: Role }[]>([]);
+    const [inviteVenueIds, setInviteVenueIds] = useState<string[]>([]);
+    const [inviteAreaIds, setInviteAreaIds] = useState<string[]>([]);
+    const [invitedList, setInvitedList] = useState<{ email: string; role: Role; venueIds: string[]; areaIds: string[] }[]>([]);
 
     // Scan config step
     const [scanMethod, setScanMethod] = useState<'CAMERA' | 'BLUETOOTH'>('CAMERA');
@@ -215,8 +217,18 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                 await addClicr({ ...c, area_id: c.area_id ? (areaIdMap[c.area_id] ?? c.area_id) : null });
             }
 
+            // Remap temp IDs and invite team members
+            const realVenueId = venueId || currentAreas[0]?.venue_id;
             for (const inv of invitedList) {
-                await inviteTeamMember(inv.email, inv.role, batchBusinessId);
+                const remappedVenueIds = inv.venueIds.map(id => id === '__venue__' ? realVenueId : id).filter(Boolean);
+                const remappedAreaIds = inv.areaIds.map(id => areaIdMap[id] ?? id);
+                const options =
+                    inv.role === 'MANAGER' && remappedVenueIds.length > 0
+                        ? { assignedVenueIds: remappedVenueIds }
+                        : inv.role === 'STAFF' && remappedAreaIds.length > 0
+                          ? { assignedAreaIds: remappedAreaIds }
+                          : undefined;
+                await inviteTeamMember(inv.email, inv.role, batchBusinessId, options);
             }
 
             const settingsPayload: Record<string, any> = {};
@@ -497,7 +509,7 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                         </button>
                         <button type="button" onClick={() => setStep('CLICRS')}
                             className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all">
-                            Next: Clicrs
+                            {createdAreas.length > 0 ? 'Next: Clicrs' : 'Set up later'}
                         </button>
                     </div>
                 </div>
@@ -639,7 +651,7 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                             <ArrowLeft className="w-4 h-4" /> Back
                         </button>
                         <button type="button" onClick={() => setStep('INVITE')} className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all">
-                            Next: Invite Team
+                            {createdClicrs.length > 0 ? 'Next: Invite Team' : 'Set up later'}
                         </button>
                     </div>
                 </div>
@@ -652,7 +664,7 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                         <Mail className="text-primary w-6 h-6" />
                         <h2 className="text-2xl font-bold text-white">Invite your team</h2>
                     </div>
-                    <p className="text-slate-400 text-sm">Add staff members who will help manage your venue.</p>
+                    <p className="text-slate-400 text-sm">Add staff members who will help manage your venue. You can also do this later in Settings → Team.</p>
                     {invitedList.length > 0 && (
                         <div className="space-y-2">
                             {invitedList.map((inv, i) => (
@@ -661,7 +673,10 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                                         <span className="text-white text-sm font-mono">{inv.email}</span>
                                         <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-bold">{inv.role}</span>
                                     </div>
-                                    <span className="text-xs text-emerald-500 font-bold flex items-center gap-1"><Check className="w-3 h-3" /> Invited</span>
+                                    <button type="button" onClick={() => setInvitedList(prev => prev.filter((_, j) => j !== i))}
+                                        className="text-slate-500 hover:text-red-400 transition-colors">
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
                                 </div>
                             ))}
                         </div>
@@ -672,13 +687,71 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                             className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none text-sm" />
                         <div className="flex gap-2">
                             {(['ADMIN', 'MANAGER', 'STAFF', 'ANALYST'] as Role[]).map(r => (
-                                <button key={r} type="button" onClick={() => setInviteRole(r)}
+                                <button key={r} type="button" onClick={() => {
+                                    setInviteRole(r);
+                                    if (r !== 'MANAGER') setInviteVenueIds([]);
+                                    if (r !== 'STAFF') setInviteAreaIds([]);
+                                }}
                                     className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all border ${inviteRole === r ? 'bg-primary/10 border-primary text-primary' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}>
                                     {r}
                                 </button>
                             ))}
                         </div>
-                        <button onClick={() => { if (!inviteEmail) return; setInvitedList(prev => [...prev, { email: inviteEmail, role: inviteRole }]); setInviteEmail(''); }}
+
+                        {/* Venue assignment for MANAGER */}
+                        {inviteRole === 'MANAGER' && venueData.name && (
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Assign Venue</label>
+                                <label className="flex items-center gap-2 p-2.5 rounded-lg border border-slate-700 hover:bg-slate-800/40 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={inviteVenueIds.includes('__venue__')}
+                                        onChange={e => {
+                                            if (e.target.checked) setInviteVenueIds(['__venue__']);
+                                            else setInviteVenueIds([]);
+                                        }}
+                                        className="rounded border-slate-600"
+                                    />
+                                    <span className="text-sm text-white">{venueData.name}</span>
+                                </label>
+                            </div>
+                        )}
+
+                        {/* Area assignment for STAFF */}
+                        {inviteRole === 'STAFF' && createdAreas.length > 0 && (
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Assign Areas</label>
+                                <div className="max-h-40 overflow-y-auto space-y-1">
+                                    {createdAreas.map(area => (
+                                        <label key={area.id} className="flex items-center gap-2 p-2.5 rounded-lg border border-slate-700 hover:bg-slate-800/40 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={inviteAreaIds.includes(area.id)}
+                                                onChange={e => {
+                                                    if (e.target.checked) setInviteAreaIds(prev => [...prev, area.id]);
+                                                    else setInviteAreaIds(prev => prev.filter(id => id !== area.id));
+                                                }}
+                                                className="rounded border-slate-600"
+                                            />
+                                            <span className="text-sm text-white">{area.name}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        <button onClick={() => {
+                            if (!inviteEmail) return;
+                            setInvitedList(prev => [...prev, {
+                                email: inviteEmail,
+                                role: inviteRole,
+                                venueIds: inviteRole === 'MANAGER' ? inviteVenueIds : [],
+                                areaIds: inviteRole === 'STAFF' ? inviteAreaIds : [],
+                            }]);
+                            setInviteEmail('');
+                            setInviteVenueIds([]);
+                            setInviteAreaIds([]);
+                        }}
                             disabled={!inviteEmail}
                             className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-sm font-medium transition-all disabled:opacity-50 flex items-center justify-center gap-2">
                             <Plus className="w-4 h-4" /> Add & Invite Another
@@ -690,7 +763,7 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                             <ArrowLeft className="w-4 h-4" /> Back
                         </button>
                         <button type="button" onClick={() => { setError(null); setStep('SCAN_CONFIG'); }} className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all">
-                            Next: Scan Config
+                            {invitedList.length > 0 ? 'Next: Scan Config' : 'Set up later'}
                         </button>
                     </div>
                 </div>
