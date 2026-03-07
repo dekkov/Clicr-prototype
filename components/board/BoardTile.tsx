@@ -4,8 +4,6 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import type { Clicr, Area, Venue } from '@/lib/types';
 
-const DEFAULT_CAPACITY = 100;
-
 type BoardTileProps = {
     clicr: Clicr;
     area: Area | undefined;
@@ -22,25 +20,28 @@ export function BoardTile({ clicr, area, venue, label, onTap }: BoardTileProps) 
         ? (venue.current_occupancy ?? 0)
         : (area?.current_occupancy ?? 0);
 
-    const rawCapacity = isVenueCounter
+    const capacity = isVenueCounter
         ? (venue.total_capacity ?? venue.default_capacity_total ?? null)
         : (area?.capacity_max ?? area?.default_capacity ?? null);
 
-    const capacity = rawCapacity && rawCapacity > 0 ? rawCapacity : DEFAULT_CAPACITY;
-    const pct = Math.min(100, Math.round((occupancy / capacity) * 100));
+    const hasCapacity = capacity !== null && capacity > 0;
+    const pct = hasCapacity ? Math.min(100, Math.round((occupancy / capacity) * 100)) : null;
 
     // Status color based on fill percentage
-    const statusColor = pct >= 100 ? 'text-red-400'
+    const statusColor = pct === null ? 'text-white'
+        : pct >= 100 ? 'text-red-400'
         : pct >= 90 ? 'text-amber-400'
         : pct >= 80 ? 'text-amber-300'
         : 'text-white';
 
-    const barColor = pct >= 100 ? 'bg-red-500'
+    const barColor = pct === null ? 'bg-slate-600'
+        : pct >= 100 ? 'bg-red-500'
         : pct >= 90 ? 'bg-amber-400'
         : pct >= 80 ? 'bg-amber-300'
         : 'bg-emerald-400';
 
-    const glowColor = pct >= 100 ? 'shadow-red-500/20'
+    const glowColor = pct === null ? 'shadow-transparent'
+        : pct >= 100 ? 'shadow-red-500/20'
         : pct >= 90 ? 'shadow-amber-400/20'
         : pct >= 80 ? 'shadow-amber-300/10'
         : 'shadow-emerald-400/10';
@@ -75,15 +76,20 @@ export function BoardTile({ clicr, area, venue, label, onTap }: BoardTileProps) 
             {/* Capacity info */}
             <div className="w-full max-w-[220px] mb-5">
                 <div className="text-[11px] text-slate-500 text-center mb-2 tabular-nums">
-                    <span className="text-slate-400 font-medium">{pct}%</span>
-                    {' '}&middot; {occupancy} of {capacity}
+                    {hasCapacity ? (
+                        <><span className="text-slate-400 font-medium">{pct}%</span>{' '}&middot; {occupancy} of {capacity}</>
+                    ) : (
+                        <span className="text-slate-600">No capacity set</span>
+                    )}
                 </div>
-                <div className="h-1 bg-white/[0.06] rounded-full overflow-hidden">
-                    <div
-                        className={cn("h-full rounded-full transition-all duration-300", barColor)}
-                        style={{ width: `${pct}%` }}
-                    />
-                </div>
+                {hasCapacity && (
+                    <div className="h-1 bg-white/[0.06] rounded-full overflow-hidden">
+                        <div
+                            className={cn("h-full rounded-full transition-all duration-300", barColor)}
+                            style={{ width: `${pct}%` }}
+                        />
+                    </div>
+                )}
             </div>
 
             {/* Tap buttons */}
