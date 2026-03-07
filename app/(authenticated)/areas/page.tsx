@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useApp } from '@/lib/store';
 import { Area, AreaType, CountingMode, FlowMode, ShiftMode, Role } from '@/lib/types';
-import { Search, RefreshCw, ArrowUp, ArrowDown, Plus, ChevronDown, Sparkles, Play, Square, Settings2, Layers, Maximize2 } from 'lucide-react';
+import { Search, RefreshCw, ArrowUp, ArrowDown, Plus, ChevronDown, Play, Square, Settings2, Layers, Maximize2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { canEditVenuesAndAreas, canStartShift, canAddClicr, hasMinRole } from '@/lib/permissions';
@@ -35,14 +35,14 @@ const AREA_TYPE_ORDER: Record<string, number> = {
 };
 
 const AREA_TYPE_LABELS: Record<string, string> = {
-    VENUE_DOOR: 'Venue Door',
-    BAR: 'Bar',
-    ENTRY: 'Entry',
-    EVENT_SPACE: 'Event Space',
-    MAIN: 'Main Floor',
-    OTHER: 'Other',
-    PATIO: 'Patio',
-    VIP: 'VIP',
+    VENUE_DOOR: 'venue door',
+    BAR: 'bar',
+    ENTRY: 'entry',
+    EVENT_SPACE: 'event space',
+    MAIN: 'main floor',
+    OTHER: 'other',
+    PATIO: 'patio',
+    VIP: 'vip',
 };
 
 export default function AreasPage() {
@@ -94,11 +94,6 @@ export default function AreasPage() {
         areas.find(a => a.venue_id === venueId && a.area_type === 'VENUE_DOOR' && a.is_active !== false);
     const venueDoorExists = !!(newArea.venue_id && getVenueDoorArea(newArea.venue_id));
 
-    const CLICR_TEMPLATES: { id: string; label: string; desc: string; names: string[] }[] = [
-        { id: 'single', label: 'Single door', desc: '1 counter', names: ['Front Door'] },
-        { id: 'entry_exit', label: 'Entry + Exit pair', desc: '2 counters', names: ['Entry Door', 'Exit Door'] },
-        { id: 'busy', label: 'Busy door setup', desc: '3 counters', names: ['Front Door 1', 'Front Door 2', 'VIP Door'] },
-    ];
 
     const handleAddClicr = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -118,23 +113,6 @@ export default function AreasPage() {
         setNewClicrFlow('BIDIRECTIONAL');
     };
 
-    const handleApplyTemplate = async (template: typeof CLICR_TEMPLATES[0]) => {
-        if (!addClicrAreaId) return;
-        setIsAddingClicr(true);
-        for (const name of template.names) {
-            await addClicr({
-                id: crypto.randomUUID(),
-                area_id: addClicrAreaId,
-                name,
-                flow_mode: newClicrFlow,
-                current_count: 0,
-                active: true,
-            });
-        }
-        setIsAddingClicr(false);
-        setAddClicrAreaId(null);
-        setNewClicrName('');
-    };
 
     const handleCreateArea = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -323,10 +301,7 @@ export default function AreasPage() {
                                 .map(([type, typeAreas]) => [type, [...typeAreas].sort((a, b) => a.name.localeCompare(b.name))] as const)
                                 .map(([type, typeAreas]) => (
                                     <div key={type}>
-                                        <h3 className={cn(
-                                            "text-xs font-bold uppercase tracking-widest mb-3",
-                                            type === 'VENUE_DOOR' ? "text-amber-500" : "text-gray-500"
-                                        )}>
+                                        <h3 className="text-xs font-bold uppercase tracking-widest mb-3 text-gray-500">
                                             {AREA_TYPE_LABELS[type] ?? type}
                                         </h3>
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -344,12 +319,7 @@ export default function AreasPage() {
                                                 return (
                                                     <div
                                                         key={area.id}
-                                                        className={cn(
-                                                            "border rounded-xl p-6 hover:border-gray-700 transition-colors",
-                                                            area.area_type === 'VENUE_DOOR'
-                                                                ? "bg-amber-950/10 border-amber-500/20"
-                                                                : "bg-gray-900/50 border-gray-800"
-                                                        )}
+                                                        className="border rounded-xl p-6 hover:border-gray-700 transition-colors bg-gray-900/50 border-gray-800"
                                                     >
                                                         <div className="flex items-center justify-between mb-6">
                                                             <div className="flex items-center gap-3">
@@ -373,6 +343,15 @@ export default function AreasPage() {
                                                                 >
                                                                     <RefreshCw className="w-4 h-4 text-gray-400" />
                                                                 </button>
+                                                                {canEdit && (
+                                                                    <button
+                                                                        onClick={() => openConfigModal(area)}
+                                                                        className="w-8 h-8 rounded-lg hover:bg-gray-800 flex items-center justify-center transition-colors"
+                                                                        title="Configure area"
+                                                                    >
+                                                                        <Settings2 className="w-4 h-4 text-gray-400" />
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         </div>
 
@@ -439,23 +418,14 @@ export default function AreasPage() {
                                                                     Manual
                                                                 </span>
                                                             )}
-                                                            {canEdit && (
-                                                                <button
-                                                                    onClick={() => openConfigModal(area)}
-                                                                    className="text-gray-500 hover:text-gray-300 transition-colors p-1"
-                                                                    title="Configure area"
-                                                                >
-                                                                    <Settings2 className="w-3.5 h-3.5" />
-                                                                </button>
-                                                            )}
                                                             {canAdd && (
                                                                 <button
                                                                     onClick={() => setAddClicrAreaId(area.id)}
-                                                                    className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+                                                                    className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium transition-colors"
                                                                     title="Add Clicr to this area"
                                                                 >
-                                                                    <Plus className="w-3 h-3" />
-                                                                    <Sparkles className="w-3 h-3" />
+                                                                    <Plus className="w-3.5 h-3.5" />
+                                                                    Add Clicr
                                                                 </button>
                                                             )}
                                                         </div>
@@ -533,16 +503,13 @@ export default function AreasPage() {
                                             onChange={e => setNewArea(prev => ({ ...prev, area_type: e.target.value as AreaType }))}
                                             className="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                                         >
-                                            {!venueDoorExists && (
-                                                <option value="VENUE_DOOR">🚪 Venue Door</option>
-                                            )}
-                                            <option value="MAIN">Main</option>
-                                            <option value="ENTRY">Entry</option>
-                                            <option value="VIP">VIP</option>
-                                            <option value="PATIO">Patio</option>
-                                            <option value="BAR">Bar</option>
-                                            <option value="EVENT_SPACE">Event Space</option>
-                                            <option value="OTHER">Other</option>
+                                            <option value="MAIN">main</option>
+                                            <option value="ENTRY">entry</option>
+                                            <option value="VIP">vip</option>
+                                            <option value="PATIO">patio</option>
+                                            <option value="BAR">bar</option>
+                                            <option value="EVENT_SPACE">event space</option>
+                                            <option value="OTHER">other</option>
                                         </select>
                                     </div>
                                     <div className="space-y-2">
@@ -665,22 +632,6 @@ export default function AreasPage() {
                             <p className="text-sm text-gray-400 mb-4">
                                 Adding to <span className="text-white font-medium">{areas.find(a => a.id === addClicrAreaId)?.name}</span>
                             </p>
-                            <div className="space-y-2 mb-4">
-                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Quick setup</label>
-                                <div className="flex flex-wrap gap-2">
-                                    {CLICR_TEMPLATES.map(t => (
-                                        <button
-                                            key={t.id}
-                                            type="button"
-                                            onClick={() => handleApplyTemplate(t)}
-                                            disabled={isAddingClicr}
-                                            className="px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors disabled:opacity-50"
-                                        >
-                                            {t.label} ({t.desc})
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
                             <form onSubmit={handleAddClicr} className="space-y-4">
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-gray-400">Clicr Name</label>
