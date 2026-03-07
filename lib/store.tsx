@@ -427,8 +427,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     const recordEvent = async (data: Omit<CountEvent, 'id' | 'timestamp' | 'user_id' | 'business_id'>) => {
         if (!state.business) return;
-        if (!data.area_id) {
-            console.error('recordEvent: area_id is required');
+        if (!data.area_id && !data.venue_id) {
+            console.error('recordEvent: area_id or venue_id is required');
             return;
         }
 
@@ -451,23 +451,35 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 }
                 return c;
             });
-            return {
-                ...prev,
-                clicrs: updatedClicrs,
-                // OPTIMISTICALLY UPDATE AREA OCCUPANCY
-                areas: prev.areas.map(a => {
-                    if (a.id === data.area_id) {
-                        // Fallback to summing if current_occupancy is missing in cache (migration edge case)
-                        const current = a.current_occupancy ?? prev.clicrs.filter(c => c.area_id === a.id).reduce((sum, c) => sum + c.current_count, 0);
-                        return {
-                            ...a,
-                            current_occupancy: Math.max(0, current + data.delta)
-                        };
-                    }
-                    return a;
-                }),
-                events: [newEvent, ...prev.events] // Prepend locally
-            };
+
+            if (data.area_id) {
+                // AREA-LEVEL: optimistically update area occupancy
+                return {
+                    ...prev,
+                    clicrs: updatedClicrs,
+                    areas: prev.areas.map(a => {
+                        if (a.id === data.area_id) {
+                            const current = a.current_occupancy ?? prev.clicrs.filter(c => c.area_id === a.id).reduce((sum, c) => sum + c.current_count, 0);
+                            return { ...a, current_occupancy: Math.max(0, current + data.delta) };
+                        }
+                        return a;
+                    }),
+                    events: [newEvent, ...prev.events]
+                };
+            } else {
+                // VENUE-LEVEL (venue counter clicr): optimistically update venue occupancy
+                return {
+                    ...prev,
+                    clicrs: updatedClicrs,
+                    venues: prev.venues.map(v => {
+                        if (v.id === data.venue_id) {
+                            return { ...v, current_occupancy: Math.max(0, (v.current_occupancy ?? 0) + data.delta) };
+                        }
+                        return v;
+                    }),
+                    events: [newEvent, ...prev.events]
+                };
+            }
         });
 
         // Send to API
@@ -492,7 +504,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             // then refresh traffic totals so TOTAL IN/OUT reflect the new event.
             setTimeout(() => {
                 isWritingRef.current = Math.max(0, isWritingRef.current - 1);
-                refreshTrafficStats(data.venue_id, data.area_id);
+                if (data.area_id) refreshTrafficStats(data.venue_id, data.area_id);
             }, 500);
         }
     };
@@ -662,20 +674,19 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setState(prev => ({ ...prev, venues: [...prev.venues, venue] }));
         try {
             await authFetch({ action: 'ADD_VENUE', payload: venue });
-            // Auto-create the venue's dedicated occupancy counter
-            const venueDoorArea: Area = {
+            // Auto-create the venue's dedicated counter clicr
+            const venueCounterClicr: Clicr = {
                 id: crypto.randomUUID(),
+                area_id: null,
                 venue_id: venue.id,
-                business_id: venue.business_id,
+                is_venue_counter: true,
                 name: 'Venue Counter',
-                area_type: 'VENUE_DOOR',
-                counting_mode: 'BOTH',
-                is_active: true,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
+                flow_mode: 'BIDIRECTIONAL',
+                active: true,
+                current_count: 0,
             };
-            setState(prev => ({ ...prev, areas: [...prev.areas, venueDoorArea] }));
-            await authFetch({ action: 'ADD_AREA', payload: venueDoorArea });
+            setState(prev => ({ ...prev, clicrs: [...prev.clicrs, venueCounterClicr] }));
+            await authFetch({ action: 'ADD_CLICR', payload: venueCounterClicr });
         } catch (error) { console.error("Failed to add venue", error); }
     };
 

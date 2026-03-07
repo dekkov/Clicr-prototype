@@ -3,8 +3,9 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/store';
-import { Venue, Area, Clicr } from '@/lib/types';
-import { ArrowLeft, Check, Plus, MapPin, Building2, Users } from 'lucide-react';
+import { Venue, Area, AreaType, Clicr, FlowMode } from '@/lib/types';
+import { ArrowLeft, Check, Plus, MapPin, Building2, Users, Pencil, Trash2, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 type Step = 'VENUE' | 'AREAS' | 'CLICRS';
 
@@ -29,43 +30,57 @@ export default function NewVenuePage() {
 
     // Clicr Form (Map areaId -> List of Clicr Names)
     const [clicrInputs, setClicrInputs] = useState<Record<string, string>>({});
+    const [clicrFlowModes, setClicrFlowModes] = useState<Record<string, FlowMode>>({});
     const [createdClicrs, setCreatedClicrs] = useState<Clicr[]>([]);
 
-    // --- STEP 1: CREATE VENUE ---
-    const handleCreateVenue = async (e: React.FormEvent) => {
+    // Inline-edit state for areas
+    const [editingAreaId, setEditingAreaId] = useState<string | null>(null);
+    const [editingAreaName, setEditingAreaName] = useState('');
+    const [editingAreaCapacity, setEditingAreaCapacity] = useState('');
+    const [editingAreaType, setEditingAreaType] = useState<AreaType>('MAIN');
+
+    // Inline-edit state for clicrs
+    const [editingClicrId, setEditingClicrId] = useState<string | null>(null);
+    const [editingClicrName, setEditingClicrName] = useState('');
+    const [editingClicrFlow, setEditingClicrFlow] = useState<FlowMode>('BIDIRECTIONAL');
+
+    const handleSaveArea = (id: string) => {
+        const trimmed = editingAreaName.trim();
+        const parsedCap = parseInt(editingAreaCapacity, 10);
+        if (trimmed) setCreatedAreas(prev => prev.map(a => a.id === id ? {
+            ...a,
+            name: trimmed,
+            default_capacity: !isNaN(parsedCap) && parsedCap > 0 ? parsedCap : 0,
+            area_type: editingAreaType,
+        } : a));
+        setEditingAreaId(null);
+    };
+
+    const handleSaveClicr = (id: string) => {
+        const trimmed = editingClicrName.trim();
+        if (trimmed) setCreatedClicrs(prev => prev.map(c => c.id === id ? {
+            ...c,
+            name: trimmed,
+            flow_mode: editingClicrFlow,
+        } : c));
+        setEditingClicrId(null);
+    };
+
+    // --- STEP 1: COLLECT VENUE (no network call yet) ---
+    const handleCreateVenue = (e: React.FormEvent) => {
         e.preventDefault();
         if (!activeBusiness?.id) {
             alert('Please select a business from the sidebar first.');
             return;
         }
-        setIsLoading(true);
-
         const newId = crypto.randomUUID();
-        const venue: Venue = {
-            id: newId,
-            business_id: activeBusiness.id,
-            name: venueData.name,
-            city: venueData.city,
-            state: venueData.state,
-            default_capacity_total: venueData.capacity,
-            capacity_enforcement_mode: 'WARN_ONLY',
-            status: 'ACTIVE',
-            timezone: 'America/New_York',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            active: true
-        };
-
-        await addVenue(venue);
         setVenueId(newId);
-        setIsLoading(false);
         setStep('AREAS');
     };
 
-    // --- STEP 2: ADD AREAS ---
-    const handleAddArea = async () => {
+    // --- STEP 2: COLLECT AREAS (no network call yet) ---
+    const handleAddArea = () => {
         if (!areaInput.name) return;
-        setIsLoading(true);
         const newAreaId = crypto.randomUUID();
         const area: Area = {
             id: newAreaId,
@@ -79,37 +94,64 @@ export default function NewVenuePage() {
             updated_at: new Date().toISOString(),
             current_count: 0
         } as Area;
-        await addArea(area);
         setCreatedAreas([...createdAreas, area]);
         setAreaInput({ name: '', capacity: 100 });
-        setIsLoading(false);
     };
 
     const nextToClicrs = () => setStep('CLICRS');
 
-    // --- STEP 3: ADD CLICRS ---
-    const handleAddClicr = async (areaId: string) => {
+    // --- STEP 3: COLLECT CLICRS (no network call yet) ---
+    const handleAddClicr = (areaId: string) => {
         const name = clicrInputs[areaId];
         if (!name) return;
-
-        setIsLoading(true);
-        const newClicrId = crypto.randomUUID();
         const clicr: Clicr = {
-            id: newClicrId,
+            id: crypto.randomUUID(),
             area_id: areaId,
-            name: name,
-            flow_mode: 'BIDIRECTIONAL',
+            name,
+            flow_mode: clicrFlowModes[areaId] || 'BIDIRECTIONAL',
             active: true,
-            current_count: 0
+            current_count: 0,
         };
-        await addClicr(clicr);
-        setCreatedClicrs([...createdClicrs, clicr]);
-        setClicrInputs({ ...clicrInputs, [areaId]: '' });
-        setIsLoading(false);
+        setCreatedClicrs(prev => [...prev, clicr]);
+        setClicrInputs(prev => ({ ...prev, [areaId]: '' }));
     };
 
-    const handleFinish = () => {
-        router.push('/venues');
+    // --- FINISH: BATCH COMMIT ALL ---
+    const handleFinish = async () => {
+        if (!activeBusiness?.id) return;
+        setIsLoading(true);
+
+        try {
+            const venue: Venue = {
+                id: venueId,
+                business_id: activeBusiness.id,
+                name: venueData.name,
+                city: venueData.city,
+                state: venueData.state,
+                default_capacity_total: venueData.capacity,
+                capacity_enforcement_mode: 'WARN_ONLY',
+                status: 'ACTIVE',
+                timezone: 'America/New_York',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                active: true,
+            };
+            await addVenue(venue);
+            // addVenue auto-creates venue counter clicr
+
+            for (const area of createdAreas) {
+                await addArea(area);
+            }
+
+            for (const clicr of createdClicrs) {
+                await addClicr(clicr);
+            }
+
+            router.push('/venues');
+        } catch (e: any) {
+            console.error('Failed to create venue setup:', e);
+            setIsLoading(false);
+        }
     };
 
     // --- RENDERERS ---
@@ -198,16 +240,62 @@ export default function NewVenuePage() {
                 <p className="text-slate-400 text-sm">Create distinct zones for your venue (e.g. "Main Floor", "VIP Lounge", "Patio").</p>
 
                 {createdAreas.length > 0 && (
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                         {createdAreas.map(area => (
-                            <div key={area.id} className="flex items-center justify-between bg-slate-800/50 p-4 rounded-lg border border-slate-700">
-                                <div>
-                                    <h4 className="font-bold text-white">{area.name}</h4>
-                                    <span className="text-xs text-slate-400">Cap: {area.default_capacity}</span>
-                                </div>
-                                <div className="text-green-500 bg-green-500/10 px-2 py-1 rounded text-xs font-bold flex items-center gap-1">
-                                    <Check className="w-3 h-3" /> Added
-                                </div>
+                            <div key={area.id} className="bg-slate-800/50 px-4 py-3 rounded-lg border border-slate-700">
+                                {editingAreaId !== area.id ? (
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <span className="text-white font-medium">{area.name}</span>
+                                            <span className="text-xs text-slate-500">{(area.area_type || 'main').replace(/_/g, ' ').toLowerCase()}</span>
+                                            {(area.default_capacity ?? 0) > 0 && <span className="text-xs text-slate-600">· cap {area.default_capacity}</span>}
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <button type="button"
+                                                onClick={() => { setEditingAreaId(area.id); setEditingAreaName(area.name); setEditingAreaCapacity(String(area.default_capacity ?? '')); setEditingAreaType((area.area_type as AreaType) || 'MAIN'); }}
+                                                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
+                                                <Pencil className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button type="button"
+                                                onClick={() => { setCreatedAreas(prev => prev.filter(x => x.id !== area.id)); setCreatedClicrs(prev => prev.filter(c => c.area_id !== area.id)); setClicrInputs(prev => { const n = { ...prev }; delete n[area.id]; return n; }); }}
+                                                className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col gap-2 w-full">
+                                        <input autoFocus type="text" value={editingAreaName}
+                                            onChange={e => setEditingAreaName(e.target.value)}
+                                            onKeyDown={e => { if (e.key === 'Escape') setEditingAreaId(null); }}
+                                            className="flex-1 bg-slate-900 border border-primary/50 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
+                                        <div className="flex gap-2">
+                                            <select value={editingAreaType} onChange={e => setEditingAreaType(e.target.value as AreaType)}
+                                                className="flex-1 bg-slate-900 border border-primary/50 rounded-lg px-2 py-1.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-primary">
+                                                <option value="MAIN">main</option>
+                                                <option value="ENTRY">entry</option>
+                                                <option value="VIP">vip</option>
+                                                <option value="PATIO">patio</option>
+                                                <option value="BAR">bar</option>
+                                                <option value="EVENT_SPACE">event space</option>
+                                                <option value="OTHER">other</option>
+                                            </select>
+                                            <input type="number" placeholder="Cap" value={editingAreaCapacity}
+                                                onChange={e => setEditingAreaCapacity(e.target.value)}
+                                                className="w-20 bg-slate-900 border border-primary/50 rounded-lg px-2 py-1.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button type="button" onClick={() => handleSaveArea(area.id)}
+                                                className="flex-1 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 text-sm font-medium transition-colors flex items-center justify-center gap-1">
+                                                <Check className="w-3.5 h-3.5" /> Save
+                                            </button>
+                                            <button type="button" onClick={() => setEditingAreaId(null)}
+                                                className="flex-1 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white text-sm font-medium transition-colors flex items-center justify-center gap-1">
+                                                <X className="w-3.5 h-3.5" /> Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </div>
@@ -282,9 +370,51 @@ export default function NewVenuePage() {
                                 {areaClicrs.length > 0 && (
                                     <div className="mb-4 space-y-2">
                                         {areaClicrs.map(clicr => (
-                                            <div key={clicr.id} className="flex items-center gap-3 bg-slate-800/40 px-3 py-2 rounded-lg border border-slate-700/50">
-                                                <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]"></div>
-                                                <span className="text-sm font-medium text-slate-200">{clicr.name}</span>
+                                            <div key={clicr.id} className="bg-slate-800/40 px-3 py-2 rounded-lg border border-slate-700/50">
+                                                {editingClicrId !== clicr.id ? (
+                                                    <div className="flex items-center justify-between text-sm">
+                                                        <div className="flex items-center gap-2 text-slate-300">
+                                                            <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                                                            <span className="font-medium">{clicr.name}</span>
+                                                            <span className="text-xs text-slate-500">{clicr.flow_mode === 'BIDIRECTIONAL' ? 'Both' : clicr.flow_mode === 'IN_ONLY' ? 'In Only' : 'Out Only'}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1">
+                                                            <button type="button"
+                                                                onClick={() => { setEditingClicrId(clicr.id); setEditingClicrName(clicr.name); setEditingClicrFlow(clicr.flow_mode); }}
+                                                                className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-700 transition-colors">
+                                                                <Pencil className="w-3 h-3" />
+                                                            </button>
+                                                            <button type="button"
+                                                                onClick={() => setCreatedClicrs(prev => prev.filter(x => x.id !== clicr.id))}
+                                                                className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex flex-col gap-2 w-full">
+                                                        <input autoFocus type="text" value={editingClicrName}
+                                                            onChange={e => setEditingClicrName(e.target.value)}
+                                                            onKeyDown={e => { if (e.key === 'Escape') setEditingClicrId(null); }}
+                                                            className="flex-1 bg-slate-900 border border-primary/50 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
+                                                        <select value={editingClicrFlow} onChange={e => setEditingClicrFlow(e.target.value as FlowMode)}
+                                                            className="flex-1 bg-slate-900 border border-primary/50 rounded-lg px-2 py-1.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-primary">
+                                                            <option value="BIDIRECTIONAL">Both (in + out)</option>
+                                                            <option value="IN_ONLY">In only</option>
+                                                            <option value="OUT_ONLY">Out only</option>
+                                                        </select>
+                                                        <div className="flex gap-2">
+                                                            <button type="button" onClick={() => handleSaveClicr(clicr.id)}
+                                                                className="flex-1 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 text-sm font-medium transition-colors flex items-center justify-center gap-1">
+                                                                <Check className="w-3.5 h-3.5" /> Save
+                                                            </button>
+                                                            <button type="button" onClick={() => setEditingClicrId(null)}
+                                                                className="flex-1 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white text-sm font-medium transition-colors flex items-center justify-center gap-1">
+                                                                <X className="w-3.5 h-3.5" /> Cancel
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
@@ -296,11 +426,19 @@ export default function NewVenuePage() {
                                         placeholder="Clicr Name (e.g. Door 1)"
                                         value={clicrInputs[area.id] || ''}
                                         onChange={e => setClicrInputs({ ...clicrInputs, [area.id]: e.target.value })}
+                                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddClicr(area.id); } }}
                                         className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-1 focus:ring-primary focus:outline-none"
                                     />
+                                    <select value={clicrFlowModes[area.id] || 'BIDIRECTIONAL'}
+                                        onChange={e => setClicrFlowModes(p => ({ ...p, [area.id]: e.target.value as FlowMode }))}
+                                        className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-2 text-white text-sm focus:ring-1 focus:ring-primary focus:outline-none">
+                                        <option value="BIDIRECTIONAL">Both</option>
+                                        <option value="IN_ONLY">In only</option>
+                                        <option value="OUT_ONLY">Out only</option>
+                                    </select>
                                     <button
                                         onClick={() => handleAddClicr(area.id)}
-                                        disabled={!clicrInputs[area.id] || isLoading}
+                                        disabled={!clicrInputs[area.id]}
                                         className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                                     >
                                         Add

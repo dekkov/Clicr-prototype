@@ -1,8 +1,9 @@
 "use client";
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/store';
 import { Area, AreaType, CountingMode, FlowMode, ShiftMode, Role } from '@/lib/types';
-import { Search, RefreshCw, ArrowUp, ArrowDown, Plus, ChevronDown, Sparkles, Play, Square, Settings2, Layers, Maximize2 } from 'lucide-react';
+import { Search, RefreshCw, ArrowUp, ArrowDown, Plus, ChevronDown, Play, Square, Settings2, Layers, Maximize2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { canEditVenuesAndAreas, canStartShift, canAddClicr, hasMinRole } from '@/lib/permissions';
@@ -24,7 +25,6 @@ const TIMEZONES = [
 ];
 
 const AREA_TYPE_ORDER: Record<string, number> = {
-    VENUE_DOOR: 0,
     BAR: 1,
     ENTRY: 2,
     EVENT_SPACE: 3,
@@ -35,17 +35,17 @@ const AREA_TYPE_ORDER: Record<string, number> = {
 };
 
 const AREA_TYPE_LABELS: Record<string, string> = {
-    VENUE_DOOR: 'Venue Door',
-    BAR: 'Bar',
-    ENTRY: 'Entry',
-    EVENT_SPACE: 'Event Space',
-    MAIN: 'Main Floor',
-    OTHER: 'Other',
-    PATIO: 'Patio',
-    VIP: 'VIP',
+    BAR: 'bar',
+    ENTRY: 'entry',
+    EVENT_SPACE: 'event space',
+    MAIN: 'main floor',
+    OTHER: 'other',
+    PATIO: 'patio',
+    VIP: 'vip',
 };
 
 export default function AreasPage() {
+    const router = useRouter();
     const { areas, clicrs, venues, areaTraffic, activeBusiness, addArea, addClicr, resetCounts, startShift, endShift, updateArea, deleteArea, isLoading, currentUser, activeShiftId, activeShiftAreaId } = useApp();
     const userRole = currentUser?.role as Role | undefined;
     const canDelete = hasMinRole(userRole, 'ADMIN');
@@ -70,7 +70,6 @@ export default function AreasPage() {
     const [isDeletingArea, setIsDeletingArea] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const configArea = configAreaId ? areas.find(a => a.id === configAreaId) : undefined;
-    const isVenueDoor = configArea?.area_type === 'VENUE_DOOR';
     const [newArea, setNewArea] = useState<Partial<Area> & { venue_id: string }>({
         venue_id: '',
         name: '',
@@ -89,16 +88,12 @@ export default function AreasPage() {
     const [newClicrFlow, setNewClicrFlow] = useState<FlowMode>('BIDIRECTIONAL');
     const [isAddingClicr, setIsAddingClicr] = useState(false);
 
-    // Find existing VENUE_DOOR area for a given venue (only one allowed per venue)
-    const getVenueDoorArea = (venueId: string) =>
-        areas.find(a => a.venue_id === venueId && a.area_type === 'VENUE_DOOR' && a.is_active !== false);
-    const venueDoorExists = !!(newArea.venue_id && getVenueDoorArea(newArea.venue_id));
 
-    const CLICR_TEMPLATES: { id: string; label: string; desc: string; names: string[] }[] = [
-        { id: 'single', label: 'Single door', desc: '1 counter', names: ['Front Door'] },
-        { id: 'entry_exit', label: 'Entry + Exit pair', desc: '2 counters', names: ['Entry Door', 'Exit Door'] },
-        { id: 'busy', label: 'Busy door setup', desc: '3 counters', names: ['Front Door 1', 'Front Door 2', 'VIP Door'] },
-    ];
+    // Cascading clicr creation state (shown after area is created)
+    const [justCreatedAreaId, setJustCreatedAreaId] = useState<string | null>(null);
+    const [cascadeClicrName, setCascadeClicrName] = useState('');
+    const [cascadeClicrFlow, setCascadeClicrFlow] = useState<FlowMode>('BIDIRECTIONAL');
+
 
     const handleAddClicr = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -118,23 +113,6 @@ export default function AreasPage() {
         setNewClicrFlow('BIDIRECTIONAL');
     };
 
-    const handleApplyTemplate = async (template: typeof CLICR_TEMPLATES[0]) => {
-        if (!addClicrAreaId) return;
-        setIsAddingClicr(true);
-        for (const name of template.names) {
-            await addClicr({
-                id: crypto.randomUUID(),
-                area_id: addClicrAreaId,
-                name,
-                flow_mode: newClicrFlow,
-                current_count: 0,
-                active: true,
-            });
-        }
-        setIsAddingClicr(false);
-        setAddClicrAreaId(null);
-        setNewClicrName('');
-    };
 
     const handleCreateArea = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -160,6 +138,7 @@ export default function AreasPage() {
         await addArea(area);
         setIsAddingArea(false);
         setIsCreateOpen(false);
+        setJustCreatedAreaId(area.id);
         setNewArea({
             venue_id: '',
             name: '',
@@ -290,7 +269,7 @@ export default function AreasPage() {
                         </div>
                         {canEdit && (
                             <button
-                                onClick={() => setIsCreateOpen(true)}
+                                onClick={() => router.push('/areas/new')}
                                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 transition-colors whitespace-nowrap text-sm"
                             >
                                 <Plus className="w-4 h-4" />
@@ -309,7 +288,9 @@ export default function AreasPage() {
             ) : (
                 venueGroups.map(({ venue, areas: venueAreas }) => (
                     <section key={venue.id} className="space-y-8">
-                        <h2 className="text-xl mb-4">{venue.name}</h2>
+                        <div className="mb-4">
+                            <span className="text-xs font-bold uppercase tracking-widest text-sky-400 bg-sky-500/10 border border-sky-500/20 px-3 py-1.5 rounded-full">Venue — {venue.name}</span>
+                        </div>
 
                         <div className="space-y-6">
                             {Object.entries(
@@ -323,10 +304,7 @@ export default function AreasPage() {
                                 .map(([type, typeAreas]) => [type, [...typeAreas].sort((a, b) => a.name.localeCompare(b.name))] as const)
                                 .map(([type, typeAreas]) => (
                                     <div key={type}>
-                                        <h3 className={cn(
-                                            "text-xs font-bold uppercase tracking-widest mb-3",
-                                            type === 'VENUE_DOOR' ? "text-amber-500" : "text-gray-500"
-                                        )}>
+                                        <h3 className="text-xs font-bold uppercase tracking-widest mb-3 text-gray-500">
                                             {AREA_TYPE_LABELS[type] ?? type}
                                         </h3>
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -344,12 +322,7 @@ export default function AreasPage() {
                                                 return (
                                                     <div
                                                         key={area.id}
-                                                        className={cn(
-                                                            "border rounded-xl p-6 hover:border-gray-700 transition-colors",
-                                                            area.area_type === 'VENUE_DOOR'
-                                                                ? "bg-amber-950/10 border-amber-500/20"
-                                                                : "bg-gray-900/50 border-gray-800"
-                                                        )}
+                                                        className="border rounded-xl p-6 hover:border-gray-700 transition-colors bg-gray-900/50 border-gray-800"
                                                     >
                                                         <div className="flex items-center justify-between mb-6">
                                                             <div className="flex items-center gap-3">
@@ -373,6 +346,15 @@ export default function AreasPage() {
                                                                 >
                                                                     <RefreshCw className="w-4 h-4 text-gray-400" />
                                                                 </button>
+                                                                {canEdit && (
+                                                                    <button
+                                                                        onClick={() => openConfigModal(area)}
+                                                                        className="w-8 h-8 rounded-lg hover:bg-gray-800 flex items-center justify-center transition-colors"
+                                                                        title="Configure area"
+                                                                    >
+                                                                        <Settings2 className="w-4 h-4 text-gray-400" />
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         </div>
 
@@ -439,23 +421,14 @@ export default function AreasPage() {
                                                                     Manual
                                                                 </span>
                                                             )}
-                                                            {canEdit && (
-                                                                <button
-                                                                    onClick={() => openConfigModal(area)}
-                                                                    className="text-gray-500 hover:text-gray-300 transition-colors p-1"
-                                                                    title="Configure area"
-                                                                >
-                                                                    <Settings2 className="w-3.5 h-3.5" />
-                                                                </button>
-                                                            )}
                                                             {canAdd && (
                                                                 <button
                                                                     onClick={() => setAddClicrAreaId(area.id)}
-                                                                    className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+                                                                    className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium transition-colors"
                                                                     title="Add Clicr to this area"
                                                                 >
-                                                                    <Plus className="w-3 h-3" />
-                                                                    <Sparkles className="w-3 h-3" />
+                                                                    <Plus className="w-3.5 h-3.5" />
+                                                                    Add Clicr
                                                                 </button>
                                                             )}
                                                         </div>
@@ -495,12 +468,9 @@ export default function AreasPage() {
                                         <select
                                             value={newArea.venue_id}
                                             onChange={e => {
-                                                const venueId = e.target.value;
-                                                const hasDoor = !!(venueId && getVenueDoorArea(venueId));
                                                 setNewArea(prev => ({
                                                     ...prev,
-                                                    venue_id: venueId,
-                                                    area_type: prev.area_type === 'VENUE_DOOR' && hasDoor ? 'MAIN' : prev.area_type,
+                                                    venue_id: e.target.value,
                                                 }));
                                             }}
                                             required
@@ -533,16 +503,13 @@ export default function AreasPage() {
                                             onChange={e => setNewArea(prev => ({ ...prev, area_type: e.target.value as AreaType }))}
                                             className="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                                         >
-                                            {!venueDoorExists && (
-                                                <option value="VENUE_DOOR">🚪 Venue Door</option>
-                                            )}
-                                            <option value="MAIN">Main</option>
-                                            <option value="ENTRY">Entry</option>
-                                            <option value="VIP">VIP</option>
-                                            <option value="PATIO">Patio</option>
-                                            <option value="BAR">Bar</option>
-                                            <option value="EVENT_SPACE">Event Space</option>
-                                            <option value="OTHER">Other</option>
+                                            <option value="MAIN">main</option>
+                                            <option value="ENTRY">entry</option>
+                                            <option value="VIP">vip</option>
+                                            <option value="PATIO">patio</option>
+                                            <option value="BAR">bar</option>
+                                            <option value="EVENT_SPACE">event space</option>
+                                            <option value="OTHER">other</option>
                                         </select>
                                     </div>
                                     <div className="space-y-2">
@@ -644,6 +611,34 @@ export default function AreasPage() {
                 )}
             </AnimatePresence>
 
+            {/* Cascading Clicr Prompt — shown after area creation */}
+            {justCreatedAreaId && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900 border border-primary/20 rounded-xl p-4 shadow-xl w-full max-w-md space-y-3">
+                    <p className="text-sm text-slate-300">Add Clicrs to <span className="font-bold text-white">{areas.find(a => a.id === justCreatedAreaId)?.name}</span>?</p>
+                    <div className="flex gap-2">
+                        <input type="text" placeholder="Clicr name" value={cascadeClicrName}
+                            onChange={e => setCascadeClicrName(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter' && cascadeClicrName.trim()) { e.preventDefault(); addClicr({ id: crypto.randomUUID(), area_id: justCreatedAreaId, name: cascadeClicrName.trim(), flow_mode: cascadeClicrFlow, active: true, current_count: 0 }); setCascadeClicrName(''); } }}
+                            className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm" />
+                        <select value={cascadeClicrFlow} onChange={e => setCascadeClicrFlow(e.target.value as FlowMode)}
+                            className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-2 text-white text-sm">
+                            <option value="BIDIRECTIONAL">Both</option>
+                            <option value="IN_ONLY">In only</option>
+                            <option value="OUT_ONLY">Out only</option>
+                        </select>
+                        <button onClick={async () => {
+                            if (!cascadeClicrName.trim()) return;
+                            await addClicr({ id: crypto.randomUUID(), area_id: justCreatedAreaId, name: cascadeClicrName.trim(), flow_mode: cascadeClicrFlow, active: true, current_count: 0 });
+                            setCascadeClicrName('');
+                        }} disabled={!cascadeClicrName.trim()}
+                            className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium disabled:opacity-50">
+                            Add
+                        </button>
+                    </div>
+                    <button onClick={() => setJustCreatedAreaId(null)} className="text-xs text-slate-500 hover:text-slate-300">Done adding clicrs</button>
+                </div>
+            )}
+
             {/* Add Clicr Modal */}
             <AnimatePresence>
                 {addClicrAreaId && (
@@ -665,22 +660,6 @@ export default function AreasPage() {
                             <p className="text-sm text-gray-400 mb-4">
                                 Adding to <span className="text-white font-medium">{areas.find(a => a.id === addClicrAreaId)?.name}</span>
                             </p>
-                            <div className="space-y-2 mb-4">
-                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Quick setup</label>
-                                <div className="flex flex-wrap gap-2">
-                                    {CLICR_TEMPLATES.map(t => (
-                                        <button
-                                            key={t.id}
-                                            type="button"
-                                            onClick={() => handleApplyTemplate(t)}
-                                            disabled={isAddingClicr}
-                                            className="px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors disabled:opacity-50"
-                                        >
-                                            {t.label} ({t.desc})
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
                             <form onSubmit={handleAddClicr} className="space-y-4">
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-gray-400">Clicr Name</label>
@@ -776,24 +755,22 @@ export default function AreasPage() {
                                             placeholder="0 for unlimited"
                                         />
                                     </div>
-                                    {!isVenueDoor && (
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium text-gray-400">Type</label>
-                                            <select
-                                                value={configAreaType}
-                                                onChange={e => setConfigAreaType(e.target.value as AreaType)}
-                                                className="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                                            >
-                                                <option value="MAIN">Main Floor</option>
-                                                <option value="ENTRY">Entry</option>
-                                                <option value="VIP">VIP</option>
-                                                <option value="PATIO">Patio</option>
-                                                <option value="BAR">Bar</option>
-                                                <option value="EVENT_SPACE">Event Space</option>
-                                                <option value="OTHER">Other</option>
-                                            </select>
-                                        </div>
-                                    )}
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-gray-400">Type</label>
+                                        <select
+                                            value={configAreaType}
+                                            onChange={e => setConfigAreaType(e.target.value as AreaType)}
+                                            className="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                        >
+                                            <option value="MAIN">Main Floor</option>
+                                            <option value="ENTRY">Entry</option>
+                                            <option value="VIP">VIP</option>
+                                            <option value="PATIO">Patio</option>
+                                            <option value="BAR">Bar</option>
+                                            <option value="EVENT_SPACE">Event Space</option>
+                                            <option value="OTHER">Other</option>
+                                        </select>
+                                    </div>
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium text-gray-400">Counting Mode</label>
                                         <div className="grid grid-cols-3 gap-2">
@@ -847,7 +824,7 @@ export default function AreasPage() {
                                         )}
                                     </div>
                                     <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-800">
-                                        {canDelete && !isVenueDoor ? (
+                                        {canDelete ? (
                                             !confirmDelete ? (
                                                 <button type="button" onClick={() => setConfirmDelete(true)}
                                                     className="px-4 py-2 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 text-sm font-medium transition-colors">

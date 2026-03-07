@@ -237,7 +237,7 @@ export default function VenueReportingDashboard() {
         }
 
         const vAreas = areas.filter(a => a.venue_id === venueId);
-        const vClicrs = clicrs.filter(c => vAreas.map(a => a.id).includes(c.area_id));
+        const vClicrs = clicrs.filter(c => c.area_id && vAreas.map(a => a.id).includes(c.area_id));
 
         exportReportsToExcel(
             exportEvents,

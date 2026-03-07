@@ -10,7 +10,7 @@ import type { Role } from '@/lib/types';
 import { createClient } from '@/utils/supabase/client';
 
 export default function VenuesPage() {
-    const { activeBusiness, areas, clicrs, devices, isLoading: storeLoading, areaTraffic, currentUser } = useApp();
+    const { activeBusiness, venues: storeVenues, areas, clicrs, devices, isLoading: storeLoading, areaTraffic, currentUser } = useApp();
     const showAddVenue = canAddVenue(currentUser?.role as Role | undefined);
     const [allVenues, setAllVenues] = useState<Venue[]>([]);
     const [loadingVenues, setLoadingVenues] = useState(true);
@@ -59,8 +59,9 @@ export default function VenuesPage() {
     const getVenueStats = (venueId: string) => {
         const venueAreas = areas.filter(a => a.venue_id === venueId);
         const areaIds = venueAreas.map(a => a.id);
-        const venueClicrs = clicrs.filter(c => areaIds.includes(c.area_id));
-        const currentOccupancy = venueAreas.reduce((sum, a) => sum + (a.current_occupancy || 0), 0);
+        const venueClicrs = clicrs.filter(c => c.area_id && areaIds.includes(c.area_id));
+        const storeVenue = storeVenues.find(v => v.id === venueId);
+        const currentOccupancy = storeVenue?.current_occupancy ?? 0;
         const relevantDevices = devices.filter(
             d => d.venue_id === venueId || (d.area_id && areaIds.includes(d.area_id))
         );

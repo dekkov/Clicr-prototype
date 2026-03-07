@@ -30,7 +30,7 @@ export type TimeWindow = {
 export type DeltaPayload = {
     businessId: string;
     venueId: string;
-    areaId: string;
+    areaId: string | null;
     deviceId?: string;
     delta: number; // +N or -N
     source: 'manual' | 'scan' | 'bulk' | 'reset' | 'auto_scan';

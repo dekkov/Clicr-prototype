@@ -85,11 +85,13 @@ export type Venue = {
     created_at: string;
     updated_at: string;
 
+    current_occupancy?: number;
+
     // Legacy/Backwards Compat (if needed, or map to new fields)
     active?: boolean; // map to status === 'ACTIVE'
 };
 
-export type AreaType = 'ENTRY' | 'MAIN' | 'PATIO' | 'VIP' | 'BAR' | 'EVENT_SPACE' | 'OTHER' | 'VENUE_DOOR';
+export type AreaType = 'ENTRY' | 'MAIN' | 'PATIO' | 'VIP' | 'BAR' | 'EVENT_SPACE' | 'OTHER';
 export type CountingMode = 'MANUAL' | 'AUTO_FROM_SCANS' | 'BOTH';
 
 export type ShiftMode = 'AUTO' | 'MANUAL';
@@ -130,7 +132,9 @@ export type FlowMode = 'IN_ONLY' | 'OUT_ONLY' | 'BIDIRECTIONAL';
 // Legacy Clicr type - plan to migrate to Device
 export type Clicr = {
     id: string;
-    area_id: string;
+    area_id: string | null;
+    venue_id?: string;
+    is_venue_counter?: boolean;
     name: string;
     flow_mode: FlowMode;
     current_count: number; // Cached value
@@ -193,7 +197,7 @@ export type VenueAuditLog = {
 export type CountEvent = {
     id: string;
     venue_id: string;
-    area_id: string;
+    area_id: string | null;
     clicr_id: string;
     user_id: string;
     business_id: string;

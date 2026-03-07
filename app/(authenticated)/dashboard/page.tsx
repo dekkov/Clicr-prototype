@@ -544,8 +544,10 @@ export default function DashboardPage() {
         return () => clearTimeout(timer);
     }, [todayStart]);
 
+    // Dashboard metrics only use venue counter events (area_id is null/empty).
+    // Area counter taps track area-level flow only and don't contribute to dashboard metrics.
     const todayEvents = useMemo(
-        () => events.filter((e) => e.timestamp >= todayStart),
+        () => events.filter((e) => e.timestamp >= todayStart && !e.area_id),
         [events, todayStart]
     );
 
@@ -554,12 +556,10 @@ export default function DashboardPage() {
         [scanEvents, todayStart]
     );
 
-    // Venue occupancy = VENUE_DOOR areas only (one per venue)
+    // Venue occupancy = sum of venues.current_occupancy
     const liveOccupancy = useMemo(
-        () => areas
-            .filter(a => a.area_type === 'VENUE_DOOR')
-            .reduce((sum, a) => sum + (a.current_occupancy ?? 0), 0),
-        [areas]
+        () => venues.reduce((sum, v) => sum + (v.current_occupancy ?? 0), 0),
+        [venues]
     );
 
     const peakOccupancy = useMemo(() => {
@@ -637,7 +637,7 @@ export default function DashboardPage() {
                 id: `c-${e.id}`,
                 ts: e.timestamp,
                 kind: e.delta > 0 ? 'ENTRY' : 'EXIT',
-                areaId: e.area_id,
+                areaId: e.area_id ?? undefined,
                 gender: e.gender as 'M' | 'F' | undefined,
             }))
             .sort((a, b) => b.ts - a.ts)
@@ -689,7 +689,7 @@ export default function DashboardPage() {
         const counts: Record<string, number> = {};
         todayEvents
             .filter(e => e.delta > 0 && e.area_id)
-            .forEach(e => { counts[e.area_id] = (counts[e.area_id] ?? 0) + e.delta; });
+            .forEach(e => { counts[e.area_id!] = (counts[e.area_id!] ?? 0) + e.delta; });
         const totalIn = Object.values(counts).reduce((s, v) => s + v, 0);
         return Object.entries(counts)
             .sort((a, b) => b[1] - a[1])
@@ -703,15 +703,14 @@ export default function DashboardPage() {
     const liveVenuesData = useMemo(() => {
         return venues.map(venue => {
             const venueAreas = areas.filter(a => a.venue_id === venue.id);
-            const doorArea = venueAreas.find(a => a.area_type === 'VENUE_DOOR');
-            const occupancy = doorArea?.current_occupancy ?? 0;
+            const occupancy = venue.current_occupancy ?? 0;
             const capacity = venue.total_capacity ?? null;
             const pctFull = capacity && capacity > 0 ? Math.round((occupancy / capacity) * 100) : null;
 
             const venueEvents = todayEvents.filter(e => e.venue_id === venue.id);
             const venueEntries = venueEvents.filter(e => e.delta > 0).reduce((s, e) => s + e.delta, 0);
             const venueExits = venueEvents.filter(e => e.delta < 0).reduce((s, e) => s + Math.abs(e.delta), 0);
-            const areaCount = venueAreas.filter(a => a.area_type !== 'VENUE_DOOR' && a.is_active).length;
+            const areaCount = venueAreas.filter(a => a.is_active).length;
 
             return { venue, occupancy, capacity, pctFull, venueEntries, venueExits, areaCount };
         });

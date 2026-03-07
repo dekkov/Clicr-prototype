@@ -24,10 +24,10 @@ export default function VenueOverview({ venueId, setActiveTab }: { venueId: stri
     // Filtered Data
     const venueAreas = useMemo(() => areas.filter(a => a.venue_id === venueId), [areas, venueId]);
     const areaIds = useMemo(() => venueAreas.map(a => a.id), [venueAreas]);
-    const venueClicrs = useMemo(() => clicrs.filter(c => areaIds.includes(c.area_id)), [clicrs, areaIds]);
+    const venueClicrs = useMemo(() => clicrs.filter(c => c.area_id && areaIds.includes(c.area_id)), [clicrs, areaIds]);
 
-    // Live Stats (Source of truth: Area Snapshots)
-    const currentOccupancy = venueAreas.reduce((sum, a) => sum + (a.current_occupancy || 0), 0);
+    // Live Stats (Source of truth: Venue Counter)
+    const currentOccupancy = venue?.current_occupancy ?? 0;
 
     const { maxCapacity } = getVenueCapacityRules(venue);
     const capacityPct = maxCapacity
