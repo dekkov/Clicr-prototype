@@ -77,6 +77,7 @@ async function hydrateData(data: DBData): Promise<DBData> {
                 delta: e.delta,
                 flow_type: e.flow_type as any,
                 event_type: e.event_type as any,
+                gender: e.gender ?? undefined,
             }));
         }
 

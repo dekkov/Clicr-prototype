@@ -9,7 +9,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { GettingStartedChecklist } from './_components/GettingStartedChecklist';
-import type { IDScanEvent, CountEvent, Venue } from '@/lib/types';
+import type { CountEvent, Venue } from '@/lib/types';
 import type { HeatmapData } from '@/app/api/reports/heatmap/route';
 import {
     BarChart, Bar, AreaChart, Area,
@@ -59,11 +59,11 @@ const AgeBand = ({ band, count, max }: { band: string; count: number; max: numbe
     </div>
 );
 
-const GenderBreakdown = ({ scanEvents }: { scanEvents: IDScanEvent[] }) => {
-    const accepted = scanEvents.filter(s => s.scan_result === 'ACCEPTED');
-    const total = accepted.length;
-    const male = accepted.filter(s => s.sex?.toUpperCase().startsWith('M')).length;
-    const female = accepted.filter(s => s.sex?.toUpperCase().startsWith('F')).length;
+const GenderBreakdown = ({ events }: { events: CountEvent[] }) => {
+    const entries = events.filter(e => e.delta > 0);
+    const total = entries.length;
+    const male = entries.filter(e => e.gender === 'M').length;
+    const female = entries.filter(e => e.gender === 'F').length;
     const unknown = total - male - female;
 
     const malePct = total > 0 ? Math.round((male / total) * 100) : 0;
@@ -76,7 +76,7 @@ const GenderBreakdown = ({ scanEvents }: { scanEvents: IDScanEvent[] }) => {
                 <Users className="w-4 h-4 text-gray-400" />
                 <span className="text-lg">Gender Breakdown</span>
             </div>
-            <p className="text-xs text-gray-500 mb-4">Based on accepted ID scans</p>
+            <p className="text-xs text-gray-500 mb-4">Based on gender-tagged entries tonight</p>
             <div className="flex h-4 rounded-full overflow-hidden mb-3">
                 <div className="bg-blue-500 transition-all" style={{ width: `${malePct}%` }} />
                 <div className="bg-pink-500 transition-all" style={{ width: `${femalePct}%` }} />
@@ -197,6 +197,8 @@ const PeakTimesHeatmap = ({ data, loading }: { data: HeatmapData; loading: boole
             <p className="text-xs text-gray-500 mb-4">Entry density by day × hour (all time)</p>
             {loading ? (
                 <div className="h-40 animate-pulse bg-gray-800/50 rounded-lg" />
+            ) : Object.keys(data).length === 0 ? (
+                <p className="text-sm text-gray-600 italic text-center py-8">No historical data yet. Data appears after events are recorded.</p>
             ) : (
                 <div className="overflow-x-auto">
                     <div className="min-w-[600px]">
@@ -425,17 +427,25 @@ const LiveVenues = ({ data, onViewAll }: {
 
 function buildHourlyData(events: CountEvent[]) {
     const buckets: Record<number, { entries: number; exits: number }> = {};
+    // Seed evening hours so they always appear even with no data
     EVENING_HOURS.forEach(h => { buckets[h] = { entries: 0, exits: 0 }; });
 
     events.forEach(e => {
         const hour = new Date(e.timestamp).getHours();
-        if (buckets[hour] !== undefined) {
-            if (e.delta > 0) buckets[hour].entries += e.delta;
-            else buckets[hour].exits += Math.abs(e.delta);
-        }
+        // Include any hour, not just EVENING_HOURS
+        if (!buckets[hour]) buckets[hour] = { entries: 0, exits: 0 };
+        if (e.delta > 0) buckets[hour].entries += e.delta;
+        else buckets[hour].exits += Math.abs(e.delta);
     });
 
-    return EVENING_HOURS.map(h => ({
+    // Sort hours in evening-first order (18→23, then 0→17)
+    const hours = Object.keys(buckets).map(Number).sort((a, b) => {
+        const aAdj = a < 18 ? a + 24 : a;
+        const bAdj = b < 18 ? b + 24 : b;
+        return aAdj - bAdj;
+    });
+
+    return hours.map(h => ({
         hour: h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`,
         entries: buckets[h].entries,
         exits: buckets[h].exits,
@@ -612,14 +622,14 @@ export default function DashboardPage() {
         [ageDistribution]
     );
 
-    // Live Event Log — count events only (ENTRY/EXIT), newest first, last 20
+    // Live Event Log — count events only (ENTRY/EXIT), newest first, last 5
     const liveEventLog = useMemo(() => {
         type LogEntry = {
             id: string;
             ts: number;
             kind: 'ENTRY' | 'EXIT';
             areaId?: string;
-            venueId?: string;
+            gender?: 'M' | 'F';
         };
 
         return todayEvents
@@ -628,10 +638,10 @@ export default function DashboardPage() {
                 ts: e.timestamp,
                 kind: e.delta > 0 ? 'ENTRY' : 'EXIT',
                 areaId: e.area_id,
-                venueId: e.venue_id,
+                gender: e.gender as 'M' | 'F' | undefined,
             }))
             .sort((a, b) => b.ts - a.ts)
-            .slice(0, 20);
+            .slice(0, 5);
     }, [todayEvents]);
 
     const hourlyData = useMemo(() => buildHourlyData(todayEvents), [todayEvents]);
@@ -653,26 +663,6 @@ export default function DashboardPage() {
         return m;
     }, [venues]);
 
-    const venueGroups = useMemo(() => {
-        const groups: { venueId: string | undefined; label: string; entries: typeof liveEventLog }[] = [];
-        const seen = new Set<string>();
-
-        liveEventLog.forEach(entry => {
-            const key = entry.venueId ?? '__scan__';
-            if (!seen.has(key)) {
-                seen.add(key);
-                groups.push({
-                    venueId: entry.venueId,
-                    label: entry.venueId ? (venueNameMap[entry.venueId] ?? 'Unknown Venue') : 'ID Scans',
-                    entries: [],
-                });
-            }
-            const group = groups.find(g => (g.venueId ?? '__scan__') === key);
-            group?.entries.push(entry);
-        });
-
-        return groups;
-    }, [liveEventLog, venueNameMap]);
 
     const locationData = useMemo(() => {
         const counts: Record<string, number> = {};
@@ -877,30 +867,32 @@ export default function DashboardPage() {
                         <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
                         <div className="text-lg">Live Event Log</div>
                     </div>
-                    <div className="space-y-4">
+                    <div className="space-y-2">
                         {liveEventLog.length === 0 && (
                             <p className="text-xs text-gray-600 italic">No events recorded tonight.</p>
                         )}
-                        {venueGroups.map(group => (
-                            <div key={group.venueId ?? '__scan__'} className="mb-3 last:mb-0">
-                                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">{group.label}</p>
-                                <div className="space-y-2">
-                                    {group.entries.map(entry => (
-                                        <div key={entry.id} className="border-l-2 border-gray-800 pl-4 pb-4 relative">
-                                            <div className={cn(
-                                                "text-xs uppercase tracking-wide mb-1",
-                                                entry.kind === "ENTRY" ? "text-emerald-400" :
-                                                entry.kind === "EXIT" ? "text-blue-400" : "text-gray-400"
-                                            )}>
-                                                {badgeLabel[entry.kind]}
-                                            </div>
-                                            <div className="text-sm text-gray-300 mb-1">
-                                                {entry.areaId ? areaMap[entry.areaId] ?? 'Unknown Area' : '—'}
-                                            </div>
-                                            <div className="text-xs text-gray-500">{formatTime(entry.ts)}</div>
-                                        </div>
-                                    ))}
+                        {liveEventLog.map(entry => (
+                            <div key={entry.id} className="border-l-2 border-gray-800 pl-3 py-1">
+                                <div className="flex items-center gap-2 mb-0.5">
+                                    <span className={cn(
+                                        "text-xs uppercase tracking-wide",
+                                        entry.kind === "ENTRY" ? "text-emerald-400" : "text-red-400"
+                                    )}>
+                                        {badgeLabel[entry.kind]}
+                                    </span>
+                                    {entry.gender && (
+                                        <span className={cn(
+                                            "text-[10px] font-bold px-1 rounded",
+                                            entry.gender === 'M' ? "bg-blue-900/60 text-blue-300" : "bg-pink-900/60 text-pink-300"
+                                        )}>
+                                            {entry.gender}
+                                        </span>
+                                    )}
                                 </div>
+                                <div className="text-sm text-gray-300">
+                                    {entry.areaId ? areaMap[entry.areaId] ?? 'Unknown Area' : '—'}
+                                </div>
+                                <div className="text-xs text-gray-500">{formatTime(entry.ts)}</div>
                             </div>
                         ))}
                     </div>
@@ -908,7 +900,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Gender Breakdown */}
-            <GenderBreakdown scanEvents={todayScanEvents} />
+            <GenderBreakdown events={todayEvents} />
 
             {/* Hourly Traffic + Occupancy Over Time */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

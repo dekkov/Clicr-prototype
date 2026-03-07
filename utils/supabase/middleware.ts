@@ -41,6 +41,7 @@ export async function updateSession(request: NextRequest) {
         path.startsWith('/banning') ||
         path.startsWith('/reports') ||
         path.startsWith('/settings') ||
+        path.startsWith('/businesses') ||
         path.startsWith('/onboarding/setup');
 
     if (!user) {

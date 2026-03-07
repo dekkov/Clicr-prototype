@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/store';
-import { Area, Clicr } from '@/lib/types';
+import { Area, AreaType, Clicr } from '@/lib/types';
 import { Building2, MapPin, Users, Check, Plus, ArrowRight, ArrowLeft, Mail, Shield, Scan, Ban, Trash2, Pencil, X } from 'lucide-react';
 import { createBusinessVenueAndAreas, updateBusinessSettings } from '@/app/onboarding/setup-actions';
 import { inviteTeamMember } from '@/app/(authenticated)/settings/team-actions';
@@ -61,7 +61,7 @@ export default function NewBusinessPage() {
 
     // Areas step
     const [createdAreas, setCreatedAreas] = useState<Area[]>([]);
-    const [areaInput, setAreaInput] = useState({ name: '', capacity: '100' });
+    const [areaInput, setAreaInput] = useState({ name: '', capacity: '100', area_type: 'MAIN' as AreaType });
 
     // Clicrs step
     const [createdClicrs, setCreatedClicrs] = useState<Clicr[]>([]);
@@ -95,12 +95,13 @@ export default function NewBusinessPage() {
     const handleAddArea = () => {
         if (!areaInput.name) return;
         const parsedCap = parseInt(areaInput.capacity, 10);
+        const areaId = crypto.randomUUID();
         const area: Area = {
-            id: crypto.randomUUID(),
+            id: areaId,
             venue_id: '',
             name: areaInput.name,
             default_capacity: !isNaN(parsedCap) && parsedCap > 0 ? parsedCap : null,
-            area_type: 'MAIN',
+            area_type: areaInput.area_type,
             counting_mode: 'BOTH',
             is_active: true,
             created_at: new Date().toISOString(),
@@ -108,7 +109,17 @@ export default function NewBusinessPage() {
             current_count: 0,
         } as Area;
         setCreatedAreas(prev => [...prev, area]);
-        setAreaInput({ name: '', capacity: '100' });
+        if (areaInput.area_type === 'VENUE_DOOR') {
+            setCreatedClicrs(prev => [...prev, {
+                id: crypto.randomUUID(),
+                area_id: areaId,
+                name: 'Entry Door',
+                flow_mode: 'BIDIRECTIONAL',
+                active: true,
+                current_count: 0,
+            }]);
+        }
+        setAreaInput({ name: '', capacity: '100', area_type: 'MAIN' });
     };
 
     const handleSaveAreaName = (id: string) => {
@@ -176,6 +187,7 @@ export default function NewBusinessPage() {
                     areas: createdAreas.map(a => ({
                         name: a.name,
                         capacity: a.default_capacity ?? undefined,
+                        area_type: a.area_type,
                     })),
                 });
 
@@ -440,6 +452,19 @@ export default function NewBusinessPage() {
                             onChange={e => setAreaInput(p => ({ ...p, name: e.target.value }))}
                             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddArea(); } }}
                             className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none text-sm" />
+                        <select value={areaInput.area_type} onChange={e => setAreaInput(p => ({ ...p, area_type: e.target.value as AreaType }))}
+                            className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none text-sm">
+                            {!createdAreas.some(a => a.area_type === 'VENUE_DOOR') && (
+                                <option value="VENUE_DOOR">🚪 Venue Door</option>
+                            )}
+                            <option value="MAIN">Main</option>
+                            <option value="ENTRY">Entry</option>
+                            <option value="VIP">VIP</option>
+                            <option value="PATIO">Patio</option>
+                            <option value="BAR">Bar</option>
+                            <option value="EVENT_SPACE">Event Space</option>
+                            <option value="OTHER">Other</option>
+                        </select>
                         <input type="number" value={areaInput.capacity} onChange={e => setAreaInput(p => ({ ...p, capacity: e.target.value }))}
                             className="w-24 bg-slate-950 border border-slate-800 rounded-xl px-3 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none text-sm" />
                         <button onClick={handleAddArea} disabled={!areaInput.name}

@@ -120,7 +120,7 @@ export default function ClicrPanel({
         recordEvent, recordScan, recordTurnaround,
         resetCounts, endShift, isLoading, patrons, patronBans, updateClicr, debug, currentUser,
         turnarounds, activeShiftId, activeShiftAreaId,
-        setPollingPaused, areaTraffic, refreshTrafficStats
+        setPollingPaused, areaTraffic, refreshTrafficStats, activeBusiness
     } = useApp();
 
     const id = clicrId;
@@ -128,6 +128,13 @@ export default function ClicrPanel({
     const lastClicrRef = useRef<any>(null);
     if (rawClicr) lastClicrRef.current = rawClicr;
     const clicr = rawClicr || lastClicrRef.current;
+
+    // If business was switched and this clicr no longer exists, redirect to the list.
+    useEffect(() => {
+        if (!isLoading && !rawClicr && activeBusiness) {
+            router.replace('/clicr');
+        }
+    }, [isLoading, rawClicr, activeBusiness]);
 
     // Mode: count or scan
     const [mode, setMode] = useState<Mode>('count');
