@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useApp } from '@/lib/store';
 import { LayoutGrid, Sparkles, ScanLine, ChevronRight, Plus, Wifi } from 'lucide-react';
+import { BoardSelectPanel } from '@/components/board/BoardSelectPanel';
+import { listBoardViews } from '@/app/actions/board';
 import { canAddClicr } from '@/lib/permissions';
 import type { Role } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -12,6 +14,20 @@ import { Clicr, Area, FlowMode } from '@/lib/types';
 export default function ClicrListPage() {
     const { clicrs, areas, venues, isLoading, activeBusiness, currentUser, addClicr } = useApp();
     const [showAddClicr, setShowAddClicr] = useState(false);
+    const [showBoardPanel, setShowBoardPanel] = useState(false);
+    const [boardDeviceIds, setBoardDeviceIds] = useState<Set<string>>(new Set());
+
+    useEffect(() => {
+        if (!activeBusiness) return;
+        let cancelled = false;
+        listBoardViews(activeBusiness.id).then(views => {
+            if (cancelled) return;
+            const ids = new Set<string>();
+            views.forEach(v => v.device_ids.forEach(d => ids.add(d)));
+            setBoardDeviceIds(ids);
+        });
+        return () => { cancelled = true; };
+    }, [activeBusiness]);
     const [newClicrAreaId, setNewClicrAreaId] = useState('');
     const [newClicrName, setNewClicrName] = useState('');
     const [newClicrFlow, setNewClicrFlow] = useState<FlowMode>('BIDIRECTIONAL');
@@ -28,7 +44,7 @@ export default function ClicrListPage() {
     if (isLoading) {
         return (
             <div className="p-6 max-w-[1600px] pb-20">
-                <PageHeader canAddClicr={canAddClicr(currentUser?.role as Role | undefined)} onAddClicr={() => setShowAddClicr(true)} />
+                <PageHeader canAddClicr={canAddClicr(currentUser?.role as Role | undefined)} onAddClicr={() => setShowAddClicr(true)} onBoardView={() => setShowBoardPanel(true)} />
                 <div className="space-y-6 animate-pulse">
                     <div className="flex items-center gap-4">
                         <div className="h-6 bg-gray-800 rounded w-40" />
@@ -63,7 +79,7 @@ export default function ClicrListPage() {
     if (!clicrs || clicrs.length === 0) {
         return (
             <div className="p-6 max-w-[1600px] pb-20">
-                <PageHeader canAddClicr={canAddClicr(currentUser?.role as Role | undefined)} onAddClicr={() => setShowAddClicr(true)} />
+                <PageHeader canAddClicr={canAddClicr(currentUser?.role as Role | undefined)} onAddClicr={() => setShowAddClicr(true)} onBoardView={() => setShowBoardPanel(true)} />
                 <div className="p-8 text-gray-400">No Clicrs configured yet.</div>
             </div>
         );
@@ -84,7 +100,7 @@ export default function ClicrListPage() {
 
     return (
         <div className="p-6 max-w-[1600px] pb-20">
-            <PageHeader canAddClicr={canAddClicr(currentUser?.role as Role | undefined)} onAddClicr={() => setShowAddClicr(true)} />
+            <PageHeader canAddClicr={canAddClicr(currentUser?.role as Role | undefined)} onAddClicr={() => setShowAddClicr(true)} onBoardView={() => setShowBoardPanel(true)} />
 
             <div className="space-y-8">
                 {venuesWithContent.map(venue => (
@@ -93,11 +109,11 @@ export default function ClicrListPage() {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {venue.venueCounterClicrs.map(clicr => (
-                                <ClicrCard key={clicr.id} clicr={clicr} area={null} isVenueCounter venue={venue} />
+                                <ClicrCard key={clicr.id} clicr={clicr} area={null} isVenueCounter venue={venue} isOnBoard={boardDeviceIds.has(clicr.id)} />
                             ))}
                             {venue.areas.flatMap(area =>
                                 area.clicrs.map(clicr => (
-                                    <ClicrCard key={clicr.id} clicr={clicr} area={area} />
+                                    <ClicrCard key={clicr.id} clicr={clicr} area={area} isOnBoard={boardDeviceIds.has(clicr.id)} />
                                 ))
                             )}
                         </div>
@@ -175,11 +191,13 @@ export default function ClicrListPage() {
                     </div>
                 </div>
             )}
+
+            <BoardSelectPanel open={showBoardPanel} onClose={() => setShowBoardPanel(false)} />
         </div>
     );
 }
 
-function PageHeader({ canAddClicr, onAddClicr }: { canAddClicr: boolean; onAddClicr: () => void }) {
+function PageHeader({ canAddClicr, onAddClicr, onBoardView }: { canAddClicr: boolean; onAddClicr: () => void; onBoardView: () => void }) {
     return (
         <div className="mb-8">
             <div className="flex items-center justify-between">
@@ -197,10 +215,10 @@ function PageHeader({ canAddClicr, onAddClicr }: { canAddClicr: boolean; onAddCl
                             Add Clicr
                         </button>
                     )}
-                    <Link href="/settings/board-views" className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-800/50 hover:bg-gray-800 text-sm text-gray-300 transition-colors">
+                    <button onClick={onBoardView} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-800/50 hover:bg-gray-800 text-sm text-gray-300 transition-colors">
                         <LayoutGrid className="w-4 h-4" />
                         Board View
-                    </Link>
+                    </button>
                 </div>
             </div>
         </div>
@@ -217,7 +235,7 @@ function getFlowModeLabel(flowMode: string | undefined): string {
     }
 }
 
-function ClicrCard({ clicr, area, isVenueCounter, venue }: { clicr: Clicr; area: (Area & { clicrs: Clicr[] }) | null; isVenueCounter?: boolean; venue?: any }) {
+function ClicrCard({ clicr, area, isVenueCounter, venue, isOnBoard }: { clicr: Clicr; area: (Area & { clicrs: Clicr[] }) | null; isVenueCounter?: boolean; venue?: any; isOnBoard?: boolean }) {
     const flowModeLabel = getFlowModeLabel(clicr.flow_mode);
     const scanEnabled = clicr.scan_enabled;
 
@@ -279,6 +297,12 @@ function ClicrCard({ clicr, area, isVenueCounter, venue }: { clicr: Clicr; area:
                     <>
                         <div className="text-gray-400">·</div>
                         <div className="text-purple-400">Scan</div>
+                    </>
+                )}
+                {isOnBoard && (
+                    <>
+                        <div className="text-gray-400">·</div>
+                        <div className="text-primary">On Board</div>
                     </>
                 )}
             </div>

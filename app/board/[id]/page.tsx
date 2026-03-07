@@ -1,44 +1,41 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, use } from 'react';
+import React, { useState, useEffect, use } from 'react';
 import { LayoutGrid, Maximize, ArrowLeft } from 'lucide-react';
-import { getBoardView } from '@/app/(authenticated)/settings/board-actions';
-import type { BoardView } from '@/lib/types';
+import { getBoardView } from '@/app/actions/board';
+import { BoardTile } from '@/components/board/BoardTile';
+import type { BoardView, Clicr, Area, Venue } from '@/lib/types';
 import Link from 'next/link';
 import { useApp } from '@/lib/store';
 
-type DeviceStatus = {
-    id: string;
-    name: string;
-    current_count: number;
-    area_name: string;
-    area_id?: string;
-    venue_id?: string;
+type TileData = {
+    clicr: Clicr;
+    area: Area | undefined;
+    venue?: Venue;
+    label: string;
 };
 
 export default function BoardDisplayPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
-    const { recordEvent, currentUser, business } = useApp();
+    const { recordEvent } = useApp();
     const [boardView, setBoardView] = useState<BoardView | null>(null);
-    const [devices, setDevices] = useState<DeviceStatus[]>([]);
+    const [tiles, setTiles] = useState<TileData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const canTap = !!currentUser?.id && !!business?.id;
-
-    const load = useCallback(async () => {
-        const view = await getBoardView(id);
-        if (!view) {
-            setError('Board view not found');
-            setIsLoading(false);
-            return;
-        }
-        setBoardView(view);
-        setIsLoading(false);
-    }, [id]);
 
     useEffect(() => {
-        load();
-    }, [load]);
+        let cancelled = false;
+        getBoardView(id).then(view => {
+            if (cancelled) return;
+            if (!view) {
+                setError('Board view not found');
+            } else {
+                setBoardView(view);
+            }
+            setIsLoading(false);
+        });
+        return () => { cancelled = true; };
+    }, [id]);
 
     useEffect(() => {
         if (!boardView) return;
@@ -48,22 +45,24 @@ export default function BoardDisplayPage({ params }: { params: Promise<{ id: str
                 const res = await fetch('/api/sync');
                 if (!res.ok) return;
                 const data = await res.json();
-                const allClicrs = data.clicrs || [];
-                const allAreas = data.areas || [];
+                const allClicrs: Clicr[] = data.clicrs || [];
+                const allAreas: Area[] = data.areas || [];
+                const allVenues: Venue[] = data.venues || [];
 
-                const mapped: DeviceStatus[] = boardView.device_ids.map(did => {
-                    const clicr = allClicrs.find((c: any) => c.id === did);
-                    const area = clicr ? allAreas.find((a: any) => a.id === clicr.area_id) : null;
+                const mapped: TileData[] = boardView.device_ids.map(did => {
+                    const clicr = allClicrs.find(c => c.id === did);
+                    const area = clicr ? allAreas.find(a => a.id === clicr.area_id) : undefined;
+                    const venue = clicr?.is_venue_counter
+                        ? allVenues.find(v => v.id === clicr.venue_id)
+                        : undefined;
                     return {
-                        id: did,
-                        name: boardView.labels[did] || clicr?.name || 'Unknown',
-                        current_count: clicr?.current_count ?? 0,
-                        area_name: area?.name || '',
-                        area_id: clicr?.area_id,
-                        venue_id: area?.venue_id,
+                        clicr: clicr || { id: did, name: 'Unknown', area_id: '', active: false, current_count: 0 } as Clicr,
+                        area,
+                        venue,
+                        label: boardView.labels[did] || clicr?.name || 'Unknown',
                     };
                 });
-                setDevices(mapped);
+                setTiles(mapped);
             } catch { /* polling silently fails */ }
         };
 
@@ -76,16 +75,18 @@ export default function BoardDisplayPage({ params }: { params: Promise<{ id: str
         document.documentElement.requestFullscreen?.();
     };
 
-    const handleTap = (device: DeviceStatus, delta: number) => {
-        if (!device.venue_id || !device.area_id || !recordEvent) return;
+    const handleTap = (clicrId: string, delta: number, gender: 'M' | 'F') => {
+        const tile = tiles.find(t => t.clicr.id === clicrId);
+        if (!tile || !tile.area?.venue_id || !tile.clicr.area_id || !recordEvent) return;
         recordEvent({
-            venue_id: device.venue_id,
-            area_id: device.area_id,
-            clicr_id: device.id,
+            venue_id: tile.area.venue_id,
+            area_id: tile.clicr.area_id,
+            clicr_id: clicrId,
             delta,
             flow_type: delta > 0 ? 'IN' : 'OUT',
+            gender,
             event_type: 'TAP',
-            idempotency_key: `board-${device.id}-${Date.now()}-${delta}`,
+            idempotency_key: `board-${clicrId}-${Date.now()}-${delta}`,
         });
     };
 
@@ -101,22 +102,23 @@ export default function BoardDisplayPage({ params }: { params: Promise<{ id: str
         return (
             <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4">
                 <p className="text-red-400 text-lg">{error || 'Board view not found'}</p>
-                <Link href="/settings/board-views" className="text-primary hover:text-emerald-400 text-sm">
-                    Back to Board Views
+                <Link href="/clicr" className="text-primary hover:text-emerald-400 text-sm">
+                    Back to Clicrs
                 </Link>
             </div>
         );
     }
 
-    const gridCols = devices.length <= 2 ? 'grid-cols-1 md:grid-cols-2'
-        : devices.length <= 4 ? 'grid-cols-2'
-        : 'grid-cols-2 lg:grid-cols-3';
+    const gridCols = tiles.length <= 1 ? 'grid-cols-1 max-w-md mx-auto'
+        : tiles.length === 2 ? 'grid-cols-2'
+        : tiles.length === 3 ? 'grid-cols-3'
+        : 'grid-cols-2';
 
     return (
         <div className="min-h-screen bg-black text-white flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
                 <div className="flex items-center gap-3">
-                    <Link href="/settings/board-views" className="text-slate-500 hover:text-white transition-colors">
+                    <Link href="/clicr" className="text-slate-500 hover:text-white transition-colors">
                         <ArrowLeft className="w-5 h-5" />
                     </Link>
                     <LayoutGrid className="w-5 h-5 text-primary" />
@@ -129,35 +131,15 @@ export default function BoardDisplayPage({ params }: { params: Promise<{ id: str
             </div>
 
             <div className={`flex-1 grid ${gridCols} gap-4 p-6`}>
-                {devices.map(device => (
-                    <div key={device.id}
-                        className="bg-slate-900/50 border border-slate-800 rounded-3xl flex flex-col items-center justify-center p-8 min-h-[200px]">
-                        <div className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2">
-                            {device.area_name}
-                        </div>
-                        <div className="text-7xl md:text-9xl font-black tabular-nums text-primary leading-none mb-4">
-                            {device.current_count}
-                        </div>
-                        <div className="text-lg text-slate-300 font-bold mb-4">
-                            {device.name}
-                        </div>
-                        {canTap && device.venue_id && device.area_id && (
-                            <div className="flex flex-wrap gap-2 justify-center">
-                                {[1, 2, 3].map(n => (
-                                    <button key={`in-${n}`} onClick={() => handleTap(device, n)}
-                                        className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 text-sm font-bold border border-emerald-500/30 active:scale-95 transition-all">
-                                        +{n} IN
-                                    </button>
-                                ))}
-                                {[1, 2, 3].map(n => (
-                                    <button key={`out-${n}`} onClick={() => handleTap(device, -n)}
-                                        className="px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 text-sm font-bold border border-red-500/30 active:scale-95 transition-all">
-                                        -{n} OUT
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                {tiles.map(tile => (
+                    <BoardTile
+                        key={tile.clicr.id}
+                        clicr={tile.clicr}
+                        area={tile.area}
+                        venue={tile.venue}
+                        label={tile.label}
+                        onTap={handleTap}
+                    />
                 ))}
             </div>
         </div>

@@ -31,9 +31,9 @@ export async function createBoardView(
 
         if (error) throw error;
         return { success: true, boardView: data as BoardView };
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error('[board] createBoardView error:', e);
-        return { success: false, error: e.message || 'Failed to create board view' };
+        return { success: false, error: e instanceof Error ? e.message : 'Failed to create board view' };
     }
 }
 
@@ -77,8 +77,34 @@ export async function deleteBoardView(boardId: string, businessId: string): Prom
 
         if (error) throw error;
         return { success: true };
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error('[board] deleteBoardView error:', e);
-        return { success: false, error: e.message || 'Failed to delete board view' };
+        return { success: false, error: e instanceof Error ? e.message : 'Failed to delete board view' };
+    }
+}
+
+export async function updateBoardView(
+    boardId: string,
+    businessId: string,
+    updates: { name?: string; device_ids?: string[]; labels?: Record<string, string> }
+): Promise<BoardResult> {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'Not authenticated' };
+
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('board_views')
+            .update(updates)
+            .eq('id', boardId)
+            .eq('business_id', businessId)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return { success: true, boardView: data as BoardView };
+    } catch (e: unknown) {
+        console.error('[board] updateBoardView error:', e);
+        return { success: false, error: e instanceof Error ? e.message : 'Failed to update board view' };
     }
 }

@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/store';
 import { Area, AreaType, CountingMode, FlowMode, ShiftMode, Role } from '@/lib/types';
-import { Search, RefreshCw, ArrowUp, ArrowDown, Plus, ChevronDown, Play, Square, Settings2, Layers, Maximize2 } from 'lucide-react';
+import { Search, RefreshCw, ArrowUp, ArrowDown, Plus, ChevronDown, Play, Square, Settings2, Layers, LayoutGrid } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { canEditVenuesAndAreas, canStartShift, canAddClicr, hasMinRole } from '@/lib/permissions';
@@ -334,10 +334,12 @@ export default function AreasPage() {
                                                             <div className="flex items-center gap-2">
                                                                 <button
                                                                     type="button"
+                                                                    onClick={() => router.push(`/clicr/board/area-${area.id}`)}
                                                                     className="w-8 h-8 rounded-lg hover:bg-gray-800 flex items-center justify-center transition-colors"
-                                                                    aria-label="Expand"
+                                                                    aria-label="Board View"
+                                                                    title="Open board view"
                                                                 >
-                                                                    <Maximize2 className="w-4 h-4 text-purple-400" />
+                                                                    <LayoutGrid className="w-4 h-4 text-purple-400" />
                                                                 </button>
                                                                 <button
                                                                     type="button"
