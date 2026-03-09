@@ -66,20 +66,26 @@ export function computeMonthlyTrend(
   venueId: string,
   year: number
 ): { monthLabel: string; total: number }[] {
-  return Array.from({ length: 12 }, (_, m) => {
-    const monthStart = new Date(year, m, 1).getTime();
-    const monthEnd = new Date(year, m + 1, 0, 23, 59, 59, 999).getTime();
-    const total = events
-      .filter(e =>
-        e.venue_id === venueId &&
-        e.flow_type === 'IN' &&
-        e.event_type !== 'RESET' &&
-        e.timestamp >= monthStart &&
-        e.timestamp <= monthEnd
-      )
-      .reduce((sum, e) => sum + e.delta, 0);
-    return { monthLabel: format(new Date(year, m, 1), 'MMM'), total };
+  const yearStart = new Date(year, 0, 1).getTime();
+  const yearEnd = new Date(year, 11, 31, 23, 59, 59, 999).getTime();
+  const totals = new Array(12).fill(0);
+
+  events.forEach(e => {
+    if (
+      e.venue_id !== venueId ||
+      e.flow_type !== 'IN' ||
+      e.event_type === 'RESET' ||
+      e.timestamp < yearStart ||
+      e.timestamp > yearEnd
+    ) return;
+    const m = new Date(e.timestamp).getMonth();
+    totals[m] += e.delta;
   });
+
+  return totals.map((total, m) => ({
+    monthLabel: format(new Date(year, m, 1), 'MMM'),
+    total,
+  }));
 }
 
 /**
@@ -154,13 +160,14 @@ export function computeDayGenderRatio(
   );
   const male = dayScans.filter(s => s.sex === 'M').length;
   const female = dayScans.filter(s => s.sex === 'F').length;
-  const total = male + female || 1;
+  const rawTotal = male + female;
+  const safeDivisor = rawTotal || 1;
 
   return {
     male,
     female,
-    total: male + female,
-    malePercent: Math.round((male / total) * 100),
-    femalePercent: Math.round((female / total) * 100),
+    total: rawTotal,
+    malePercent: rawTotal === 0 ? 0 : Math.round((male / safeDivisor) * 100),
+    femalePercent: rawTotal === 0 ? 0 : Math.round((female / safeDivisor) * 100),
   };
 }
