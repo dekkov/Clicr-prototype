@@ -44,7 +44,7 @@ The `/api/sync` route currently handles both reads and writes. Here's how each a
 
 ### GET /api/sync (State Hydration)
 
-**Current**: Reads `data/db.json` + hydrates with Supabase data.
+**Current**: Reads from Supabase, hydrates derived fields.
 
 **Target**: Replace with direct DataClient calls in components:
 
@@ -188,8 +188,8 @@ The prototype uses `Clicr` type; production uses `Device`. Here's the mapping:
 ## 6. Migration Checklist for Developer
 
 ```
-□ 1. Set up Supabase project (supabase init, supabase start)
-□ 2. Run migrations in order: 001_schema.sql → … → 013_identity_hash.sql (13 files total)
+□ 1. Create a Supabase project at https://supabase.com
+□ 2. Run migrations in order: 001_schema.sql → … → 016_venue_counter_clicr.sql (16 files total)
 □ 3. Enable Realtime on: occupancy_snapshots, occupancy_events, id_scans
 □ 4. Copy .env.example → .env.local, fill in Supabase credentials
 □ 5. Implement SupabaseAdapter.ts (all methods)

@@ -46,6 +46,8 @@ app/
 ├── (authenticated)/        # Protected routes (layout applies auth check)
 │   ├── layout.tsx          # Auth guard wrapper
 │   ├── dashboard/page.tsx  # Main dashboard
+│   ├── businesses/
+│   │   └── new/page.tsx    # Create new business
 │   ├── venues/
 │   │   ├── page.tsx        # Venue list
 │   │   ├── new/page.tsx    # Create venue
@@ -55,7 +57,7 @@ app/
 │   │   └── [id]/page.tsx   # Area detail + device management
 │   ├── clicr/
 │   │   ├── page.tsx        # Device list
-│   │   └── [id]/page.tsx   # Counter UI (Board View)
+│   │   └── [id]/page.tsx   # Counter UI
 │   ├── scanner/page.tsx    # ID scanning
 │   ├── banning/
 │   │   ├── page.tsx        # Ban list
@@ -74,14 +76,28 @@ app/
 │   └── debug/              # Dev-only debug panels
 │       └── context/page.tsx
 │
-├── api/
-│   └── sync/route.ts       # GET: hydrate state, POST: mutations
+├── board/
+│   └── [id]/[token]/page.tsx   # Board view (multi-counter tiles)
+├── tap/
+│   └── [token]/page.tsx        # Quick-tap view
 │
-├── debug/                  # Top-level debug pages
+├── api/
+│   ├── sync/route.ts           # GET: hydrate state, POST: mutations
+│   ├── tap/[token]/route.ts    # POST: tap event (device token auth)
+│   ├── rpc/reset/route.ts      # POST: atomic reset RPC
+│   ├── rpc/traffic/route.ts    # GET: traffic totals
+│   ├── reports/aggregate/route.ts  # GET: server-side report aggregation
+│   ├── reports/heatmap/route.ts    # GET: heatmap data
+│   ├── auth/signout/route.ts   # POST: sign out
+│   ├── log-error/route.ts      # POST: client error logging
+│   ├── verify-id/route.ts      # POST: ID verification
+│   └── admin/deploy-rpc/route.ts   # POST: admin RPC deploy
+│
+├── debug/                      # Top-level debug pages
 │   ├── auth/page.tsx
 │   └── onboarding-trace/page.tsx
 │
-└── qa/                     # QA utilities
+└── qa/                         # QA utilities
 ```
 
 ---
@@ -99,7 +115,7 @@ The prototype uses a **centralized React Context** (`AppProvider` in `lib/store.
 5. **Realtime**: Subscribes to Supabase `postgres_changes` on `occupancy_snapshots`
 
 The `/api/sync` route (`app/api/sync/route.ts`) acts as a data proxy:
-- **GET**: Reads from `data/db.json` (local file) or Supabase, hydrates derived fields
+- **GET**: Reads from Supabase, hydrates derived fields
 - **POST**: Dispatches mutations (`RECORD_EVENT`, `RECORD_SCAN`, `RESET_COUNTS`, etc.)
 
 ### Data Flow

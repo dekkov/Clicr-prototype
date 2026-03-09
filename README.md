@@ -2,7 +2,7 @@
 
 > Real-time occupancy tracking, ID scanning, and patron management for the hospitality industry.
 
-CLICR replaces clunky standalone ID scanners and analog clickers with one connected platform — live communicated counters, Bluetooth ID scanning, and clean reporting, visible from anywhere.
+CLICR replaces clunky standalone ID scanners and analog clickers with one connected platform — live counters, camera-based ID scanning, and clean reporting, visible from anywhere.
 
 ---
 
@@ -31,11 +31,22 @@ npm run dev
 # 1. Create a Supabase project at https://supabase.com
 
 # 2. Run migrations in order via the Supabase SQL Editor:
-#    migrations/001_schema.sql  → all tables
-#    migrations/002_indexes.sql → performance indexes
-#    migrations/003_rpcs.sql    → atomic stored procedures
-#    migrations/004_rls.sql     → row-level security
-#    (continue through 013_identity_hash.sql)
+#    migrations/001_schema.sql              → all tables
+#    migrations/002_indexes.sql             → performance indexes
+#    migrations/003_rpcs.sql                → atomic stored procedures
+#    migrations/004_rls.sql                 → row-level security
+#    migrations/005_fix_onboarding_rls.sql  → onboarding RLS fix
+#    migrations/006_user_cascade_deletes.sql→ cascade deletes
+#    migrations/007_fix_report_summary.sql  → report summary RPC fix
+#    migrations/008_role_migration.sql      → roles + board_views table
+#    migrations/009_area_shifts.sql         → area shift mode
+#    migrations/010_member_assignments.sql  → member venue/area assignments
+#    migrations/011_support_tickets.sql     → support tickets table
+#    migrations/012_shifts.sql              → shifts table
+#    migrations/013_identity_hash.sql       → identity token hashing
+#    migrations/014_venue_door_area_type.sql→ VENUE_DOOR area type
+#    migrations/015_heatmap_index.sql       → heatmap performance index
+#    migrations/016_venue_counter_clicr.sql → venue counter clicr support
 
 # 3. Enable Realtime on tables:
 #    Dashboard → Database → Replication → Enable for:
@@ -64,7 +75,7 @@ clicr-v4/
 │   │   ├── dashboard/          # Live occupancy overview
 │   │   ├── venues/             # Venue management
 │   │   ├── areas/              # Area management
-│   │   ├── businesses/         # Business management
+│   │   ├── businesses/new/     # Create new business
 │   │   ├── clicr/              # Clicr (counter) configuration
 │   │   ├── devices/            # Device management
 │   │   ├── scanner/            # ID scanner screen
@@ -76,8 +87,9 @@ clicr-v4/
 │   ├── login/ signup/ auth/    # Authentication
 │   ├── onboarding/             # First-run setup wizard
 │   ├── demo/                   # Interactive marketing demo
-│   ├── board/                  # Board view (multi-counter tiles)
-│   └── tap/                    # Quick-tap view
+│   ├── board/[id]/[token]/     # Board view (multi-counter tiles)
+│   ├── tap/[token]/            # Quick-tap view
+│   └── api/                    # API routes (tap, rpc, reports, sync)
 │
 ├── components/                 # Shared UI components
 │   ├── ui/                     # Base primitives (Button, Input, etc.)
@@ -92,12 +104,20 @@ clicr-v4/
 │       ├── SupabaseAdapter.ts  # Production mode (stub — implement this)
 │       └── index.ts            # Factory function
 │
-├── lib/                        # Utilities
+├── lib/                        # Utilities & services
 │   ├── types.ts                # TypeScript type definitions
-│   ├── core/                   # Mutation/metric helpers
-│   └── supabase.ts             # Supabase client factory
+│   ├── store.tsx               # AppContext + useApp() global state
+│   ├── permissions.ts          # RBAC helpers (hasMinRole)
+│   ├── aamva.ts                # Driver's license PDF417 parsing
+│   ├── realtime-manager.ts     # Supabase Channels subscriptions
+│   ├── sync-data.ts            # Initial state hydration
+│   ├── supabase.ts             # Supabase browser client
+│   ├── supabase-admin.ts       # Supabase server/admin client
+│   └── core/                   # Mutation & metric RPC wrappers
 │
-├── migrations/                 # ★ Supabase DDL (run in order, 001 → 013)
+├── supabase/                   # Supabase config & manual SQL helpers
+│
+├── migrations/                 # ★ Supabase DDL (run in order, 001 → 016)
 │
 ├── docs/                       # ★ Developer documentation
 │   ├── PRODUCT_SPEC.md         # Roles, flows, data model
@@ -145,17 +165,17 @@ const result = await client.applyOccupancyDelta({
 Business (tenant)
 └── Venue
     └── Area
-        └── Clicr (communicated counter: IN_ONLY | OUT_ONLY | BIDIRECTIONAL)
+        └── Clicr (counter device: IN_ONLY | OUT_ONLY | BIDIRECTIONAL)
 ```
 
-Every tap creates an append-only `CountEvent`. Occupancy is derived from event replay, never stored as a mutable integer directly.
+Every tap creates an append-only event. Current occupancy is stored in `occupancy_snapshots` but only ever updated atomically via the `apply_occupancy_delta` RPC — never with direct writes.
 
 ### Critical RPCs
 
 | RPC | Why it matters |
 |-----|----------------|
 | `apply_occupancy_delta` | Row-locked atomic counting — prevents race conditions |
-| `reset_area_counts` / `reset_venue_counts` | Transactional reset with audit log |
+| `reset_counts(scope)` | Transactional reset with audit log — scope: area, venue, or all |
 | `get_report_summary` | Server-side aggregation — don't transfer raw events to client |
 
 ### RLS (Row-Level Security)
