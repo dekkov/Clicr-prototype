@@ -120,8 +120,9 @@ export function computeHourlyOccupancy(
   venueId: string,
   dateStr: string // YYYY-MM-DD
 ): { hourLabel: string; occupancy: number; entries: number; exits: number }[] {
-  const dayStart = startOfDay(new Date(dateStr));
-  const dayEnd = endOfDay(new Date(dateStr));
+  const noon = new Date(dateStr + 'T12:00:00'); // local-time anchor avoids UTC-midnight parse
+  const dayStart = startOfDay(noon);
+  const dayEnd = endOfDay(noon);
   const hours = eachHourOfInterval({ start: dayStart, end: dayEnd });
 
   let runningOcc = 0;
@@ -152,8 +153,9 @@ export function computeDayGenderRatio(
   venueId: string,
   dateStr: string
 ): { male: number; female: number; total: number; malePercent: number; femalePercent: number } {
-  const dayStart = new Date(dateStr).setHours(0, 0, 0, 0);
-  const dayEnd = new Date(dateStr).setHours(23, 59, 59, 999);
+  const noon = new Date(dateStr + 'T12:00:00');
+  const dayStart = startOfDay(noon).getTime();
+  const dayEnd = endOfDay(noon).getTime();
 
   const dayScans = scans.filter(
     s => s.venue_id === venueId && s.timestamp >= dayStart && s.timestamp <= dayEnd
