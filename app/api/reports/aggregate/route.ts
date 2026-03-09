@@ -1,17 +1,27 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-
-// Initialize SERVICE ROLE client for backend jobs (bypasses RLS)
-const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY! // Fallback for dev only
-);
+import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getAuthenticatedUser } from '@/lib/api-auth';
 
 export async function POST(req: Request) {
     try {
+        const user = await getAuthenticatedUser();
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const { businessId, date } = await req.json();
 
-        console.log(`[REPORTING_JOB] Starting aggregation for business ${businessId} on ${date}`);
+        const { data: membership } = await supabaseAdmin
+            .from('business_members')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('business_id', businessId)
+            .limit(1)
+            .single();
+
+        if (!membership) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
 
         // 1. Fetch all raw events for the day
         // In production, use proper timezone framing (start of day to end of day in business TZ)
@@ -78,12 +88,10 @@ export async function POST(req: Request) {
             }))
         };
 
-        console.log(`[REPORTING_JOB] Completed. Ent: ${totalEntries}, Ex: ${totalExits}`);
-
         return NextResponse.json({ success: true, report: reportPayload });
 
     } catch (error) {
-        console.error('[REPORTING_JOB_ERROR]', error);
+        console.error('[REPORTING_JOB_ERROR]', error instanceof Error ? error.message : 'Unknown error');
         return NextResponse.json({ success: false, error: 'Aggregation failed' }, { status: 500 });
     }
 }

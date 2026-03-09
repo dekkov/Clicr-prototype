@@ -7,7 +7,8 @@ import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
 export default function TotalsLatencyDebug() {
-    const { currentUser, traffic, recordEvent, events } = useApp();
+    const ctx = useApp() as any;
+    const { currentUser, traffic, recordEvent, events } = ctx;
     const [logs, setLogs] = useState<{ ts: number, msg: string, latency?: number }[]>([]);
     const [lastClick, setLastClick] = useState<number>(0);
 

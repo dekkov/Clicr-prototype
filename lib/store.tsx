@@ -208,11 +208,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 'Content-Type': 'application/json'
             };
 
-            if (user) {
-                headers['x-user-id'] = user.id;
-                headers['x-user-email'] = user.email || '';
-            }
-
             const params = new URLSearchParams();
             if (activeBusinessIdRef.current) params.set('businessId', activeBusinessIdRef.current);
             if (activeVenueIdRef.current) params.set('venueId', activeVenueIdRef.current);
@@ -410,14 +405,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }, [state.business?.id]); // Re-run when business context loads
 
     const authFetch = async (body: any) => {
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (user) {
-            headers['x-user-id'] = user.id;
-            headers['x-user-email'] = user.email || '';
-        }
-        return fetch('/api/sync', { method: 'POST', headers, body: JSON.stringify(body) });
+        return fetch('/api/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
     };
 
     // Counter lock: incremented per in-flight write, decremented when each settles.
@@ -562,7 +554,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setState(optimisticState);
 
         try {
-            // authFetch attaches x-user-id so the server can resolve business_id
+            // authFetch posts to /api/sync; the server resolves business_id from the session cookie
             const res = await authFetch({ action: 'RESET_COUNTS', venue_id: venueId });
 
             if (res.ok) {

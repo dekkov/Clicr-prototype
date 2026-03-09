@@ -7,7 +7,6 @@ import { Venue } from '@/lib/types';
 import { MapPin, Plus, RefreshCw, ChevronRight } from 'lucide-react';
 import { canAddVenue } from '@/lib/permissions';
 import type { Role } from '@/lib/types';
-import { createClient } from '@/utils/supabase/client';
 
 export default function VenuesPage() {
     const { activeBusiness, venues: storeVenues, areas, clicrs, devices, isLoading: storeLoading, areaTraffic, currentUser } = useApp();
@@ -26,17 +25,10 @@ export default function VenuesPage() {
 
         const load = async () => {
             setLoadingVenues(true);
-            const supabase = createClient();
-            const { data: { user } } = await supabase.auth.getUser();
-            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-            if (user) {
-                headers['x-user-id'] = user.id;
-                headers['x-user-email'] = user.email || '';
-            }
             try {
                 const res = await fetch(`/api/sync?businessId=${activeBusiness.id}`, {
                     cache: 'no-store',
-                    headers,
+                    headers: { 'Content-Type': 'application/json' },
                     signal: controller.signal,
                 });
                 if (res.ok) {

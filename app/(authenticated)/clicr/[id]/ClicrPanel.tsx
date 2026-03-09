@@ -807,7 +807,7 @@ export default function ClicrPanel({
                                     setTurnaroundFlash(true);
                                     setTimeout(() => setTurnaroundFlash(false), 600);
                                     if (clicr.area_id) recordTurnaround?.(venueId || '', clicr.area_id, clicr.id, 1);
-                                    else if (venueId) recordTurnaround?.(venueId, undefined, clicr.id, 1);
+                                    else if (venueId) recordTurnaround?.(venueId, '', clicr.id, 1);
                                 }}
                                 className={cn(
                                     "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all active:scale-[0.92] touch-manipulation",

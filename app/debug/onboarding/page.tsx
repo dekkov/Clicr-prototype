@@ -70,7 +70,7 @@ export default async function OnboardingDebugPage() {
                         <JsonDisplay data={adminMemberships} />
                     </div>
                 </div>
-                {userMemberships?.length === 0 && adminMemberships?.length > 0 && (
+                {userMemberships?.length === 0 && (adminMemberships?.length ?? 0) > 0 && (
                     <div className="mt-4 p-4 bg-red-900/50 text-red-200 border border-red-500 rounded font-bold">
                         🚨 RLS BLOCKING DETECTED: Data exists but User cannot see it. Middleware thinks user is new.
                     </div>

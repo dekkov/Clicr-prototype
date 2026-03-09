@@ -5,6 +5,10 @@ import { createClient } from '@/utils/supabase/client';
 import { useApp } from '@/lib/store';
 
 export default function DebugContextPage() {
+    if (process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_APP_MODE !== 'demo') {
+        return null;
+    }
+
     const supabase = createClient();
     const { currentUser, business, venues, areas, devices } = useApp();
 

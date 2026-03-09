@@ -3,6 +3,10 @@ import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
 
 export default async function AuthDebugPage() {
+    if (process.env.NODE_ENV === 'production' && !process.env.ENABLE_DEBUG_PAGES) {
+        redirect('/dashboard');
+    }
+
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 

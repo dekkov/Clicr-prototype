@@ -309,7 +309,7 @@ export default function AreasPage() {
                                         </h3>
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                             {typeAreas.map(area => {
-                                                const scopeKey = `area:${activeBusiness.id}:${area.venue_id}:${area.id}`;
+                                                const scopeKey = `area:${activeBusiness!.id}:${area.venue_id}:${area.id}`;
                                                 const traffic = areaTraffic[scopeKey] ?? { total_in: 0, total_out: 0 };
 
                                                 const areaClicrs = clicrs.filter(c => c.area_id === area.id);

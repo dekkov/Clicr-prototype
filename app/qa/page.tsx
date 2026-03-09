@@ -76,7 +76,7 @@ export default function QAPage() {
                                 Test API: GET_TRAFFIC_STATS
                             </button>
                             <button
-                                onClick={() => runAction('Store: refreshTrafficStats', async () => { await refreshTrafficStats(); return "Refreshed Store"; })}
+                                onClick={() => runAction('Store: refreshTrafficStats', async () => { await refreshTrafficStats(venues[0]?.id ?? '', areas[0]?.id ?? ''); return "Refreshed Store"; })}
                                 className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 rounded text-white font-bold"
                             >
                                 Trigger Store Refresh

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { getAuthenticatedUser } from '@/lib/api-auth';
 
 // Initialize Admin Client
 const supabaseAdmin = createClient(
@@ -15,13 +16,30 @@ const supabaseAdmin = createClient(
 
 export async function POST(request: Request) {
     try {
-        const body = await request.json();
-        const { business_id, scope, target_id, user_id } = body;
+        // Authenticate the user from session
+        const user = await getAuthenticatedUser();
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
 
-        console.log(`[RESET] Request received`, { business_id, scope, target_id });
+        const body = await request.json();
+        const { business_id, scope, target_id } = body;
 
         if (!business_id || !scope || !target_id) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+        }
+
+        // Verify user has ADMIN+ role in this business
+        const { data: membership } = await supabaseAdmin
+            .from('business_members')
+            .select('role')
+            .eq('user_id', user.id)
+            .eq('business_id', business_id)
+            .limit(1)
+            .single();
+
+        if (!membership || !['OWNER', 'ADMIN'].includes(membership.role)) {
+            return NextResponse.json({ error: 'Forbidden: ADMIN role required' }, { status: 403 });
         }
 
         // 1. Resolve Areas to Reset
@@ -51,8 +69,6 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: "No areas found to reset" });
         }
 
-        console.log(`[RESET] Resetting ${areasToReset.length} areas:`, areasToReset);
-
         // 2. Perform Reset Transactionally (or pseudo-transactionally)
         // We iterate because we need to know the 'current_occupancy' to calculate the negative delta for the event log
         const results = [];
@@ -79,10 +95,10 @@ export async function POST(request: Request) {
                         flow_type: 'OUT',
                         event_type: 'RESET',
                         source: 'reset',
-                        user_id: user_id || null,
+                        user_id: user.id,
                     });
 
-                if (eventError) console.error("Error logging reset event", eventError);
+                if (eventError) console.error("[reset] Error logging reset event:", eventError.message);
             }
 
             // C. Zero the area's count (source of truth)
@@ -94,7 +110,7 @@ export async function POST(request: Request) {
                 })
                 .eq('id', areaId);
 
-            if (areaError) console.error("Error updating area", areaError);
+            if (areaError) console.error("[reset] Error updating area:", areaError.message);
 
             results.push({ areaId, success: !areaError });
         }
@@ -102,7 +118,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: true, results });
 
     } catch (e: any) {
-        console.error("Reset API Failed", e);
-        return NextResponse.json({ error: e.message }, { status: 500 });
+        console.error("[reset] API failed:", e instanceof Error ? e.message : "Unknown error");
+        return NextResponse.json({ error: 'Reset failed' }, { status: 500 });
     }
 }

@@ -1,8 +1,26 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getAuthenticatedUser } from '@/lib/api-auth';
 
 export async function GET() {
     try {
+        const user = await getAuthenticatedUser();
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        // Require OWNER role in at least one business
+        const { data: ownership } = await supabaseAdmin
+            .from('business_members')
+            .select('role')
+            .eq('user_id', user.id)
+            .eq('role', 'OWNER')
+            .limit(1)
+            .single();
+
+        if (!ownership) {
+            return NextResponse.json({ error: 'Forbidden: OWNER role required' }, { status: 403 });
+        }
         const sql = `
 -- Pipeline 1 & 2 Fixes: Hard Constraints, Authoritative RPC, Area Summary View, RLS Repairs
 
@@ -197,7 +215,7 @@ $$;
         const { error } = await supabaseAdmin.rpc('exec_sql', { sql_query: sql });
 
         if (error) {
-            console.error("Deploy RPC Error:", error);
+            console.error("[deploy-rpc] Error:", error instanceof Error ? error.message : (error as any)?.message || "Unknown error");
             // Fallback: If exec_sql missing, return SQL for manual execution
             return NextResponse.json({
                 error: 'Failed to deploy automatically. exec_sql RPC may be missing.',

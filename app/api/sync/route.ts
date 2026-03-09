@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { CountEvent, IDScanEvent, User, Clicr, Area, Venue } from '@/lib/types';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createInitialDBData, type DBData } from '@/lib/sync-data';
+import { getAuthenticatedUser } from '@/lib/api-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -136,7 +137,7 @@ async function hydrateData(data: DBData): Promise<DBData> {
             });
         }
     } catch (err) {
-        console.error("[API] Supabase Hydration Failed:", err);
+        console.error("[API] Supabase Hydration Failed:", err instanceof Error ? err.message : "Unknown error");
     }
     return data;
 }
@@ -345,27 +346,29 @@ async function buildSyncResponse(
 }
 
 export async function GET(request: Request) {
-    const userId = request.headers.get('x-user-id');
-    const userEmail = request.headers.get('x-user-email');
+    const user = await getAuthenticatedUser();
+    if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const url = new URL(request.url);
     const requestedBusinessId = url.searchParams.get('businessId');
     const requestedVenueId = url.searchParams.get('venueId');
 
-    if (userId && userEmail) {
-        const response = await buildSyncResponse(userId, userEmail, requestedBusinessId, requestedVenueId);
-        return NextResponse.json(response);
-    }
-
-    const data = createInitialDBData();
-    const hydrated = await hydrateData(data);
-    return NextResponse.json({ ...hydrated, businesses: [] });
+    const response = await buildSyncResponse(user.id, user.email, requestedBusinessId, requestedVenueId);
+    return NextResponse.json(response);
 }
 
 export async function POST(request: Request) {
+    const user = await getAuthenticatedUser();
+    if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { action, payload } = body;
-    const userId = request.headers.get('x-user-id');
-    const userEmail = request.headers.get('x-user-email') || '';
+    const userId = user.id;
+    const userEmail = user.email;
 
     const getBusinessId = async () => {
         if (!userId) return null;
@@ -396,10 +399,9 @@ export async function POST(request: Request) {
                 } else {
                     rpcParams.p_venue_id = (event as any).venue_id;
                 }
-                console.log('[sync] RECORD_EVENT RPC params:', JSON.stringify(rpcParams));
                 const { error: rpcError } = await supabaseAdmin.rpc('apply_occupancy_delta', rpcParams);
                 if (rpcError) {
-                    console.error('[sync] RECORD_EVENT RPC error:', JSON.stringify(rpcError));
+                    console.error('[sync] RECORD_EVENT RPC error:', rpcError.message);
                     return NextResponse.json({ error: rpcError.message || 'Failed to record event', details: rpcError }, { status: 500 });
                 }
                 break;
@@ -426,7 +428,7 @@ export async function POST(request: Request) {
                         shift_id: (scan as any).shift_id || null,
                         identity_token_hash: (scan as any).identity_token_hash || null
                     });
-                } catch (e) { console.error("Scan Persistence Failed", e); }
+                } catch (e) { console.error("[sync] Scan persistence failed:", e instanceof Error ? e.message : "Unknown error"); }
                 break;
             }
 
@@ -669,7 +671,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error("API Error", error);
+        console.error("[sync] API error:", error instanceof Error ? error.message : "Unknown error");
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

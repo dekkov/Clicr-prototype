@@ -208,13 +208,14 @@ export type CountEvent = {
     first_name?: string;
     last_name?: string;
     dob?: string; // YYYYMMDD
-    event_type: 'TAP' | 'SCAN' | 'BULK' | 'RESET';
+    event_type: 'TAP' | 'SCAN' | 'AUTO_SCAN' | 'BULK' | 'RESET';
     idempotency_key?: string;
     shift_id?: string;
 };
 
 export type IDScanEvent = {
     id: string;
+    business_id?: string;
     timestamp: number;
     venue_id: string;
     scan_result: 'ACCEPTED' | 'DENIED' | 'PENDING';
@@ -324,7 +325,7 @@ export type SupportTicket = {
     subject: string;
     status: TicketStatus;
     priority: TicketPriority;
-    category: 'TECHNICAL' | 'BILLING' | 'FEATURE_REQUEST' | 'OTHER';
+    category: 'TECHNICAL' | 'BILLING' | 'FEATURE_REQUEST' | 'COMPLIANCE' | 'OTHER';
     created_at: string;
     updated_at: string;
     messages: SupportMessage[];

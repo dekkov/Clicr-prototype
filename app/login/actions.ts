@@ -38,8 +38,6 @@ export async function signup(formData: FormData) {
     const email = formData.get('email') as string
     const password = formData.get('password') as string
 
-    console.log(`[Auth] Attempting signup for ${email}`);
-
     const { data, error } = await supabase.auth.signUp({
         email,
         password,

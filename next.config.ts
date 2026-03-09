@@ -10,12 +10,6 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_GIT_SHA: gitSha,
     NEXT_PUBLIC_BUILD_TIME: new Date().toISOString(),
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
 };
 
 export default nextConfig;

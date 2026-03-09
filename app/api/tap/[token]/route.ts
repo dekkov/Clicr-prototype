@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { rateLimit } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,8 +40,15 @@ export async function POST(
 ) {
     const { token } = await params;
 
-    // NOTE: This endpoint is public and has no server-side rate limiting.
-    // For production use, configure rate limiting at the CDN/proxy layer (e.g. Vercel, Cloudflare).
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    const rateLimitKey = `tap:${token}:${clientIp}`;
+
+    if (!rateLimit(rateLimitKey, 30, 60_000)) {
+        return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+    }
+
+    // NOTE: This endpoint is public. Rate limited to 30 requests/minute per IP+token.
+    // For higher traffic, consider Redis-based rate limiting (e.g. @upstash/ratelimit).
     let body: { direction?: unknown; details?: unknown };
     try {
         body = await req.json();
@@ -88,7 +96,7 @@ export async function POST(
     const { error: rpcError } = await supabaseAdmin.rpc('apply_occupancy_delta', rpcParams);
 
     if (rpcError) {
-        console.error('[tap] RPC error:', rpcError);
+        console.error('[tap] RPC error:', rpcError.message);
         return NextResponse.json({ error: 'Failed to record tap' }, { status: 500 });
     }
 

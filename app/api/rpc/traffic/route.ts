@@ -1,12 +1,31 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getAuthenticatedUser } from '@/lib/api-auth';
 
 export async function POST(request: Request) {
     try {
+        const user = await getAuthenticatedUser();
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const { business_id, venue_id, area_id, start_ts, end_ts } = await request.json();
 
         if (!business_id) {
             return NextResponse.json({ error: 'Business ID required' }, { status: 400 });
+        }
+
+        // Verify user is a member of the requested business
+        const { data: membership } = await supabaseAdmin
+            .from('business_members')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('business_id', business_id)
+            .limit(1)
+            .single();
+
+        if (!membership) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
         // Validate Timestamps (Required for correctness)
@@ -40,7 +59,7 @@ export async function POST(request: Request) {
         });
 
         if (rpcError) {
-            console.error("RPC Error", rpcError);
+            console.error("[traffic] RPC error:", rpcError.message);
             throw new Error(rpcError.message);
         }
 
@@ -65,7 +84,7 @@ export async function POST(request: Request) {
         });
 
     } catch (e) {
-        console.error("Traffic API Error", e);
+        console.error("[traffic] API error:", e instanceof Error ? e.message : "Unknown error");
         return NextResponse.json({ error: (e as Error).message }, { status: 500 });
     }
 }

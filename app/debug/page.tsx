@@ -1,8 +1,13 @@
 import { createClient } from '@/utils/supabase/server';
+import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import RuntimeInspector from './RuntimeInspector';
 
 export default async function DebugPage() {
+    if (process.env.NODE_ENV === 'production' && !process.env.ENABLE_DEBUG_PAGES) {
+        redirect('/dashboard');
+    }
+
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -47,7 +52,7 @@ export default async function DebugPage() {
                         <div className="text-slate-500">Project Ref:</div>
                         <div className="font-bold text-blue-600">{projectRef}</div>
                         <div className="text-slate-500">Service Role:</div>
-                        <div>{process.env.SUPABASE_SERVICE_ROLE_KEY ? '✅ Present' : '❌ Missing'}</div>
+                        <div>[redacted]</div>
                     </div>
                 </section>
 

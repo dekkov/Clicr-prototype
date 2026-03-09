@@ -20,7 +20,7 @@ export type TicketFormData = {
 };
 
 export async function submitSupportTicket(data: TicketFormData) {
-    console.log(`[SUPPORT] Processing ticket from ${data.userId}`);
+    console.log('[SUPPORT] Processing new ticket');
 
     const ticketId = crypto.randomUUID();
     const messageId = crypto.randomUUID();
@@ -126,12 +126,12 @@ async function sendEmailNotification(ticket: SupportTicket) {
         });
 
         if (error) {
-            console.error('Resend API Error:', error);
+            console.error('[RESEND] API error:', error instanceof Error ? error.message : (error as any)?.message || 'Unknown error');
             throw new Error(error.message);
         }
 
-        console.log(`[RESEND] Email sent successfully: ${data?.id}`);
+        console.log('[RESEND] Email sent successfully');
     } catch (err) {
-        console.error('Failed to send email via Resend:', err);
+        console.error('[RESEND] Failed to send email:', err instanceof Error ? err.message : 'Unknown error');
     }
 }

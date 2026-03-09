@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { parseAAMVA } from '@/lib/aamva';
 import { generateIdentityHash } from '@/lib/identity-hash';
+import { getAuthenticatedUser } from '@/lib/api-auth';
 
 interface ScanRequest {
     scan_data: string;
@@ -12,7 +13,25 @@ interface ScanRequest {
 
 export async function POST(request: Request) {
     try {
+        const user = await getAuthenticatedUser();
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const { scan_data, business_id, venue_id, area_id } = await request.json();
+
+        // Verify user is a member of the requested business
+        const { data: membership } = await supabaseAdmin
+            .from('business_members')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('business_id', business_id)
+            .limit(1)
+            .single();
+
+        if (!membership) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
 
         // 1. Parse
         let parsed;

@@ -4,6 +4,15 @@ import { createClient } from '@/utils/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { resolvePostAuthRoute } from '@/lib/auth-helpers'
 
+function sanitizeRedirectPath(path: string | null): string | null {
+    if (!path) return null;
+    // Must start with / and must not contain protocol or double-slash (open redirect)
+    if (!path.startsWith('/') || path.startsWith('//') || path.includes('://')) {
+        return null;
+    }
+    return path;
+}
+
 export async function GET(request: Request) {
     const { searchParams, origin } = new URL(request.url)
     const code = searchParams.get('code')
@@ -25,19 +34,12 @@ export async function GET(request: Request) {
             const isInviteAcceptance = user?.user_metadata?.invited_business_id
                 && !user?.user_metadata?.password_set;
 
+            const safeNext = sanitizeRedirectPath(next);
             const destination = isInviteAcceptance
                 ? '/auth/set-password'
-                : (next ?? (user ? await resolvePostAuthRoute(user.id) : '/dashboard'));
+                : (safeNext ?? (user ? await resolvePostAuthRoute(user.id) : '/dashboard'));
 
-            const forwardedHost = request.headers.get('x-forwarded-host')
-            const isLocalEnv = process.env.NODE_ENV === 'development'
-            if (isLocalEnv) {
-                return NextResponse.redirect(`${origin}${destination}`)
-            } else if (forwardedHost) {
-                return NextResponse.redirect(`https://${forwardedHost}${destination}`)
-            } else {
-                return NextResponse.redirect(`${origin}${destination}`)
-            }
+            return NextResponse.redirect(`${origin}${destination}`)
         }
     } else if (token_hash && type) {
         const { error } = await supabase.auth.verifyOtp({ token_hash, type: type as any })
@@ -51,19 +53,12 @@ export async function GET(request: Request) {
             const isInviteAcceptance = user?.user_metadata?.invited_business_id
                 && !user?.user_metadata?.password_set;
 
+            const safeNext = sanitizeRedirectPath(next);
             const destination = isInviteAcceptance
                 ? '/auth/set-password'
-                : (next ?? (user ? await resolvePostAuthRoute(user.id) : '/dashboard'));
+                : (safeNext ?? (user ? await resolvePostAuthRoute(user.id) : '/dashboard'));
 
-            const forwardedHost = request.headers.get('x-forwarded-host')
-            const isLocalEnv = process.env.NODE_ENV === 'development'
-            if (isLocalEnv) {
-                return NextResponse.redirect(`${origin}${destination}`)
-            } else if (forwardedHost) {
-                return NextResponse.redirect(`https://${forwardedHost}${destination}`)
-            } else {
-                return NextResponse.redirect(`${origin}${destination}`)
-            }
+            return NextResponse.redirect(`${origin}${destination}`)
         }
     }
 

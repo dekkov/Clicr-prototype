@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getAuthenticatedUser } from '@/lib/api-auth';
 
 export async function POST(request: Request) {
     const body = await request.json();
-    const userId = request.headers.get('x-user-id');
+    const user = await getAuthenticatedUser();
+    // Allow unauthenticated error logging but use session for user ID
+    const userId = user?.id ?? null;
     const { message, context, payload } = body;
 
     try {
@@ -15,7 +18,7 @@ export async function POST(request: Request) {
         });
         return NextResponse.json({ success: true });
     } catch (e) {
-        console.error("Failed to log error", e);
+        console.error("[log-error] Failed to persist error:", e instanceof Error ? e.message : "Unknown error");
         return NextResponse.json({ success: false }, { status: 500 });
     }
 }

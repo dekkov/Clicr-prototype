@@ -29,7 +29,7 @@ export default function VenueDevices({ venueId }: { venueId: string }) {
             venue_id: venueId,
             area_id: null, // Unassigned area initially
             device_type: 'SCANNER',
-            device_name: 'New Scanner',
+            name: 'New Scanner',
             serial_number: `SN-${Math.floor(Math.random() * 10000)}`,
             status: 'ACTIVE',
             created_at: new Date().toISOString(),
@@ -76,7 +76,7 @@ export default function VenueDevices({ venueId }: { venueId: string }) {
                                 </div>
                                 <div>
                                     <div className="font-bold text-white flex items-center gap-2">
-                                        {device.device_name}
+                                        {device.name}
                                         <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-400 font-mono">
                                             {device.serial_number}
                                         </span>

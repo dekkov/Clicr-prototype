@@ -53,7 +53,7 @@ export default function VenueTeam({ venueId }: { venueId: string }) {
             if ((window as any).removeUser) {
                 // Implement later in store
             } else {
-                console.log("Remove user not yet implemented in store", userId);
+                console.log("Remove user not yet implemented in store");
             }
         }
     };
