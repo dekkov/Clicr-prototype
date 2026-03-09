@@ -5,21 +5,17 @@ import { useParams, useRouter } from 'next/navigation';
 import { useApp } from '@/lib/store';
 import {
     Calendar as CalendarIcon,
-    Download,
     BarChart3,
     TrendingUp,
     Users,
     AlertTriangle,
-    ArrowRight,
     ArrowUpRight,
     ArrowDownRight,
-    Filter,
     FileSpreadsheet,
-    FileText,
     ArrowLeft,
     MapPin
 } from 'lucide-react';
-import { format, subDays, startOfDay, endOfDay, isSameDay, eachHourOfInterval, addHours, differenceInMinutes, parseISO } from 'date-fns';
+import { format, subDays, startOfDay, endOfDay, eachHourOfInterval, addHours } from 'date-fns';
 import { cn } from '@/lib/utils';
 import {
     LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, AreaChart, Area as ReArea, PieChart, Pie, Cell
@@ -37,8 +33,6 @@ type DateRange = {
     to: Date;
     label: string;
 };
-
-type ComparisonMode = 'NONE' | 'COMPARE_DAY' | 'TREND';
 
 // --- COMPONENTS ---
 const MetricCard = ({ title, value, subtext, trend, icon: Icon, colorClass }: any) => (
@@ -134,14 +128,11 @@ export default function VenueReportingDashboard() {
 
         // -- Peak Occupancy Estimate
         let maxOccupancy = 0;
-        let currentOccupancy = 0;
         let runningOccupancy = 0;
-
         const sortedRangeEvents = [...filteredEvents].sort((a, b) => a.timestamp - b.timestamp);
-        const occupancyPoints = sortedRangeEvents.map(e => {
+        sortedRangeEvents.forEach(e => {
             runningOccupancy += (e.flow_type === 'IN' ? e.delta : -Math.abs(e.delta));
             if (runningOccupancy > maxOccupancy) maxOccupancy = runningOccupancy;
-            return { time: e.timestamp, occupancy: runningOccupancy };
         });
 
         // -- Hourly Breakdown
