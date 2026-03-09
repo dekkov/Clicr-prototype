@@ -45,11 +45,11 @@ export function DayDetailPanel({ dateStr, events, scans, venueId }: Props) {
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={hourlyData} margin={{ top: 5, right: 5, bottom: 0, left: -20 }}>
                 <defs>
-                  <linearGradient id="occGrad" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="occGrad-day" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.5} />
                     <stop offset="95%" stopColor="#7c3aed" stopOpacity={0.05} />
                   </linearGradient>
-                  <linearGradient id="entGrad" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="entGrad-day" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3} />
                     <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.02} />
                   </linearGradient>
@@ -74,7 +74,7 @@ export function DayDetailPanel({ dateStr, events, scans, venueId }: Props) {
                   dataKey="occupancy"
                   stroke="#7c3aed"
                   strokeWidth={2}
-                  fill="url(#occGrad)"
+                  fill="url(#occGrad-day)"
                   dot={false}
                 />
                 <Area
@@ -82,7 +82,7 @@ export function DayDetailPanel({ dateStr, events, scans, venueId }: Props) {
                   dataKey="entries"
                   stroke="#06b6d4"
                   strokeWidth={1.5}
-                  fill="url(#entGrad)"
+                  fill="url(#entGrad-day)"
                   dot={false}
                 />
               </AreaChart>
@@ -104,7 +104,7 @@ export function DayDetailPanel({ dateStr, events, scans, venueId }: Props) {
               <div className="flex-1 h-2 rounded-full bg-slate-800 overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-blue-500 to-pink-500 rounded-full"
-                  style={{ width: '100%' }}
+                  style={{ width: `${gender.malePercent}%` }}
                 />
               </div>
               <div className="flex flex-col items-center gap-1">
