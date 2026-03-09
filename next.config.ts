@@ -1,12 +1,9 @@
 import type { NextConfig } from "next";
-import { execSync } from 'child_process';
 
-let gitSha = 'unknown';
-try {
-  gitSha = execSync('git rev-parse --short HEAD').toString().trim();
-} catch (e) {
-  // ignore
-}
+const gitSha =
+  process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ??
+  process.env.NEXT_PUBLIC_GIT_SHA ??
+  'unknown';
 
 const nextConfig: NextConfig = {
   env: {
