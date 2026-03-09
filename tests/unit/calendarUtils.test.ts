@@ -96,7 +96,7 @@ describe('buildCalendarGrid', () => {
     // But trailing days should be null
     const allCells = grid.flat();
     const nullCount = allCells.filter(c => c === null).length;
-    assert.ok(nullCount >= 0); // at least no crash
+    assert.equal(nullCount, 14); // 42 cells - 28 days in Feb 2026 = 14 trailing nulls
   });
 });
 

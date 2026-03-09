@@ -7,7 +7,6 @@ export default defineConfig({
   retries: 1,
   use: {
     baseURL: 'http://localhost:3000',
-    storageState: 'tests/e2e/.auth/user.json',
   },
   projects: [
     {
@@ -17,7 +16,7 @@ export default defineConfig({
     },
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: { ...devices['Desktop Chrome'], storageState: 'tests/e2e/.auth/user.json' },
       dependencies: ['setup'],
     },
   ],
