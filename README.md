@@ -64,6 +64,7 @@ clicr-v4/
 │   │   ├── dashboard/          # Live occupancy overview
 │   │   ├── venues/             # Venue management
 │   │   ├── areas/              # Area management
+│   │   ├── businesses/         # Business management
 │   │   ├── clicr/              # Clicr (counter) configuration
 │   │   ├── devices/            # Device management
 │   │   ├── scanner/            # ID scanner screen
@@ -75,11 +76,14 @@ clicr-v4/
 │   ├── login/ signup/ auth/    # Authentication
 │   ├── onboarding/             # First-run setup wizard
 │   ├── demo/                   # Interactive marketing demo
-│   ├── board/                  # Board view
+│   ├── board/                  # Board view (multi-counter tiles)
 │   └── tap/                    # Quick-tap view
 │
 ├── components/                 # Shared UI components
-│   └── ui/                     # Base primitives (Button, Input, etc.)
+│   ├── ui/                     # Base primitives (Button, Input, etc.)
+│   ├── board/                  # Board view components
+│   ├── layout/                 # AppLayout shell
+│   └── wizards/                # Business/venue setup wizards
 │
 ├── core/                       # ★ Data layer abstraction
 │   └── adapters/
@@ -98,13 +102,11 @@ clicr-v4/
 ├── docs/                       # ★ Developer documentation
 │   ├── PRODUCT_SPEC.md         # Roles, flows, data model
 │   ├── ARCHITECTURE.md         # Routes, state, DataClient strategy
-│   ├── SUPABASE_IMPLEMENTATION.md
-│   ├── REPORTING_FORMULAS.md
+│   ├── SUPABASE_IMPLEMENTATION.md  # Supabase setup & patterns
+│   ├── REPORTING_FORMULAS.md   # Analytics calculation formulas
 │   ├── INTEGRATION_MAP.md      # Function-by-function replacement guide
-│   └── QA_CHECKLIST.md
+│   └── QA_CHECKLIST.md         # Manual testing scenarios
 │
-├── PRODUCT_SPEC.md             # Full product specification
-├── DEVELOPER_HANDOFF.md        # Onboarding guide for new developers
 └── .env.example
 ```
 
@@ -170,7 +172,6 @@ CREATE POLICY venues_select ON venues FOR SELECT
 
 | Document | Read when... |
 |----------|-------------|
-| **[DEVELOPER_HANDOFF.md](DEVELOPER_HANDOFF.md)** | You're a new developer getting started |
 | **[docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md)** | You need to understand what the product does |
 | **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** | You need to understand how the code is structured |
 | **[docs/SUPABASE_IMPLEMENTATION.md](docs/SUPABASE_IMPLEMENTATION.md)** | You're implementing the SupabaseAdapter |
@@ -187,8 +188,6 @@ npm run dev       # Start development server
 npm run build     # Production build
 npm run start     # Start production server
 npm run lint      # ESLint
-npm run db:push   # Push schema to Supabase
-npm run db:pull   # Pull schema from Supabase
 ```
 
 ---
@@ -208,4 +207,3 @@ npm run db:pull   # Pull schema from Supabase
 | html5-qrcode | 2.3.8 | Camera-based ID scanning |
 | Resend | 6.x | Transactional email |
 | Lucide React | 0.563 | Icons |
-| Playwright | 1.58 | End-to-end tests |

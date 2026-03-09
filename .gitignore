@@ -48,6 +48,5 @@ next-env.d.ts
 # cursor
 .cursor/
 
-# local reference assets
-image-reference/
+# worktrees
 .worktrees/
