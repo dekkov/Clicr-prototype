@@ -94,9 +94,10 @@ export function CameraScanner({ active, onScan, onError }: CameraScannerProps) {
             )}
 
             {/* html5-qrcode mounts into this div by ID */}
+            {/* [&_input]:hidden [&_select]:hidden suppresses the file-picker html5-qrcode injects */}
             <div
                 id={CONTAINER_ID}
-                className="w-full max-w-sm rounded-2xl overflow-hidden border-2 border-slate-700"
+                className="w-full max-w-sm rounded-2xl overflow-hidden border-2 border-slate-700 [&_input]:hidden [&_select]:hidden [&_img]:hidden"
             />
 
             {status === 'running' && (

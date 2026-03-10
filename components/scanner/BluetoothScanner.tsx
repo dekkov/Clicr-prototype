@@ -50,13 +50,14 @@ export function BluetoothScanner({ active, onScan, paused = false }: BluetoothSc
             <input
                 ref={inputRef}
                 type="text"
+                inputMode="none"
                 value={buffer}
                 onChange={e => setBuffer(e.target.value)}
                 onKeyDown={handleKeyDown}
                 className="opacity-0 absolute top-0 left-0 h-full w-full cursor-default pointer-events-none"
-                autoFocus
                 autoComplete="off"
                 aria-hidden="true"
+                tabIndex={-1}
             />
 
             <div className="flex flex-col items-center gap-3 py-8 border-4 border-dashed border-slate-700 rounded-3xl w-full bg-slate-900/20 px-6">
