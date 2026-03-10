@@ -81,9 +81,9 @@ export default function VenueReportingDashboard() {
 
     // --- STATE ---
     const [dateRange, setDateRange] = useState<DateRange>({
-        from: startOfDay(subDays(new Date(), 1)), // Yesterday Start
-        to: endOfDay(subDays(new Date(), 1)),     // Yesterday End
-        label: 'Yesterday'
+        from: startOfDay(new Date()),
+        to: endOfDay(new Date()),
+        label: 'Today'
     });
 
     // Calendar view state
@@ -109,6 +109,7 @@ export default function VenueReportingDashboard() {
 
     // --- FILTERS ---
     const quickRanges = [
+        { label: 'Today', from: startOfDay(new Date()), to: endOfDay(new Date()) },
         { label: 'Yesterday', from: startOfDay(subDays(new Date(), 1)), to: endOfDay(subDays(new Date(), 1)) },
         { label: 'Last 7 Days', from: startOfDay(subDays(new Date(), 7)), to: endOfDay(new Date()) },
         { label: 'Last 30 Days', from: startOfDay(subDays(new Date(), 30)), to: endOfDay(new Date()) },
