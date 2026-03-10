@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/store';
-import { Building2, Save, Users, ShieldAlert, Shield, ChevronRight, Trash2, X, AlertTriangle } from 'lucide-react';
+import { Building2, Save, Users, ShieldAlert, Shield, ChevronRight, Trash2, X, AlertTriangle, ScanLine } from 'lucide-react';
 import { Role } from '@/lib/types';
 import Link from 'next/link';
 import { canManageSettings } from '@/lib/permissions';
@@ -127,6 +127,20 @@ export default function SettingsPage() {
                     <div className="flex-1 min-w-0">
                         <h3 className="font-bold text-white group-hover:text-purple-400 transition-colors">Bans</h3>
                         <p className="text-sm text-gray-500">Manage banned patrons</p>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-gray-500 group-hover:text-purple-400 transition-colors shrink-0" />
+                </Link>
+
+                <Link
+                    href="/settings/scanning"
+                    className="flex items-center gap-4 p-5 bg-gray-900/50 border border-gray-800 rounded-xl hover:bg-gray-800/50 hover:border-gray-700 transition-all group"
+                >
+                    <div className="w-10 h-10 rounded-lg bg-purple-900/30 border border-purple-500/20 flex items-center justify-center">
+                        <ScanLine className="w-5 h-5 text-purple-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-white group-hover:text-purple-400 transition-colors">Scanning</h3>
+                        <p className="text-sm text-gray-500">Default scan method &amp; scanner setup</p>
                     </div>
                     <ChevronRight className="w-5 h-5 text-gray-500 group-hover:text-purple-400 transition-colors shrink-0" />
                 </Link>

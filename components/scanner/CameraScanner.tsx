@@ -19,9 +19,10 @@ export function CameraScanner({ active, onScan, onError }: CameraScannerProps) {
 
     useEffect(() => {
         if (!active) {
-            if (scannerRef.current) {
-                scannerRef.current.stop().catch(() => {});
-                scannerRef.current = null;
+            const s = scannerRef.current;
+            scannerRef.current = null;
+            if (s?.isScanning) {
+                s.stop().catch(() => {});
             }
             setStatus('idle');
             return;
@@ -66,8 +67,11 @@ export function CameraScanner({ active, onScan, onError }: CameraScannerProps) {
             });
 
         return () => {
-            scannerRef.current?.stop().catch(() => {});
+            const s = scannerRef.current;
             scannerRef.current = null;
+            if (s?.isScanning) {
+                s.stop().catch(() => {});
+            }
         };
     }, [active]);
 
