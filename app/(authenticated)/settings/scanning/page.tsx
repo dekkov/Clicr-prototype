@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '@/lib/store';
-import { Scan, ArrowLeft, Save, Loader2, Bluetooth, CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Scan, ArrowLeft, Save, Loader2, Bluetooth, CheckCircle, XCircle, ChevronDown, ChevronUp, Wifi } from 'lucide-react';
 import Link from 'next/link';
 import { updateBusinessSettings } from '@/app/onboarding/setup-actions';
 import { canManageSettings } from '@/lib/permissions';
@@ -71,17 +71,16 @@ function TestScanModal({ onClose }: { onClose: () => void }) {
 
 export default function ScanningPage() {
     const { business, currentUser, refreshState } = useApp();
-    const [scanMethod, setScanMethod] = useState<'CAMERA' | 'BLUETOOTH'>('CAMERA');
+    const [scanMethod, setScanMethod] = useState<'CAMERA' | 'BLUETOOTH' | 'NFC'>('CAMERA');
     const [scanEnabled, setScanEnabled] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [saved, setSaved] = useState(false);
     const [showTestScan, setShowTestScan] = useState(false);
     const [showTroubleshooting, setShowTroubleshooting] = useState(false);
-    const [hidConnected, setHidConnected] = useState(false);
 
     useEffect(() => {
         if (business?.settings) {
-            setScanMethod((business.settings.scan_method as 'CAMERA' | 'BLUETOOTH') || 'CAMERA');
+            setScanMethod((business.settings.scan_method as 'CAMERA' | 'BLUETOOTH' | 'NFC') || 'CAMERA');
             setScanEnabled(business.settings.scan_enabled_default ?? true);
         }
     }, [business?.settings]);
@@ -110,21 +109,6 @@ export default function ScanningPage() {
         setTimeout(() => setSaved(false), 2000);
     };
 
-    const handleConnectHid = async () => {
-        if (typeof navigator !== 'undefined' && 'hid' in navigator) {
-            try {
-                const devices = await (navigator as any).hid.requestDevice({
-                    filters: [{ usagePage: 0x01, usage: 0x06 }] // Keyboard
-                });
-                if (devices?.length) setHidConnected(true);
-            } catch (e) {
-                console.warn('WebHID not supported or user cancelled', e);
-            }
-        }
-    };
-
-    const hasWebHid = typeof navigator !== 'undefined' && 'hid' in navigator;
-
     return (
         <div className="space-y-6 max-w-2xl">
             <div className="flex items-center gap-4">
@@ -137,7 +121,7 @@ export default function ScanningPage() {
             <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-6">
                 <div>
                     <label className="block text-sm font-bold text-slate-400 uppercase tracking-widest mb-3">Default Scan Method</label>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-3 gap-3">
                         <button type="button" onClick={() => setScanMethod('CAMERA')}
                             className={`p-4 rounded-xl border text-left transition-all ${scanMethod === 'CAMERA' ? 'bg-primary/10 border-primary' : 'bg-slate-800 border-slate-700 hover:bg-slate-700'}`}>
                             <div className={`font-bold text-sm ${scanMethod === 'CAMERA' ? 'text-primary' : 'text-white'}`}>Phone Camera</div>
@@ -147,6 +131,11 @@ export default function ScanningPage() {
                             className={`p-4 rounded-xl border text-left transition-all ${scanMethod === 'BLUETOOTH' ? 'bg-primary/10 border-primary' : 'bg-slate-800 border-slate-700 hover:bg-slate-700'}`}>
                             <div className={`font-bold text-sm ${scanMethod === 'BLUETOOTH' ? 'text-primary' : 'text-white'}`}>Bluetooth Scanner</div>
                             <div className="text-xs text-slate-500 mt-1">External hardware scanner</div>
+                        </button>
+                        <button type="button" onClick={() => setScanMethod('NFC')}
+                            className={`p-4 rounded-xl border text-left transition-all ${scanMethod === 'NFC' ? 'bg-primary/10 border-primary' : 'bg-slate-800 border-slate-700 hover:bg-slate-700'}`}>
+                            <div className={`font-bold text-sm ${scanMethod === 'NFC' ? 'text-primary' : 'text-white'}`}>NFC</div>
+                            <div className="text-xs text-slate-500 mt-1">Passports &amp; international IDs</div>
                         </button>
                     </div>
                 </div>
@@ -170,56 +159,59 @@ export default function ScanningPage() {
             </div>
 
             {scanMethod === 'BLUETOOTH' && (
-                <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-6">
+                <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-4">
                     <div className="flex items-center gap-2">
                         <Bluetooth className="w-5 h-5 text-primary" />
                         <h2 className="text-lg font-bold text-white">Bluetooth Scanner Setup</h2>
                     </div>
-                    <div className="space-y-4">
-                        <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
-                            <div className="font-bold text-white text-sm mb-2">1. Pair your scanner</div>
-                            <p className="text-sm text-slate-400">Pair your Bluetooth ID scanner in System Settings → Bluetooth. Most scanners work like a keyboard — once paired, they type into any focused input.</p>
-                        </div>
-                        {hasWebHid && (
-                            <div className="flex flex-col gap-2">
-                                <button
-                                    onClick={handleConnectHid}
-                                    disabled={hidConnected}
-                                    className="px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-default"
-                                >
-                                    {hidConnected ? 'HID Scanner Connected' : 'Connect HID Scanner (WebHID)'}
-                                </button>
-                                <p className="text-xs text-slate-500">Optional: Some browsers support direct HID pairing.</p>
-                            </div>
+                    <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
+                        <div className="font-bold text-white text-sm mb-2">1. Pair your scanner</div>
+                        <p className="text-sm text-slate-400">Go to System Settings → Bluetooth and pair your scanner. Most Bluetooth ID scanners emulate a keyboard — once paired, they type into the scanner page automatically.</p>
+                    </div>
+                    <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
+                        <div className="font-bold text-white text-sm mb-2">2. Open the scanner page</div>
+                        <p className="text-sm text-slate-400">Navigate to Scanner, select Bluetooth mode. The page maintains focus automatically. Scan an ID to verify.</p>
+                    </div>
+                    <button
+                        onClick={() => setShowTestScan(true)}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/20 border border-primary/50 text-primary hover:bg-primary/30 font-medium"
+                    >
+                        <Scan className="w-4 h-4" />
+                        Test Scanner
+                    </button>
+                    <div>
+                        <button
+                            type="button"
+                            onClick={() => setShowTroubleshooting(!showTroubleshooting)}
+                            className="flex items-center gap-2 text-slate-400 hover:text-white text-sm transition-colors"
+                        >
+                            {showTroubleshooting ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                            Troubleshooting tips
+                        </button>
+                        {showTroubleshooting && (
+                            <ul className="mt-2 text-sm text-slate-500 space-y-1 list-disc list-inside">
+                                <li>Ensure scanner is paired and powered on</li>
+                                <li>Scanner must output AAMVA/PDF417 format (US driver licenses)</li>
+                                <li>On the scanner page, focus is locked automatically</li>
+                                <li>Chrome or Edge offer optional WebHID direct connection</li>
+                            </ul>
                         )}
-                        <div>
-                            <button
-                                onClick={() => setShowTestScan(true)}
-                                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/20 border border-primary/50 text-primary hover:bg-primary/30 font-medium"
-                            >
-                                <Scan className="w-4 h-4" />
-                                Test Scan
-                            </button>
-                            <p className="text-xs text-slate-500 mt-1">Verify your scanner works by scanning an ID.</p>
-                        </div>
-                        <div>
-                            <button
-                                type="button"
-                                onClick={() => setShowTroubleshooting(!showTroubleshooting)}
-                                className="flex items-center gap-2 text-slate-400 hover:text-white text-sm transition-colors"
-                            >
-                                {showTroubleshooting ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                                Troubleshooting tips
-                            </button>
-                            {showTroubleshooting && (
-                                <ul className="mt-2 text-sm text-slate-500 space-y-1 list-disc list-inside">
-                                    <li>Ensure scanner is paired and powered on</li>
-                                    <li>Click into the input before scanning — focus matters</li>
-                                    <li>Scanner must output AAMVA/PDF417 format (US driver licenses)</li>
-                                    <li>Try Chrome or Edge for best WebHID support</li>
-                                </ul>
-                            )}
-                        </div>
+                    </div>
+                </div>
+            )}
+
+            {scanMethod === 'NFC' && (
+                <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-4">
+                    <div className="flex items-center gap-2">
+                        <Wifi className="w-5 h-5 text-primary" />
+                        <h2 className="text-lg font-bold text-white">NFC Mode</h2>
+                    </div>
+                    <div className="bg-amber-900/20 border border-amber-700/40 p-4 rounded-xl">
+                        <p className="text-amber-400 text-sm font-medium">Chrome on Android only</p>
+                        <p className="text-amber-600/80 text-xs mt-1">Web NFC is not supported on iOS, desktop, or other browsers.</p>
+                    </div>
+                    <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
+                        <p className="text-sm text-slate-400">NFC mode reads NFC-enabled ID cards — primarily passports and some international IDs. <strong className="text-white">US driver&apos;s licenses do not have NFC chips</strong> and will not work in this mode.</p>
                     </div>
                 </div>
             )}
