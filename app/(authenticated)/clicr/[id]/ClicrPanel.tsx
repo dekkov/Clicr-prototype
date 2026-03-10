@@ -385,7 +385,8 @@ export default function ClicrPanel({
 
     // --- SCAN LOGIC ---
     const processScan = async (parsed: ReturnType<typeof parseAAMVA>, rawData?: string) => {
-        if (!venueId) return;
+        if (!venueId) { console.warn('[CLICR] processScan: no venueId'); return; }
+        console.log('[CLICR] processScan start', { rawData: !!rawData, parsed: { firstName: parsed.firstName, age: parsed.age } });
 
         if (rawData) {
             try {
@@ -400,6 +401,7 @@ export default function ClicrPanel({
                     }),
                 });
                 const json = await res.json();
+                console.log('[CLICR] API response:', json);
                 if (json.success) {
                     const { status, message, age } = json.data;
                     const scanEvent: any = {
@@ -437,7 +439,9 @@ export default function ClicrPanel({
             }
         }
 
+        console.log('[CLICR] API failed or no rawData, falling back to local evaluation');
         const result = evaluateScan(parsed, patrons, patronBans, venueId);
+        console.log('[CLICR] Local eval result:', result.status, result.message);
         const scanEvent: Omit<IDScanEvent, 'id' | 'timestamp'> = {
             venue_id: venueId,
             scan_result: result.status === 'ACCEPTED' ? 'ACCEPTED' : 'DENIED',
@@ -519,11 +523,18 @@ export default function ClicrPanel({
         processScan(fakeParsed);
     };
 
-    const handleCameraScan = (decodedText: string) => {
+    const scanProcessingRef = useRef(false);
+    const handleCameraScan = async (decodedText: string) => {
+        if (scanProcessingRef.current) return; // Already processing a scan
+        scanProcessingRef.current = true;
         try {
             const parsed = parseAAMVA(decodedText);
-            processScan(parsed, decodedText);
-        } catch { }
+            await processScan(parsed, decodedText);
+        } catch (err) {
+            console.error('[CLICR] Camera scan failed:', err);
+        } finally {
+            scanProcessingRef.current = false;
+        }
     };
 
     const toggleTorch = async () => {
