@@ -1,9 +1,16 @@
 // playwright.config.ts
 import { defineConfig, devices } from '@playwright/test';
-import dotenv from 'dotenv';
+import fs from 'fs';
 import path from 'path';
 
-dotenv.config({ path: path.resolve(__dirname, '.env.test.local') });
+// Manually parse .env.test.local — avoids dotenvx v17 path resolution quirks in TS runner
+const envFile = path.resolve(__dirname, '.env.test.local');
+if (fs.existsSync(envFile)) {
+  for (const line of fs.readFileSync(envFile, 'utf-8').split('\n')) {
+    const [key, ...rest] = line.split('=');
+    if (key?.trim()) process.env[key.trim()] = rest.join('=').trim();
+  }
+}
 
 export default defineConfig({
   testDir: './tests/e2e',
