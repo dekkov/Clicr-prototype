@@ -43,11 +43,7 @@ export function CameraScanner({ active, onScan, onError }: CameraScannerProps) {
         scanner
             .start(
                 { facingMode: 'environment' },
-                {
-                    fps: 10,
-                    qrbox: { width: 280, height: 70 },
-                    aspectRatio: 1.78,
-                },
+                { fps: 15 },
                 (decodedText) => {
                     onScan(decodedText);
                 },
@@ -102,7 +98,7 @@ export function CameraScanner({ active, onScan, onError }: CameraScannerProps) {
 
             {status === 'running' && (
                 <p className="text-slate-500 text-xs text-center">
-                    Align the wide barcode on the back of the ID within the box — hold steady 6–10 inches away
+                    Point camera at the PDF417 barcode on the back of the ID — hold steady
                 </p>
             )}
         </div>
