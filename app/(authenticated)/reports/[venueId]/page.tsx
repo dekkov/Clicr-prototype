@@ -64,8 +64,13 @@ const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'
 export default function VenueReportingDashboard() {
     const { venueId } = useParams();
     const router = useRouter();
-    const { venues, events, scanEvents, areas, clicrs } = useApp();
+    const { venues, areas, clicrs } = useApp();
     const [isMounted, setIsMounted] = useState(false);
+
+    // Venue-specific events fetched directly — AppState only has last 100 global events
+    const [venueEvents, setVenueEvents] = useState<any[]>([]);
+    const [venueScans, setVenueScans] = useState<any[]>([]);
+    const [isLoadingData, setIsLoadingData] = useState(false);
 
     useEffect(() => {
         setIsMounted(true);
@@ -87,6 +92,21 @@ export default function VenueReportingDashboard() {
     const [calMonth, setCalMonth] = useState(() => new Date().getMonth()); // 0-indexed
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
+    // Fetch all venue events for calYear (covers calendar + analytics date ranges)
+    useEffect(() => {
+        if (!venueId) return;
+        setIsLoadingData(true);
+        const from = `${calYear - 1}-12-01T00:00:00.000Z`;
+        const to = `${calYear}-12-31T23:59:59.999Z`;
+        fetch(`/api/reports/venue-events?venueId=${venueId}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.events) setVenueEvents(data.events);
+                if (data.scans) setVenueScans(data.scans);
+            })
+            .finally(() => setIsLoadingData(false));
+    }, [venueId, calYear]);
+
     // --- FILTERS ---
     const quickRanges = [
         { label: 'Yesterday', from: startOfDay(subDays(new Date(), 1)), to: endOfDay(subDays(new Date(), 1)) },
@@ -98,8 +118,8 @@ export default function VenueReportingDashboard() {
     const reportData = useMemo(() => {
         if (!venueId) return null;
 
-        const safeEvents = events || [];
-        const safeScans = scanEvents || [];
+        const safeEvents = venueEvents;
+        const safeScans = venueScans;
 
         // 1. Filter raw events by date and venue
         const filteredEvents = safeEvents.filter(e => {
@@ -213,21 +233,21 @@ export default function VenueReportingDashboard() {
             genderChartData,
             topZips
         };
-    }, [events, scanEvents, venueId, dateRange]);
+    }, [venueEvents, venueScans, venueId, dateRange]);
 
     const dailyEntries = useMemo(
-        () => computeDailyEntries(events || [], venueId as string, calYear, calMonth),
-        [events, venueId, calYear, calMonth]
+        () => computeDailyEntries(venueEvents, venueId as string, calYear, calMonth),
+        [venueEvents, venueId, calYear, calMonth]
     );
 
     const monthStats = useMemo(
-        () => computeMonthStats(events || [], venueId as string, calYear, calMonth),
-        [events, venueId, calYear, calMonth]
+        () => computeMonthStats(venueEvents, venueId as string, calYear, calMonth),
+        [venueEvents, venueId, calYear, calMonth]
     );
 
     const monthlyTrend = useMemo(
-        () => computeMonthlyTrend(events || [], venueId as string, calYear),
-        [events, venueId, calYear]
+        () => computeMonthlyTrend(venueEvents, venueId as string, calYear),
+        [venueEvents, venueId, calYear]
     );
 
     const calMonthLabel = format(new Date(calYear, calMonth, 1), 'MMMM').toUpperCase();
@@ -362,8 +382,8 @@ export default function VenueReportingDashboard() {
                     {selectedDate && (
                         <DayDetailPanel
                             dateStr={selectedDate}
-                            events={events || []}
-                            scans={scanEvents || []}
+                            events={venueEvents}
+                            scans={venueScans}
                             venueId={venueId as string}
                         />
                     )}
