@@ -586,6 +586,7 @@ export default function ClicrPanel({
                 onChange={(e) => setScannerInput(e.target.value)}
                 className="opacity-0 absolute top-0 left-0 w-0 h-0 overflow-hidden pointer-events-none"
                 autoComplete="off"
+                inputMode="none"
             />
 
             {/* ── TOPBAR ─────────────────────────────────────────── */}
@@ -955,7 +956,7 @@ export default function ClicrPanel({
                         initial={{ opacity: 0, y: 50 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 50 }}
-                        className="absolute inset-0 z-50"
+                        className="fixed inset-0 z-50"
                     >
                         <ScannerResult
                             status={
