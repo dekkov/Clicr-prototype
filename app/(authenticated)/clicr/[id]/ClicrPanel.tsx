@@ -5,17 +5,20 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     ArrowLeft, Wifi, WifiOff, ScanLine, XCircle, Zap,
-    RefreshCw, Settings2, Bug, RotateCcw, Scan
+    RefreshCw, Settings2, Bug, RotateCcw, Scan,
+    Camera, Bluetooth
 } from 'lucide-react';
 import { useApp } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import type { IDScanEvent } from '@/lib/types';
 import { parseAAMVA } from '@/lib/aamva';
 import { evaluateScan } from '@/lib/scan-service';
-import { Html5Qrcode } from 'html5-qrcode';
 import { getVenueCapacityRules } from '@/lib/capacity';
 import { ScannerResult } from '@/lib/ui/components/ScannerResult';
 import { useAreaShift } from '@/lib/useAreaShift';
+import { CameraScanner, BluetoothScanner, NFCScanner } from '@/components/scanner';
+import { useScanMode } from '@/lib/scanner/use-scan-mode';
+import type { ScanMode } from '@/lib/scanner/use-scan-mode';
 
 type Mode = 'count' | 'scan';
 
@@ -116,7 +119,7 @@ export default function ClicrPanel({
 }) {
     const router = useRouter();
     const {
-        clicrs, areas, events, venues,
+        clicrs, areas, events, venues, business,
         recordEvent, recordScan, recordTurnaround,
         resetCounts, endShift, isLoading, patrons, patronBans, updateClicr, debug, currentUser,
         turnarounds, activeShiftId, activeShiftAreaId,
@@ -138,6 +141,10 @@ export default function ClicrPanel({
 
     // Mode: count or scan
     const [mode, setMode] = useState<Mode>('count');
+
+    // Scan input mode (Camera / Bluetooth / NFC)
+    const businessScanDefault = (business?.settings?.scan_method as ScanMode | undefined) ?? 'BLUETOOTH';
+    const { mode: scanInputMode, setMode: setScanInputMode, support: scanSupport } = useScanMode(businessScanDefault);
 
     // Scan state
     const [addToCountOnAccept, setAddToCountOnAccept] = useState(true);
@@ -844,21 +851,43 @@ export default function ClicrPanel({
                 {/* ── SCAN MODE ────────────────────────────────────── */}
                 {mode === 'scan' && (
                     <>
-                        {/* Scan Zone */}
-                        <div className="bg-slate-900/60 border border-slate-800/60 rounded-2xl p-8 flex flex-col items-center justify-center gap-3 min-h-[180px]">
-                            <div className="w-14 h-14 rounded-xl border-2 border-slate-700 flex items-center justify-center">
-                                <Scan className="w-7 h-7 text-slate-500" />
-                            </div>
-                            <div className="text-center">
-                                <p className="text-white font-semibold">Ready to Scan</p>
-                                <p className="text-slate-500 text-sm mt-0.5">Use scanner or enter data below</p>
-                            </div>
-                            <button
-                                onClick={() => setShowCameraScanner(true)}
-                                className="mt-1 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition-colors"
-                            >
-                                Open Camera
-                            </button>
+                        {/* Scan Input Mode Selector */}
+                        <div className="flex gap-1.5 bg-slate-900/60 border border-slate-800/60 rounded-2xl p-2">
+                            {([
+                                { id: 'CAMERA' as ScanMode, label: 'Camera', Icon: Camera },
+                                { id: 'BLUETOOTH' as ScanMode, label: 'Bluetooth', Icon: Bluetooth },
+                                { id: 'NFC' as ScanMode, label: 'NFC', Icon: Wifi },
+                            ]).map(({ id, label, Icon }) => (
+                                <button
+                                    key={id}
+                                    onClick={() => setScanInputMode(id)}
+                                    className={cn(
+                                        'flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all',
+                                        scanInputMode === id
+                                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20'
+                                            : 'text-slate-400 hover:text-white'
+                                    )}
+                                >
+                                    <Icon className="w-3.5 h-3.5" />
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Scanner Components */}
+                        <div className="bg-slate-900/60 border border-slate-800/60 rounded-2xl p-4 min-h-[180px] flex flex-col items-center justify-center">
+                            <CameraScanner
+                                active={scanInputMode === 'CAMERA' && mode === 'scan' && !lastScan}
+                                onScan={handleCameraScan}
+                            />
+                            <BluetoothScanner
+                                active={scanInputMode === 'BLUETOOTH' && mode === 'scan'}
+                                onScan={handleCameraScan}
+                            />
+                            <NFCScanner
+                                active={scanInputMode === 'NFC' && mode === 'scan' && !lastScan}
+                                onScan={handleCameraScan}
+                            />
                         </div>
 
                         {/* Manual paste input */}
@@ -946,30 +975,7 @@ export default function ClicrPanel({
                 )}
             </AnimatePresence>
 
-            {/* Camera scanner modal */}
-            <AnimatePresence>
-                {showCameraScanner && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center p-4"
-                    >
-                        <div className="absolute top-4 right-4 z-20">
-                            <button
-                                onClick={() => setShowCameraScanner(false)}
-                                className="p-4 bg-slate-900 rounded-full text-white"
-                            >
-                                <XCircle className="w-6 h-6" />
-                            </button>
-                        </div>
-                        <CameraScanner onScan={handleCameraScan} />
-                        <div className="absolute bottom-12 text-center text-slate-500 text-sm">
-                            Align ID barcode within the frame
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            {/* Camera scanner modal removed — camera is now inline in scan mode */}
 
             {/* Config modal */}
             {showConfigModal && (
@@ -1058,65 +1064,3 @@ export default function ClicrPanel({
 }
 
 
-function CameraScanner({ onScan }: { onScan: (text: string) => void }) {
-    const [torch, setTorch] = useState(false);
-    const scannerRef = useRef<Html5Qrcode | null>(null);
-    const [status, setStatus] = useState<'INIT' | 'SCANNING' | 'ERROR'>('INIT');
-
-    useEffect(() => {
-        const config = { fps: 10, qrbox: { width: 300, height: 200 } };
-        const html5QrCode = new Html5Qrcode("reader");
-        scannerRef.current = html5QrCode;
-        const startScanner = async () => {
-            try {
-                await html5QrCode.start(
-                    { facingMode: "environment" },
-                    config,
-                    (decodedText) => { onScan(decodedText); },
-                    () => { }
-                );
-                setStatus('SCANNING');
-            } catch {
-                setStatus('ERROR');
-            }
-        };
-        startScanner();
-        return () => {
-            if (scannerRef.current && scannerRef.current.isScanning) {
-                scannerRef.current.stop().then(() => scannerRef.current?.clear());
-            }
-        };
-    }, []);
-
-    const toggleTorch = async () => {
-        if (!scannerRef.current) return;
-        try {
-            await scannerRef.current.applyVideoConstraints({ advanced: [{ torch: !torch } as any] });
-            setTorch(!torch);
-        } catch { }
-    };
-
-    return (
-        <div className="relative w-full h-[400px] bg-black">
-            <div id="reader" className="w-full h-full" />
-            <div className="absolute bottom-6 left-0 right-0 flex justify-center z-10">
-                <button
-                    onClick={toggleTorch}
-                    className={cn(
-                        "p-4 rounded-full transition-all border",
-                        torch
-                            ? "bg-yellow-500/20 border-yellow-500 text-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.3)]"
-                            : "bg-slate-900/80 border-white/10 text-white"
-                    )}
-                >
-                    {torch ? <Zap className="w-6 h-6 fill-current" /> : <Zap className="w-6 h-6" />}
-                </button>
-            </div>
-            {status === 'ERROR' && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/80 text-white p-6 text-center">
-                    <p>Camera access failed. Ensure permissions are granted.</p>
-                </div>
-            )}
-        </div>
-    );
-}
