@@ -59,13 +59,17 @@ function VenueSelector() {
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        function handleMouseDown(e: MouseEvent) {
+        function handleClickOutside(e: MouseEvent | TouchEvent) {
             if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
                 setOpen(false);
             }
         }
-        document.addEventListener('mousedown', handleMouseDown);
-        return () => document.removeEventListener('mousedown', handleMouseDown);
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('touchstart', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('touchstart', handleClickOutside);
+        };
     }, []);
 
     const selectedVenue = venues.find(v => v.id === activeVenueId);
@@ -149,13 +153,17 @@ function BusinessSelector() {
         : 0;
 
     useEffect(() => {
-        function handleMouseDown(e: MouseEvent) {
+        function handleClickOutside(e: MouseEvent | TouchEvent) {
             if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
                 setOpen(false);
             }
         }
-        document.addEventListener('mousedown', handleMouseDown);
-        return () => document.removeEventListener('mousedown', handleMouseDown);
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('touchstart', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('touchstart', handleClickOutside);
+        };
     }, []);
 
     const canToggle = true; // always allow opening to show "Add Business" option

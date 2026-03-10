@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useEffect, useState } from 'react';
+import React, { useMemo, useEffect, useState, useRef } from 'react';
 import { useApp } from '@/lib/store';
 import {
     Users, TrendingUp, ScanLine, ShieldBan,
@@ -530,9 +530,20 @@ export default function DashboardPage() {
     }, [isLoading, currentUser?.role, router]);
 
     // Auto-redirect if no businesses exist after load
+    // Use a ref to track initial load and a timeout to avoid race conditions
+    // where businesses haven't populated yet when isLoading flips to false
+    const hasCheckedBusinesses = useRef(false);
     useEffect(() => {
-        if (!isLoading && businesses.length === 0) {
-            router.push('/onboarding/setup');
+        if (isLoading || hasCheckedBusinesses.current) return;
+        if (businesses.length === 0) {
+            // Delay to allow a second sync cycle to populate businesses
+            const timer = setTimeout(() => {
+                if (businesses.length === 0) {
+                    hasCheckedBusinesses.current = true;
+                    router.push('/onboarding/setup');
+                }
+            }, 1500);
+            return () => clearTimeout(timer);
         }
     }, [isLoading, businesses.length, router]);
 
