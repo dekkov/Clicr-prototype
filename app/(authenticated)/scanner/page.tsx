@@ -1,28 +1,28 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { processScan, banPatron } from './actions';
 import { useApp } from '@/lib/store';
-import { CheckCircle, XCircle, AlertTriangle, UserX, History, Search, Settings, RefreshCcw } from 'lucide-react';
+import { CheckCircle, XCircle, AlertTriangle, UserX, History, Search, Camera, Bluetooth, Wifi } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { CameraScanner, BluetoothScanner, NFCScanner } from '@/components/scanner';
+import { useScanMode } from '@/lib/scanner/use-scan-mode';
+import type { ScanMode } from '@/lib/scanner/use-scan-mode';
 
 export default function ScannerPage() {
-    const { venues, areas } = useApp();
+    const { venues, areas, business } = useApp();
     const [venueId, setVenueId] = useState<string>('');
     const [areaId, setAreaId] = useState<string>('');
-    const router = useRouter(); // if needed
+
+    // Scanner Mode
+    const businessDefault = (business?.settings?.scan_method as ScanMode | undefined) ?? 'BLUETOOTH';
+    const { mode, setMode, support } = useScanMode(businessDefault);
 
     // Scanner State
-    const [inputBuffer, setInputBuffer] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [result, setResult] = useState<any>(null);
     const [recentScans, setRecentScans] = useState<any[]>([]);
     const [error, setError] = useState<string | null>(null);
-
-    // Focus Management
-    const inputRef = useRef<HTMLInputElement>(null);
 
     // Ban Modal State
     const [isBanModalOpen, setIsBanModalOpen] = useState(false);
@@ -39,32 +39,6 @@ export default function ScannerPage() {
             if (vAreas.length > 0) setAreaId(vAreas[0].id);
         }
     }, [venues, areas]);
-
-    // Focus Lock
-    useEffect(() => {
-        const interval = setInterval(() => {
-            if (!isBanModalOpen) {
-                inputRef.current?.focus();
-            }
-        }, 1000); // Check focus every second
-        return () => clearInterval(interval);
-    }, [isBanModalOpen]);
-
-    const handleInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const val = e.target.value;
-        setInputBuffer(val);
-    };
-
-    const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-        // Scanners typically end with Enter
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            if (!inputBuffer.trim()) return;
-
-            await submitScan(inputBuffer);
-            setInputBuffer('');
-        }
-    };
 
     const submitScan = async (raw: string) => {
         if (isProcessing) return;
@@ -150,16 +124,44 @@ export default function ScannerPage() {
                 {/* Main Visual */}
                 <div className="w-full max-w-md space-y-8 text-center z-10">
 
-                    {/* Scanner Input (Hidden/Opacity 0 but focused) */}
-                    <input
-                        ref={inputRef}
-                        type="text"
-                        value={inputBuffer}
-                        onChange={handleInput}
-                        onKeyDown={handleKeyDown}
-                        className="opacity-0 absolute top-0 left-0 h-full w-full cursor-default"
-                        autoFocus
-                        autoComplete="off"
+                    {/* Mode Selector */}
+                    <div className="flex gap-2 justify-center">
+                        {([
+                            { id: 'CAMERA' as ScanMode, label: 'Camera', Icon: Camera },
+                            { id: 'BLUETOOTH' as ScanMode, label: 'Bluetooth', Icon: Bluetooth },
+                            { id: 'NFC' as ScanMode, label: 'NFC', Icon: Wifi },
+                        ]).map(({ id, label, Icon }) => (
+                            <button
+                                key={id}
+                                onClick={() => setMode(id)}
+                                className={cn(
+                                    'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-bold transition-all border',
+                                    mode === id
+                                        ? 'bg-indigo-600 border-indigo-400 text-white'
+                                        : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'
+                                )}
+                            >
+                                <Icon className="w-4 h-4" />
+                                {label}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Active Scanner Input */}
+                    <CameraScanner
+                        active={mode === 'CAMERA' && !isProcessing}
+                        onScan={submitScan}
+                        onError={setError}
+                    />
+                    <BluetoothScanner
+                        active={mode === 'BLUETOOTH'}
+                        onScan={submitScan}
+                        paused={isBanModalOpen}
+                    />
+                    <NFCScanner
+                        active={mode === 'NFC' && !isProcessing}
+                        onScan={submitScan}
+                        onError={setError}
                     />
 
                     {/* Result Display */}
@@ -217,7 +219,11 @@ export default function ScannerPage() {
                                 <Search className="w-10 h-10 text-slate-500" />
                             </div>
                             <h2 className="text-3xl font-bold text-slate-400">Ready to Scan</h2>
-                            <p className="mt-2 text-slate-600">Keyboard wedge active</p>
+                            <p className="mt-2 text-slate-600">
+                                {mode === 'CAMERA' ? 'Point camera at ID barcode' :
+                                 mode === 'NFC' ? 'Hold ID to back of phone' :
+                                 'Waiting for Bluetooth scanner'}
+                            </p>
                         </div>
                     )}
 
