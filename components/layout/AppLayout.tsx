@@ -380,7 +380,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 {/* Main: Top bar + Content */}
                 <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                 {/* Top Bar - Design: h-16 */}
-                <header className="h-16 border-b border-gray-800 flex items-center justify-end px-6 gap-4 shrink-0">
+                <header className="h-16 border-b border-gray-800 flex items-center px-4 md:px-6 gap-3 shrink-0">
+                    {/* Mobile: Business selector (hidden on desktop — desktop uses sidebar) */}
+                    <div className="md:hidden flex-1 min-w-0">
+                        <ScopeSelector />
+                    </div>
+                    <div className="hidden md:block flex-1" />
                     <button className="w-10 h-10 rounded-lg hover:bg-gray-800 flex items-center justify-center transition-colors" aria-label="Theme">
                         <Moon className="w-5 h-5 text-gray-400" />
                     </button>
@@ -388,7 +393,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                         <Bell className="w-5 h-5 text-gray-400" />
                         <span className="absolute top-2 right-2 w-2 h-2 bg-blue-500 rounded-full" />
                     </button>
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center text-sm font-semibold">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center text-sm font-semibold shrink-0">
                         {userInitials}
                     </div>
                 </header>
