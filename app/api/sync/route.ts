@@ -428,6 +428,9 @@ export async function POST(request: Request) {
 
                     // Update venue current_occupancy directly
                     if (eventVenueId) {
+                        // Note: This read-modify-write is non-atomic. Under concurrent taps from
+                        // multiple devices on the same venue counter, taps may be silently lost.
+                        // Fix: add a venue-level apply_occupancy_delta RPC (future migration).
                         const { data: venueRow } = await supabaseAdmin
                             .from('venues')
                             .select('current_occupancy')
@@ -466,49 +469,6 @@ export async function POST(request: Request) {
                         identity_token_hash: (scan as any).identity_token_hash || null
                     });
                 } catch (e) { console.error("[sync] Scan persistence failed:", e instanceof Error ? e.message : "Unknown error"); }
-                break;
-            }
-
-            case 'RESET_COUNTS': {
-                const resetBizId = await getBusinessId();
-                if (resetBizId) {
-                    const resetAt = new Date().toISOString();
-                    const { data: bizAreas } = await supabaseAdmin
-                        .from('areas')
-                        .select('id, current_occupancy, venue_id')
-                        .eq('business_id', resetBizId);
-
-                    for (const area of (bizAreas || [])) {
-                        const currentVal = area?.current_occupancy ?? 0;
-                        if (currentVal !== 0) {
-                            await supabaseAdmin.from('occupancy_events').insert({
-                                business_id: resetBizId,
-                                venue_id: area?.venue_id || null,
-                                area_id: area.id,
-                                delta: -currentVal,
-                                flow_type: 'OUT',
-                                event_type: 'RESET',
-                                source: 'reset',
-                                user_id: userId || null,
-                            });
-                        }
-                    }
-
-                    if (bizAreas && bizAreas.length > 0) {
-                        const areaIds = bizAreas.map((a: any) => a.id);
-                        await supabaseAdmin.from('areas')
-                            .update({ current_occupancy: 0, last_reset_at: resetAt })
-                            .in('id', areaIds);
-                    }
-
-                    await supabaseAdmin.from('venues')
-                        .update({ current_occupancy: 0, last_reset_at: resetAt })
-                        .eq('business_id', resetBizId);
-
-                    await supabaseAdmin.from('businesses')
-                        .update({ last_reset_at: resetAt })
-                        .eq('id', resetBizId);
-                }
                 break;
             }
 
