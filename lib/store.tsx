@@ -86,7 +86,7 @@ type AppContextType = AppState & {
 
     // Traffic & Turnarounds
     recordTurnaround: (venueId: string, areaId: string, deviceId: string, count: number) => Promise<void>;
-    refreshTrafficStats: (venueId: string, areaId: string) => Promise<void>;
+    refreshTrafficStats: (venueId: string, areaId?: string) => Promise<void>;
 
     // Device Rename
     renameDevice?: (deviceId: string, name: string) => Promise<void>;
@@ -497,7 +497,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             // then refresh traffic totals so TOTAL IN/OUT reflect the new event.
             setTimeout(() => {
                 isWritingRef.current = Math.max(0, isWritingRef.current - 1);
-                if (data.area_id) refreshTrafficStats(data.venue_id, data.area_id);
+                refreshTrafficStats(data.venue_id, data.area_id || undefined);
             }, 500);
         }
     };
@@ -975,9 +975,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
-    const refreshTrafficStats = async (venueId: string, areaId: string) => {
+    const refreshTrafficStats = async (venueId: string, areaId?: string) => {
         if (!state.business?.id) return;
-        const scopeKey = `area:${state.business.id}:${venueId}:${areaId}`;
+        const scopeKey = areaId
+            ? `area:${state.business.id}:${venueId}:${areaId}`
+            : `venue:${state.business.id}:${venueId}`;
         try {
             const res = await fetch('/api/rpc/traffic', {
                 method: 'POST',
