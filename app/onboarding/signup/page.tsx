@@ -3,6 +3,7 @@ import { signup } from '../actions'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { Logo } from '@/components/ui/Logo'
+import { PasswordInput } from '@/components/ui/password-input'
 
 type Props = {
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>
@@ -47,13 +48,13 @@ export default async function SignupPage({ searchParams }: Props) {
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Password</label>
-                        <input name="password" type="password" required minLength={8} placeholder="8+ characters"
-                            className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white placeholder-slate-600 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" />
+                        <PasswordInput name="password" required minLength={8} placeholder="8+ characters"
+                            className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 pr-10 text-white placeholder-slate-600 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" />
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Confirm Password</label>
-                        <input name="confirmPassword" type="password" required minLength={8} placeholder="Repeat password"
-                            className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white placeholder-slate-600 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" />
+                        <PasswordInput name="confirmPassword" required minLength={8} placeholder="Repeat password"
+                            className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 pr-10 text-white placeholder-slate-600 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" />
                     </div>
 
                     <button type="submit" className="w-full bg-primary text-white font-bold py-4 rounded-xl hover:bg-primary-hover shadow-lg shadow-primary/25 transition-all mt-4">
