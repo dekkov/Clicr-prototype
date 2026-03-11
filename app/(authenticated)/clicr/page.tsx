@@ -209,7 +209,7 @@ function PageHeader({ canAddClicr, onAddClicr, onBoardView }: { canAddClicr: boo
                     {canAddClicr && (
                         <button
                             onClick={onAddClicr}
-                            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 transition-colors text-sm"
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover transition-colors text-sm"
                         >
                             <Plus className="w-4 h-4" />
                             Add Clicr

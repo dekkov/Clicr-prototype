@@ -110,7 +110,7 @@ export default function BanningPage() {
                     </div>
                     <Link
                         href="/banning/new"
-                        className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 transition-colors flex items-center gap-2 text-sm"
+                        className="px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover transition-colors flex items-center gap-2 text-sm"
                     >
                         <Shield className="w-4 h-4" /> Manage Bans
                     </Link>

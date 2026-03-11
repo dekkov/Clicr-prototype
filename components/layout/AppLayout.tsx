@@ -85,7 +85,7 @@ function VenueSelector() {
     if (venues.length === 1) {
         return (
             <div className="w-full flex items-center gap-3 rounded-lg bg-purple-100 dark:bg-purple-900/30 p-3">
-                <div className="w-8 h-8 rounded-lg bg-purple-400 dark:bg-purple-600 flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
                     <span className="text-sm font-semibold text-white">
                         {(venues[0].name.charAt(0) || '?').toUpperCase()}
                     </span>
@@ -104,7 +104,7 @@ function VenueSelector() {
                 onClick={() => setOpen(prev => !prev)}
                 className="w-full flex items-center gap-3 rounded-lg bg-purple-100 dark:bg-purple-900/30 p-3 hover:bg-purple-200 dark:hover:bg-purple-900/40 transition-colors text-left cursor-pointer"
             >
-                <div className="w-8 h-8 rounded-lg bg-purple-400 dark:bg-purple-600 flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
                     <span className="text-sm font-semibold text-white">
                         {selectedVenue ? (selectedVenue.name.charAt(0) || '?').toUpperCase() : '?'}
                     </span>
@@ -130,7 +130,7 @@ function VenueSelector() {
                             >
                                 <div className={cn(
                                     "w-7 h-7 rounded-md flex items-center justify-center shrink-0 text-xs font-bold",
-                                    isSelected ? "bg-purple-600 text-white" : "bg-muted text-foreground"
+                                    isSelected ? "bg-primary text-white" : "bg-muted text-foreground"
                                 )}>
                                     {(venue.name.charAt(0) || '?').toUpperCase()}
                                 </div>
@@ -193,8 +193,8 @@ function BusinessSelector() {
                         className="w-8 h-8 rounded-lg object-cover shrink-0"
                     />
                 ) : (
-                    <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center shrink-0">
-                        <span className="text-sm font-semibold text-foreground">
+                    <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
+                        <span className="text-sm font-semibold text-white">
                             {activeBusiness ? (activeBusiness.name.charAt(0) || '?').toUpperCase() : '?'}
                         </span>
                     </div>
@@ -241,7 +241,7 @@ function BusinessSelector() {
                                 ) : (
                                     <div className={cn(
                                         "w-7 h-7 rounded-md flex items-center justify-center shrink-0 text-xs font-bold",
-                                        isSelected ? "bg-purple-600 text-white" : "bg-muted text-foreground"
+                                        isSelected ? "bg-primary text-white" : "bg-muted text-foreground"
                                     )}>
                                         {(biz.name.charAt(0) || '?').toUpperCase()}
                                     </div>

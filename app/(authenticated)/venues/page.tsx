@@ -110,7 +110,7 @@ export default function VenuesPage() {
                     {activeBusiness && showAddVenue && (
                         <Link
                             href={`/venues/new?businessId=${activeBusiness.id}`}
-                            className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 transition-colors flex items-center gap-2 text-sm"
+                            className="px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover transition-colors flex items-center gap-2 text-sm"
                         >
                             <Plus className="w-4 h-4" />
                             <span>Add Venue</span>
@@ -151,7 +151,7 @@ export default function VenuesPage() {
                     {activeBusiness && showAddVenue && (
                         <Link
                             href={`/venues/new?businessId=${activeBusiness.id}`}
-                            className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 transition-colors flex items-center gap-2 text-sm"
+                            className="px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover transition-colors flex items-center gap-2 text-sm"
                         >
                             <Plus className="w-4 h-4" />
                             Add Venue

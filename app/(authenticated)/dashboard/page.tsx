@@ -166,7 +166,7 @@ const INTENSITY_CLASSES = [
     'bg-zinc-200 dark:bg-muted',
     'bg-purple-200/70 dark:bg-purple-900/60',
     'bg-purple-700/60',
-    'bg-purple-600/80',
+    'bg-primary/80',
     'bg-purple-500',
 ];
 const EVENING_HOURS = [18, 19, 20, 21, 22, 23, 0, 1, 2, 3];
@@ -323,7 +323,7 @@ const TrafficFlow = ({
                     <div key={a.name} className="flex items-center gap-3">
                         <div className="w-28 text-xs text-muted-foreground truncate shrink-0">{a.name}</div>
                         <div className="flex-1 h-5 bg-muted rounded overflow-hidden">
-                            <div className="h-full bg-purple-600 rounded" style={{ width: `${a.pct}%` }} />
+                            <div className="h-full bg-primary rounded" style={{ width: `${a.pct}%` }} />
                         </div>
                         <div className="w-10 text-right text-xs text-muted-foreground">{a.pct}%</div>
                     </div>
@@ -831,7 +831,7 @@ export default function DashboardPage() {
                             <RefreshCw className={cn("w-4 h-4", isResetting && "animate-spin")} />
                             <span>Reset Data</span>
                         </button>
-                        <button className="px-4 py-2 rounded-lg bg-purple-500 hover:bg-purple-600 dark:bg-purple-600 dark:hover:bg-purple-700 text-white transition-colors flex items-center gap-2 text-sm">
+                        <button className="px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-white transition-colors flex items-center gap-2 text-sm">
                             <Download className="w-4 h-4" />
                             <span>Export</span>
                         </button>

@@ -181,7 +181,7 @@ export default function SettingsPage() {
                     <button
                         type="submit"
                         disabled={isSaving || businessName.trim() === business.name}
-                        className="flex items-center gap-2 px-6 py-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-foreground font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center gap-2 px-6 py-3 rounded-lg bg-primary hover:bg-primary-hover text-foreground font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <Save className="w-4 h-4" />
                         {saved ? 'Saved!' : isSaving ? 'Saving...' : 'Save Changes'}

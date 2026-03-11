@@ -17,10 +17,10 @@
   --muted: #f4f4f5;             /* zinc-100 */
   --muted-foreground: #71717a;  /* zinc-500 */
 
-  /* Primary - Purple */
-  --primary: #9333ea;
+  /* Primary - Purple (lighter in light mode) */
+  --primary: #a855f7;
   --primary-foreground: #ffffff;
-  --primary-hover: #7e22ce;
+  --primary-hover: #9333ea;
 
   /* Secondary - Emerald */
   --secondary: #10b981;
@@ -36,6 +36,9 @@
 }
 
 .dark {
+  --primary: #9333ea;
+  --primary-hover: #7e22ce;
+
   --background: #000000;
   --foreground: #f8fafc;
 

@@ -267,7 +267,7 @@ export default function AreasPage() {
                         {canEdit && (
                             <button
                                 onClick={() => router.push('/areas/new')}
-                                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 transition-colors whitespace-nowrap text-sm"
+                                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover transition-colors whitespace-nowrap text-sm"
                             >
                                 <Plus className="w-4 h-4" />
                                 Add Area
@@ -598,7 +598,7 @@ export default function AreasPage() {
                                     <button
                                         type="submit"
                                         disabled={isAddingArea}
-                                        className="px-6 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 font-bold disabled:opacity-50 flex items-center gap-2"
+                                        className="px-6 py-2 rounded-lg bg-primary hover:bg-primary-hover font-bold disabled:opacity-50 flex items-center gap-2"
                                     >
                                         {isAddingArea && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
                                         {isAddingArea ? 'Adding...' : 'Create Area'}

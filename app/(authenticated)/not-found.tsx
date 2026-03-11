@@ -9,7 +9,7 @@ export default function NotFound() {
                 <p className="text-muted-foreground mb-6">You don&apos;t have access to this page.</p>
                 <Link
                     href="/dashboard"
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl transition-colors"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-primary hover:bg-purple-500 text-white font-semibold rounded-xl transition-colors"
                 >
                     <ArrowLeft className="w-4 h-4" />
                     Back to Dashboard
