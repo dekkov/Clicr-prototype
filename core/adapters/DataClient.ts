@@ -166,6 +166,7 @@ export interface Venue {
     default_capacity_total?: number | null;
     capacity_enforcement_mode: 'WARN_ONLY' | 'HARD_STOP' | 'MANAGER_OVERRIDE';
     last_reset_at?: string;
+    current_occupancy?: number;
     created_at: string;
     updated_at: string;
 }

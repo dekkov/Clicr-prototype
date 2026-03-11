@@ -284,9 +284,9 @@ export class LocalAdapter implements DataClient {
             // Venue counter clicr — update venue-level occupancy
             const venue = this.state.venues.find(v => v.id === payload.venueId);
             if (venue) {
-                (venue as any).current_occupancy = Math.max(0, ((venue as any).current_occupancy ?? 0) + payload.delta);
+                venue.current_occupancy = Math.max(0, (venue.current_occupancy ?? 0) + payload.delta);
             }
-            newOcc = (venue as any)?.current_occupancy ?? 0;
+            newOcc = venue?.current_occupancy ?? 0;
         } else {
             // Area-level tap (existing behavior)
             const areaId = payload.areaId!;
@@ -336,19 +336,25 @@ export class LocalAdapter implements DataClient {
         return { totalIn, totalOut, net: totalIn - totalOut };
     }
 
-    async resetCounts(scope: Scope): Promise<ResetResult> {
+    async resetCounts(businessId: string): Promise<ResetResult> {
         const resetAt = nowISO();
         let count = 0;
 
+        // Zero all area occupancy snapshots
         for (const area of this.state.areas) {
-            const matchesVenue = !scope.venueId || area.venue_id === scope.venueId;
-            const matchesArea = !scope.areaId || area.id === scope.areaId;
-            if (matchesVenue && matchesArea) {
-                this.state.snapshots.set(area.id, 0);
-                this.state.lastResetAt.set(area.id, resetAt);
-                count++;
-            }
+            this.state.snapshots.set(area.id, 0);
+            this.state.lastResetAt.set(area.id, resetAt);
+            count++;
         }
+
+        // Zero all venue occupancies
+        for (const venue of this.state.venues) {
+            venue.current_occupancy = 0;
+            venue.last_reset_at = resetAt;
+        }
+
+        // Update business last_reset_at
+        this.state.business = { ...this.state.business, last_reset_at: resetAt };
 
         this.saveState();
         return { areasReset: count, resetAt };
