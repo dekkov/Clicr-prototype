@@ -15,10 +15,10 @@ export default async function LoginPage({ searchParams }: Props) {
     const returnTo = '/';
 
     return (
-        <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4 relative">
+        <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 relative">
 
             {/* Back Button */}
-            <Link href={returnTo} className="absolute top-8 left-8 text-slate-500 hover:text-white flex items-center gap-2 transition-colors font-bold text-sm">
+            <Link href={returnTo} className="absolute top-8 left-8 text-foreground/50 hover:text-foreground flex items-center gap-2 transition-colors font-bold text-sm">
                 <ArrowLeft className="w-4 h-4" /> Back
             </Link>
 
@@ -27,8 +27,8 @@ export default async function LoginPage({ searchParams }: Props) {
                     <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-primary/10 mb-6 border border-primary/20 shadow-lg shadow-primary/10">
                         <img src="/clicr-logo.png" alt="Clicr Logo" className="w-12 h-12 object-contain" />
                     </div>
-                    <h2 className="text-3xl font-bold text-white tracking-tight">Sign in to CLICR</h2>
-                    <p className="mt-2 text-slate-400">Welcome back</p>
+                    <h2 className="text-3xl font-bold text-foreground tracking-tight">Sign in to CLICR</h2>
+                    <p className="mt-2 text-foreground/60">Welcome back</p>
                 </div>
 
                 {error && (
@@ -53,7 +53,7 @@ export default async function LoginPage({ searchParams }: Props) {
                                 type="email"
                                 autoComplete="email"
                                 required
-                                className="relative block w-full rounded-t-xl border border-white/10 bg-slate-900/50 px-4 py-3 text-white placeholder-slate-500 focus:z-10 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
+                                className="relative block w-full rounded-t-xl border border-border bg-input px-4 py-3 text-foreground placeholder-foreground/40 focus:z-10 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
                                 placeholder="Email address"
                             />
                         </div>
@@ -64,7 +64,7 @@ export default async function LoginPage({ searchParams }: Props) {
                                 name="password"
                                 autoComplete="current-password"
                                 required
-                                className="relative block w-full rounded-b-xl border border-white/10 bg-slate-900/50 px-4 pr-10 py-3 text-white placeholder-slate-500 focus:z-10 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
+                                className="relative block w-full rounded-b-xl border border-border bg-input px-4 pr-10 py-3 text-foreground placeholder-foreground/40 focus:z-10 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
                                 placeholder="Password"
                             />
                         </div>
@@ -80,9 +80,9 @@ export default async function LoginPage({ searchParams }: Props) {
                     </div>
 
                     <div className="text-center mt-6">
-                        <p className="text-slate-500 text-sm">
+                        <p className="text-foreground/50 text-sm">
                             Don&apos;t have an account?{' '}
-                            <Link href="/onboarding/signup" className="text-white font-bold hover:underline">
+                            <Link href="/onboarding/signup" className="text-foreground font-bold hover:underline">
                                 Create one
                             </Link>
                         </p>
