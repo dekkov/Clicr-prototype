@@ -42,6 +42,9 @@ export function LogoUploader({ currentUrl, businessId, onUpload, demoMode }: Log
                     reader.onerror = reject;
                     reader.readAsDataURL(file);
                 });
+                // base64 data: URL is now used for preview; objectUrl no longer needed
+                URL.revokeObjectURL(objectUrl);
+                setPreview(base64);
                 onUpload(base64);
             } else {
                 const formData = new FormData();
@@ -59,10 +62,12 @@ export function LogoUploader({ currentUrl, businessId, onUpload, demoMode }: Log
                 }
 
                 const { logo_url } = await res.json();
+                URL.revokeObjectURL(objectUrl); // revoke before replacing with CDN URL
                 setPreview(logo_url);
                 onUpload(logo_url);
             }
         } catch (e) {
+            URL.revokeObjectURL(objectUrl); // revoke on error too
             setError(e instanceof Error ? e.message : "Upload failed");
             setPreview(currentUrl || null);
         } finally {
