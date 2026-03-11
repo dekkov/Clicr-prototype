@@ -73,18 +73,8 @@ export async function POST(request: Request) {
             .update({ current_occupancy: 0, last_reset_at: resetAt })
             .eq('business_id', business_id);
 
-        const { data: venues } = await supabaseAdmin
-            .from('venues')
-            .select('id')
-            .eq('business_id', business_id);
-
-        if (venues && venues.length > 0) {
-            const venueIds = venues.map((v: any) => v.id);
-            await supabaseAdmin
-                .from('clicrs')
-                .update({ current_count: 0 })
-                .in('venue_id', venueIds);
-        }
+        // Note: device/clicr current_count is not a DB column — it's computed client-side.
+        // The client's resetCounts() optimistic update already zeros current_count in UI state.
 
         await supabaseAdmin
             .from('businesses')
