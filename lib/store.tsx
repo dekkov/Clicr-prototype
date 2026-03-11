@@ -51,7 +51,7 @@ export type AppState = {
 type AppContextType = AppState & {
     recordEvent: (event: Omit<CountEvent, 'id' | 'timestamp' | 'user_id' | 'business_id'>) => void;
     recordScan: (scan: Omit<IDScanEvent, 'id' | 'timestamp'>) => void;
-    resetCounts: (venueId?: string) => void;
+    resetCounts: () => Promise<void>;
     startShift: (venueId: string, areaId?: string) => Promise<string | null>;
     endShift: (shiftId: string) => Promise<void>;
     addUser: (user: User) => Promise<void>;
@@ -536,7 +536,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
-    const resetCounts = async (venueId?: string) => {
+    const resetCounts = async () => {
         // LOCK polling to prevent race conditions
         isResettingRef.current = true;
 
@@ -555,7 +555,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
         try {
             // authFetch posts to /api/sync; the server resolves business_id from the session cookie
-            const res = await authFetch({ action: 'RESET_COUNTS', venue_id: venueId });
+            const res = await authFetch({ action: 'RESET_COUNTS' });
 
             if (res.ok) {
                 const updatedDB = await res.json();

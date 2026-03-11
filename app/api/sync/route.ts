@@ -472,37 +472,19 @@ export async function POST(request: Request) {
             case 'RESET_COUNTS': {
                 const resetBizId = await getBusinessId();
                 if (resetBizId) {
-                    let areasToReset: string[] = [];
-                    if (body.venue_id) {
-                        const { data: venueAreas } = await supabaseAdmin
-                            .from('areas')
-                            .select('id')
-                            .eq('venue_id', body.venue_id)
-                            .eq('business_id', resetBizId);
-                        areasToReset = (venueAreas || []).map((a: any) => a.id);
-                    } else {
-                        const { data: bizAreas } = await supabaseAdmin
-                            .from('areas')
-                            .select('id')
-                            .eq('business_id', resetBizId);
-                        areasToReset = (bizAreas || []).map((a: any) => a.id);
-                    }
+                    const resetAt = new Date().toISOString();
+                    const { data: bizAreas } = await supabaseAdmin
+                        .from('areas')
+                        .select('id, current_occupancy, venue_id')
+                        .eq('business_id', resetBizId);
 
-                    for (const areaId of areasToReset) {
-                        const { data: area, error: areaReadErr } = await supabaseAdmin
-                            .from('areas')
-                            .select('current_occupancy, venue_id')
-                            .eq('id', areaId)
-                            .single();
-
-                        if (areaReadErr) continue;
-
+                    for (const area of (bizAreas || [])) {
                         const currentVal = area?.current_occupancy ?? 0;
                         if (currentVal !== 0) {
                             await supabaseAdmin.from('occupancy_events').insert({
                                 business_id: resetBizId,
                                 venue_id: area?.venue_id || null,
-                                area_id: areaId,
+                                area_id: area.id,
                                 delta: -currentVal,
                                 flow_type: 'OUT',
                                 event_type: 'RESET',
@@ -510,11 +492,22 @@ export async function POST(request: Request) {
                                 user_id: userId || null,
                             });
                         }
-
-                        await supabaseAdmin.from('areas')
-                            .update({ current_occupancy: 0, last_reset_at: new Date().toISOString() })
-                            .eq('id', areaId);
                     }
+
+                    if (bizAreas && bizAreas.length > 0) {
+                        const areaIds = bizAreas.map((a: any) => a.id);
+                        await supabaseAdmin.from('areas')
+                            .update({ current_occupancy: 0, last_reset_at: resetAt })
+                            .in('id', areaIds);
+                    }
+
+                    await supabaseAdmin.from('venues')
+                        .update({ current_occupancy: 0, last_reset_at: resetAt })
+                        .eq('business_id', resetBizId);
+
+                    await supabaseAdmin.from('businesses')
+                        .update({ last_reset_at: resetAt })
+                        .eq('id', resetBizId);
                 }
                 break;
             }
