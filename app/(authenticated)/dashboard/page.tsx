@@ -101,7 +101,7 @@ const GenderBreakdown = ({ events }: { events: CountEvent[] }) => {
     );
 };
 
-const HourlyTraffic = ({ data }: { data: { hour: string; entries: number; exits: number }[] }) => (
+const HourlyTraffic = ({ data, colors }: { data: { hour: string; entries: number; exits: number }[]; colors: { grid: string; text: string; tooltipBg: string; tooltipBorder: string } }) => (
     <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">
         <div className="flex items-center gap-2 mb-1">
             <TrendingUp className="w-4 h-4 text-gray-400" />
@@ -110,10 +110,10 @@ const HourlyTraffic = ({ data }: { data: { hour: string; entries: number; exits:
         <p className="text-xs text-gray-500 mb-4">Entries vs. exits by hour</p>
         <ResponsiveContainer width="100%" height={200}>
             <BarChart data={data} barGap={2}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
-                <XAxis dataKey="hour" tick={{ fill: '#6b7280', fontSize: 11 }} />
-                <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} />
-                <Tooltip contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
+                <XAxis dataKey="hour" tick={{ fill: colors.text, fontSize: 11 }} />
+                <YAxis tick={{ fill: colors.text, fontSize: 11 }} />
+                <Tooltip contentStyle={{ background: colors.tooltipBg, border: '1px solid ' + colors.tooltipBorder, borderRadius: 8 }} />
                 <Bar dataKey="entries" fill="#10b981" radius={[3,3,0,0]} />
                 <Bar dataKey="exits" fill="#ef4444" radius={[3,3,0,0]} />
             </BarChart>
@@ -125,7 +125,7 @@ const HourlyTraffic = ({ data }: { data: { hour: string; entries: number; exits:
     </div>
 );
 
-const OccupancyOverTime = ({ data, peak }: { data: { hour: string; occupancy: number }[]; peak: number }) => (
+const OccupancyOverTime = ({ data, peak, colors }: { data: { hour: string; occupancy: number }[]; peak: number; colors: { grid: string; text: string; tooltipBg: string; tooltipBorder: string } }) => (
     <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">
         <div className="flex items-center gap-2 mb-1">
             <TrendingUp className="w-4 h-4 text-gray-400" />
@@ -140,10 +140,10 @@ const OccupancyOverTime = ({ data, peak }: { data: { hour: string; occupancy: nu
                         <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
                     </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
-                <XAxis dataKey="hour" tick={{ fill: '#6b7280', fontSize: 11 }} />
-                <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} />
-                <Tooltip contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
+                <XAxis dataKey="hour" tick={{ fill: colors.text, fontSize: 11 }} />
+                <YAxis tick={{ fill: colors.text, fontSize: 11 }} />
+                <Tooltip contentStyle={{ background: colors.tooltipBg, border: '1px solid ' + colors.tooltipBorder, borderRadius: 8 }} />
                 <ReferenceLine y={peak} stroke="#a78bfa" strokeDasharray="4 4" label={{ value: 'Peak', fill: '#a78bfa', fontSize: 10 }} />
                 <Area type="monotone" dataKey="occupancy" stroke="#6366f1" fill="url(#occGrad)" strokeWidth={2} />
             </AreaChart>
@@ -237,7 +237,7 @@ const PeakTimesHeatmap = ({ data, loading }: { data: HeatmapData; loading: boole
     );
 };
 
-const LocationDistribution = ({ data }: { data: { state: string; count: number }[] }) => (
+const LocationDistribution = ({ data, colors }: { data: { state: string; count: number }[]; colors: { grid: string; text: string; tooltipBg: string; tooltipBorder: string } }) => (
     <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">
         <div className="text-lg mb-1">Location Distribution</div>
         <p className="text-xs text-gray-500 mb-4">Top states from accepted ID scans</p>
@@ -246,9 +246,9 @@ const LocationDistribution = ({ data }: { data: { state: string; count: number }
         ) : (
             <ResponsiveContainer width="100%" height={data.length * 36 + 20}>
                 <BarChart data={data} layout="vertical" margin={{ left: 8, right: 16 }}>
-                    <XAxis type="number" tick={{ fill: '#6b7280', fontSize: 11 }} />
-                    <YAxis type="category" dataKey="state" tick={{ fill: '#9ca3af', fontSize: 12 }} width={70} />
-                    <Tooltip contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8 }} />
+                    <XAxis type="number" tick={{ fill: colors.text, fontSize: 11 }} />
+                    <YAxis type="category" dataKey="state" tick={{ fill: colors.text, fontSize: 12 }} width={70} />
+                    <Tooltip contentStyle={{ background: colors.tooltipBg, border: '1px solid ' + colors.tooltipBorder, borderRadius: 8 }} />
                     <Bar dataKey="count" fill="#6366f1" radius={[0,3,3,0]} />
                 </BarChart>
             </ResponsiveContainer>
@@ -256,7 +256,7 @@ const LocationDistribution = ({ data }: { data: { state: string; count: number }
     </div>
 );
 
-const VenueContribution = ({ data }: { data: { name: string; count: number }[] }) => (
+const VenueContribution = ({ data, colors }: { data: { name: string; count: number }[]; colors: { grid: string; text: string; tooltipBg: string; tooltipBorder: string } }) => (
     <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">
         <div className="text-lg mb-1">Venue Contribution</div>
         <p className="text-xs text-gray-500 mb-4">Entries by venue</p>
@@ -265,9 +265,9 @@ const VenueContribution = ({ data }: { data: { name: string; count: number }[] }
         ) : (
             <ResponsiveContainer width="100%" height={data.length * 52 + 20}>
                 <BarChart data={data} layout="vertical" margin={{ left: 8, right: 16 }}>
-                    <XAxis type="number" tick={{ fill: '#6b7280', fontSize: 11 }} />
-                    <YAxis type="category" dataKey="name" tick={{ fill: '#9ca3af', fontSize: 12 }} width={100} />
-                    <Tooltip contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8 }} />
+                    <XAxis type="number" tick={{ fill: colors.text, fontSize: 11 }} />
+                    <YAxis type="category" dataKey="name" tick={{ fill: colors.text, fontSize: 12 }} width={100} />
+                    <Tooltip contentStyle={{ background: colors.tooltipBg, border: '1px solid ' + colors.tooltipBorder, borderRadius: 8 }} />
                     <Bar dataKey="count" fill="#6366f1" radius={[0,3,3,0]} />
                 </BarChart>
             </ResponsiveContainer>
@@ -514,10 +514,8 @@ export default function DashboardPage() {
     const chartColors = {
         grid: resolvedTheme === 'dark' ? '#334155' : '#e2e8f0',
         text: resolvedTheme === 'dark' ? '#94a3b8' : '#64748b',
-        tooltip: {
-            background: resolvedTheme === 'dark' ? '#111827' : '#ffffff',
-            border: resolvedTheme === 'dark' ? '#374151' : '#e2e8f0',
-        },
+        tooltipBg: resolvedTheme === 'dark' ? '#111827' : '#ffffff',
+        tooltipBorder: resolvedTheme === 'dark' ? '#374151' : '#e2e8f0',
     };
 
     const [isResetting, setIsResetting] = useState(false);
@@ -942,8 +940,8 @@ export default function DashboardPage() {
 
             {/* Hourly Traffic + Occupancy Over Time */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <HourlyTraffic data={hourlyData} />
-                <OccupancyOverTime data={occupancyData} peak={peakOccupancyValue} />
+                <HourlyTraffic data={hourlyData} colors={chartColors} />
+                <OccupancyOverTime data={occupancyData} peak={peakOccupancyValue} colors={chartColors} />
             </div>
 
             {/* Peak Times Heatmap */}
@@ -951,8 +949,8 @@ export default function DashboardPage() {
 
             {/* Location Distribution + Venue Contribution */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <LocationDistribution data={locationData} />
-                <VenueContribution data={venueContribData} />
+                <LocationDistribution data={locationData} colors={chartColors} />
+                <VenueContribution data={venueContribData} colors={chartColors} />
             </div>
 
             {/* Traffic Flow + Operational Workflow */}
