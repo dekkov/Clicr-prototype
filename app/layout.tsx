@@ -47,11 +47,8 @@ export default function RootLayout({
             __html: `
                 (function() {
                     try {
-                        var theme = localStorage.getItem('clicr-theme') || 'system';
-                        var resolved = theme;
-                        if (theme === 'system') {
-                            resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-                        }
+                        var stored = localStorage.getItem('clicr-theme');
+                        var resolved = (stored === 'light' || stored === 'dark') ? stored : 'dark';
                         document.documentElement.classList.add(resolved);
                     } catch(e) {
                         document.documentElement.classList.add('dark');

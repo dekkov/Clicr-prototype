@@ -161,19 +161,19 @@ export default function BoardViewPage({ params }: { params: Promise<{ id: string
             {/* Header */}
             <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center gap-3">
-                    <button onClick={() => router.push('/clicr')} className="text-slate-600 hover:text-white transition-colors">
+                    <button onClick={() => router.push('/clicr')} className="text-muted-foreground/60 hover:text-foreground transition-colors">
                         <ArrowLeft className="w-5 h-5" />
                     </button>
                     <div>
-                        <h1 className="text-xl font-semibold text-white tracking-tight">{boardName}</h1>
-                        {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
+                        <h1 className="text-xl font-semibold text-foreground tracking-tight">{boardName}</h1>
+                        {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
                     {!isAutoBoard && (
                         <button
                             onClick={() => setShowEdit(true)}
-                            className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                            className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                             title="Edit board"
                         >
                             <Settings2 className="w-5 h-5" />
@@ -181,7 +181,7 @@ export default function BoardViewPage({ params }: { params: Promise<{ id: string
                     )}
                     <button
                         onClick={handleFullscreen}
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-slate-400 hover:text-white hover:bg-white/[0.08] transition-all"
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-muted-foreground hover:text-foreground hover:bg-white/[0.08] transition-all"
                     >
                         <Maximize className="w-3.5 h-3.5" /> Fullscreen
                     </button>
@@ -190,7 +190,7 @@ export default function BoardViewPage({ params }: { params: Promise<{ id: string
 
             {/* Tile grid */}
             {tiles.length === 0 ? (
-                <div className="text-center text-slate-500 py-12">
+                <div className="text-center text-muted-foreground py-12">
                     No counters in this board. {!isAutoBoard && 'Edit the board to add counters.'}
                 </div>
             ) : (

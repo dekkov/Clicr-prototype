@@ -43,7 +43,7 @@ export default function VenueDevices({ venueId }: { venueId: string }) {
             <div className="flex justify-between items-center">
                 <div>
                     <h2 className="text-xl font-bold">Connected Devices</h2>
-                    <p className="text-slate-400 text-sm">Manage hardware assigned to this venue.</p>
+                    <p className="text-muted-foreground text-sm">Manage hardware assigned to this venue.</p>
                 </div>
                 <button
                     onClick={handleAddMockDevice}
@@ -56,17 +56,17 @@ export default function VenueDevices({ venueId }: { venueId: string }) {
 
             {/* Smart Devices List */}
             <div className="space-y-4">
-                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Scanners & Smart Counters</h3>
+                <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Scanners & Smart Counters</h3>
                 {venueDevices.length === 0 && (
-                    <div className="p-8 text-center bg-slate-900/30 rounded-2xl border border-slate-800 border-dashed">
-                        <MonitorSmartphone className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-                        <p className="text-slate-500 text-sm">No smart devices registered.</p>
+                    <div className="p-8 text-center bg-muted/30 rounded-2xl border border-border border-dashed">
+                        <MonitorSmartphone className="w-8 h-8 text-muted-foreground/60 mx-auto mb-2" />
+                        <p className="text-muted-foreground text-sm">No smart devices registered.</p>
                     </div>
                 )}
                 {venueDevices.map(device => {
                     const assignedArea = areas.find(a => a.id === device.area_id);
                     return (
-                        <div key={device.id} className="flex items-center justify-between p-4 bg-slate-900/50 border border-slate-800 rounded-xl hover:border-slate-700 transition-colors">
+                        <div key={device.id} className="flex items-center justify-between p-4 bg-card border border-border rounded-xl hover:border-border transition-colors">
                             <div className="flex items-center gap-4">
                                 <div className={cn(
                                     "w-10 h-10 rounded-lg flex items-center justify-center",
@@ -75,13 +75,13 @@ export default function VenueDevices({ venueId }: { venueId: string }) {
                                     {device.device_type === 'SCANNER' ? <Smartphone className="w-5 h-5" /> : <MonitorSmartphone className="w-5 h-5" />}
                                 </div>
                                 <div>
-                                    <div className="font-bold text-white flex items-center gap-2">
+                                    <div className="font-bold text-foreground flex items-center gap-2">
                                         {device.name}
-                                        <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-400 font-mono">
+                                        <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground font-mono">
                                             {device.serial_number}
                                         </span>
                                     </div>
-                                    <div className="text-xs text-slate-500 flex items-center gap-2">
+                                    <div className="text-xs text-muted-foreground flex items-center gap-2">
                                         <span className={cn(
                                             "flex items-center gap-1",
                                             device.status === 'ACTIVE' ? "text-emerald-500" : "text-amber-500"
@@ -95,7 +95,7 @@ export default function VenueDevices({ venueId }: { venueId: string }) {
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
-                                <button className="px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors text-slate-300">
+                                <button className="px-3 py-1.5 text-xs font-medium bg-muted hover:bg-muted rounded-lg transition-colors text-foreground/80">
                                     Configure
                                 </button>
                             </div>
@@ -107,25 +107,25 @@ export default function VenueDevices({ venueId }: { venueId: string }) {
             {/* Legacy Clicrs List */}
             {venueClicrs.length > 0 && (
                 <div className="space-y-4">
-                    <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Legacy Counters (Clicr V1)</h3>
+                    <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Legacy Counters (Clicr V1)</h3>
                     {venueClicrs.map(clicr => {
                         const area = areas.find(a => a.id === clicr.area_id);
                         return (
-                            <div key={clicr.id} className="flex items-center justify-between p-4 bg-slate-900/30 border border-slate-800 rounded-xl">
+                            <div key={clicr.id} className="flex items-center justify-between p-4 bg-muted/30 border border-border rounded-xl">
                                 <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-slate-500">
+                                    <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
                                         <RefreshCw className="w-5 h-5" />
                                     </div>
                                     <div>
-                                        <div className="font-bold text-slate-300">{clicr.name}</div>
-                                        <div className="text-xs text-slate-500">
+                                        <div className="font-bold text-foreground/80">{clicr.name}</div>
+                                        <div className="text-xs text-muted-foreground">
                                             Legacy ID: {clicr.id} • Assigned to: {area?.name || 'Unknown'}
                                         </div>
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    <div className="text-xl font-mono font-bold text-white">{clicr.current_count}</div>
-                                    <div className="text-xs text-slate-500">Current Count</div>
+                                    <div className="text-xl font-mono font-bold text-foreground">{clicr.current_count}</div>
+                                    <div className="text-xs text-muted-foreground">Current Count</div>
                                 </div>
                             </div>
                         );

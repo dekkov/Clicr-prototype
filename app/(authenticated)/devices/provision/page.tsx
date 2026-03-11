@@ -59,8 +59,8 @@ export default function DeviceProvisioningPage() {
 
                 {/* Header Text */}
                 <div className="text-center mb-8">
-                    <h1 className="text-3xl font-bold text-white mb-2">Add New Device</h1>
-                    <p className="text-slate-400">Pair a hardware counter or scanner to your venue.</p>
+                    <h1 className="text-3xl font-bold text-foreground mb-2">Add New Device</h1>
+                    <p className="text-muted-foreground">Pair a hardware counter or scanner to your venue.</p>
                 </div>
 
                 <AnimatePresence mode="wait">
@@ -72,9 +72,9 @@ export default function DeviceProvisioningPage() {
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -10 }}
-                            className="bg-[#1e2330]/50 border border-white/5 rounded-3xl p-8 backdrop-blur-sm"
+                            className="bg-card/50 border border-white/5 rounded-3xl p-8 backdrop-blur-sm"
                         >
-                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 text-center">
+                            <label className="block text-xs font-bold text-muted-foreground uppercase tracking-widest mb-4 text-center">
                                 Enter 6-Digit Pairing Code
                             </label>
 
@@ -86,10 +86,10 @@ export default function DeviceProvisioningPage() {
                                     value={pairingCode}
                                     onChange={(e) => setPairingCode(e.target.value.toUpperCase())}
                                     placeholder="XYZ-123"
-                                    className="w-full bg-black/50 border-2 border-slate-700/50 rounded-2xl p-6 text-center text-4xl font-mono font-bold text-white placeholder:text-slate-800 focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/10 transition-all uppercase tracking-[0.5em]"
+                                    className="w-full bg-background/50 border-2 border-border/50 rounded-2xl p-6 text-center text-4xl font-mono font-bold text-foreground placeholder:text-slate-800 focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/10 transition-all uppercase tracking-[0.5em]"
                                 />
 
-                                <div className="text-center text-xs text-slate-500">
+                                <div className="text-center text-xs text-muted-foreground">
                                     <span className="flex items-center justify-center gap-2">
                                         <QrCode className="w-4 h-4" />
                                         Don't see a code? Scan QR on device powered on screen.
@@ -114,54 +114,54 @@ export default function DeviceProvisioningPage() {
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.95 }}
-                            className="bg-[#1e2330]/50 border border-white/5 rounded-3xl p-8 backdrop-blur-sm space-y-6"
+                            className="bg-card/50 border border-white/5 rounded-3xl p-8 backdrop-blur-sm space-y-6"
                         >
                             {/* Device Identity Card */}
-                            <div className="flex items-center gap-4 bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl">
+                            <div className="flex items-center gap-4 bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 p-4 rounded-2xl">
                                 <div className="w-12 h-12 bg-emerald-500 text-black rounded-full flex items-center justify-center shrink-0">
                                     <Smartphone className="w-6 h-6" />
                                 </div>
                                 <div>
                                     <div className="text-emerald-400 text-xs font-bold uppercase tracking-widest">Device Found</div>
-                                    <div className="text-white font-bold text-lg leading-none mt-1">{deviceType}</div>
-                                    <div className="text-slate-500 text-xs font-mono mt-1">ID: {pairingCode} • Battery: 94%</div>
+                                    <div className="text-foreground font-bold text-lg leading-none mt-1">{deviceType}</div>
+                                    <div className="text-muted-foreground text-xs font-mono mt-1">ID: {pairingCode} • Battery: 94%</div>
                                 </div>
                             </div>
 
                             <div className="space-y-4">
                                 <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Device Name</label>
+                                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Device Name</label>
                                     <input
                                         type="text"
                                         value={deviceName}
                                         onChange={(e) => setDeviceName(e.target.value)}
-                                        className="w-full bg-slate-900 border-none rounded-xl p-4 text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary mt-2"
+                                        className="w-full bg-card border-none rounded-xl p-4 text-foreground placeholder:text-muted-foreground/60 focus:ring-2 focus:ring-primary mt-2"
                                     />
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
                                             <MapPin className="w-3 h-3" /> Venue
                                         </label>
                                         <select
                                             value={selectedVenueId}
                                             onChange={(e) => { setSelectedVenueId(e.target.value); setSelectedAreaId(''); }}
-                                            className="w-full bg-slate-900 border-none rounded-xl p-4 text-white mt-2 appearance-none cursor-pointer hover:bg-slate-800 transition-colors"
+                                            className="w-full bg-card border-none rounded-xl p-4 text-foreground mt-2 appearance-none cursor-pointer hover:bg-muted transition-colors"
                                         >
                                             <option value="">Select Venue...</option>
                                             {venues.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
                                             <Layers className="w-3 h-3" /> Area
                                         </label>
                                         <select
                                             value={selectedAreaId}
                                             onChange={(e) => setSelectedAreaId(e.target.value)}
                                             disabled={!selectedVenueId}
-                                            className="w-full bg-slate-900 border-none rounded-xl p-4 text-white mt-2 appearance-none cursor-pointer hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="w-full bg-card border-none rounded-xl p-4 text-foreground mt-2 appearance-none cursor-pointer hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             <option value="">Select Area...</option>
                                             {availableAreas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
@@ -170,7 +170,7 @@ export default function DeviceProvisioningPage() {
                                 </div>
 
                                 <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Direction Mode</label>
+                                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Direction Mode</label>
                                     <div className="grid grid-cols-3 gap-2 mt-2">
                                         {[
                                             { id: 'bidirectional', label: 'Bidirectional' },
@@ -184,7 +184,7 @@ export default function DeviceProvisioningPage() {
                                                     "py-3 rounded-xl text-sm font-bold border transition-all",
                                                     directionMode === mode.id
                                                         ? "bg-primary text-black border-primary"
-                                                        : "bg-slate-900 border-transparent text-slate-400 hover:border-slate-700"
+                                                        : "bg-card border-transparent text-muted-foreground hover:border-border"
                                                 )}
                                             >
                                                 {mode.label}
@@ -212,27 +212,27 @@ export default function DeviceProvisioningPage() {
                             key="success"
                             initial={{ scale: 0.8, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
-                            className="bg-[#1e2330]/50 border border-white/5 rounded-3xl p-8 backdrop-blur-sm text-center py-12"
+                            className="bg-card/50 border border-white/5 rounded-3xl p-8 backdrop-blur-sm text-center py-12"
                         >
                             <div className="w-24 h-24 bg-emerald-500/20 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
                                 <CheckCircle2 className="w-12 h-12" />
                             </div>
-                            <h2 className="text-3xl font-bold text-white mb-2">Device Active!</h2>
-                            <p className="text-slate-400 max-w-xs mx-auto mb-8">
-                                <span className="text-white font-bold">{deviceName}</span> is now paired to <br />
+                            <h2 className="text-3xl font-bold text-foreground mb-2">Device Active!</h2>
+                            <p className="text-muted-foreground max-w-xs mx-auto mb-8">
+                                <span className="text-foreground font-bold">{deviceName}</span> is now paired to <br />
                                 <span className="text-primary">{venues.find(v => v.id === selectedVenueId)?.name}</span>.
                             </p>
 
                             <div className="flex gap-4">
                                 <button
                                     onClick={() => { setStep('PAIRING'); setPairingCode(''); setDeviceName(''); }}
-                                    className="flex-1 py-3 text-slate-400 hover:text-white font-bold"
+                                    className="flex-1 py-3 text-muted-foreground hover:text-foreground font-bold"
                                 >
                                     Add Another
                                 </button>
                                 <button
                                     onClick={() => router.push('/dashboard')}
-                                    className="flex-1 py-3 bg-white text-black rounded-xl font-bold hover:bg-slate-200"
+                                    className="flex-1 py-3 bg-white text-black rounded-xl font-bold hover:bg-muted"
                                 >
                                     Done
                                 </button>

@@ -28,7 +28,7 @@ const ROLE_DEFINITIONS: Record<Role, { label: string; icon: React.ElementType; c
     ADMIN: { label: 'GM / Ops Admin', icon: Shield, color: 'text-blue-400 bg-blue-400/10 border-blue-400/30' },
     MANAGER: { label: 'Door Manager', icon: User, color: 'text-amber-400 bg-amber-400/10 border-amber-400/30' },
     STAFF: { label: 'Door Staff', icon: User, color: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/30' },
-    ANALYST: { label: 'Analyst', icon: BarChart3, color: 'text-slate-400 bg-slate-400/10 border-slate-400/30' },
+    ANALYST: { label: 'Analyst', icon: BarChart3, color: 'text-muted-foreground bg-muted border-border' },
 };
 
 type TeamMember = {
@@ -126,7 +126,7 @@ export default function TeamSettingsPage() {
 
     if (!activeBusiness) {
         return (
-            <div className="p-6 text-center text-slate-400">
+            <div className="p-6 text-center text-muted-foreground">
                 Select a business to manage team members.
             </div>
         );
@@ -139,14 +139,14 @@ export default function TeamSettingsPage() {
                 <div className="flex items-center gap-4">
                     <Link
                         href="/settings"
-                        className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors"
+                        className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                         aria-label="Back to settings"
                     >
                         <ArrowLeft className="w-5 h-5" />
                     </Link>
                     <div>
-                        <h1 className="text-2xl font-bold text-white">Team</h1>
-                        <p className="text-sm text-slate-400 mt-0.5">Manage team members and access roles.</p>
+                        <h1 className="text-2xl font-bold text-foreground">Team</h1>
+                        <p className="text-sm text-muted-foreground mt-0.5">Manage team members and access roles.</p>
                     </div>
                 </div>
                 <button
@@ -165,7 +165,7 @@ export default function TeamSettingsPage() {
                         <Loader2 className="w-6 h-6 text-primary animate-spin" />
                     </div>
                 ) : members.length === 0 ? (
-                    <div className="p-12 text-center text-slate-500 text-sm rounded-xl border border-border/50 bg-card/30">
+                    <div className="p-12 text-center text-muted-foreground text-sm rounded-xl border border-border/50 bg-card/30">
                         No team members yet. Invite someone to get started.
                     </div>
                 ) : (
@@ -189,17 +189,17 @@ export default function TeamSettingsPage() {
 
                                 {/* Name + email */}
                                 <div className="flex-1 min-w-0">
-                                    <p className="font-semibold text-white truncate">
+                                    <p className="font-semibold text-foreground truncate">
                                         {member.name || member.email.split('@')[0]}
                                     </p>
-                                    <p className="text-sm text-slate-400 truncate">{member.email}</p>
+                                    <p className="text-sm text-muted-foreground truncate">{member.email}</p>
                                 </div>
 
                                 {/* Role badge */}
                                 <span
                                     className={cn(
                                         "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border shrink-0",
-                                        def?.color ?? 'text-slate-400 bg-slate-400/10'
+                                        def?.color ?? 'text-muted-foreground bg-muted'
                                     )}
                                 >
                                     <Icon className="w-3.5 h-3.5" />
@@ -207,7 +207,7 @@ export default function TeamSettingsPage() {
                                 </span>
 
                                 {/* Status (compact) */}
-                                <span className="shrink-0 text-xs text-slate-500">
+                                <span className="shrink-0 text-xs text-muted-foreground">
                                     {member.isConfirmed ? (
                                         <span className="flex items-center gap-1 text-emerald-500">
                                             <CheckCircle2 className="w-3.5 h-3.5" /> Active
@@ -224,7 +224,7 @@ export default function TeamSettingsPage() {
                                     <div className="relative shrink-0">
                                         <button
                                             onClick={() => setOpenKebabId(isKebabOpen ? null : member.id)}
-                                            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors"
+                                            className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                                             aria-label="Options"
                                         >
                                             <MoreVertical className="w-4 h-4" />
@@ -251,7 +251,7 @@ export default function TeamSettingsPage() {
                                                                 setEditVenueIds(member.assignedVenueIds ?? []);
                                                                 setEditAreaIds(member.assignedAreaIds ?? []);
                                                             }}
-                                                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800/60 hover:text-white"
+                                                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted/60 hover:text-foreground"
                                                         >
                                                             <Pencil className="w-4 h-4" />
                                                             Edit
@@ -279,7 +279,7 @@ export default function TeamSettingsPage() {
             {/* Invite modal */}
             <AnimatePresence>
                 {showInviteModal && (
-                    <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+                    <div className="fixed inset-0 bg-background/90 backdrop-blur-sm z-50 flex items-center justify-center p-6">
                         <motion.div
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
@@ -288,22 +288,22 @@ export default function TeamSettingsPage() {
                         >
                             <button
                                 onClick={() => { setShowInviteModal(false); setInviteError(null); }}
-                                className="absolute top-6 right-6 text-slate-500 hover:text-white"
+                                className="absolute top-6 right-6 text-muted-foreground hover:text-foreground"
                             >
                                 <XCircle className="w-6 h-6" />
                             </button>
 
-                            <h2 className="text-xl font-bold text-white mb-6">Invite Team Member</h2>
+                            <h2 className="text-xl font-bold text-foreground mb-6">Invite Team Member</h2>
 
                             {inviteError && (
-                                <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
+                                <div className="mb-4 p-3 bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl text-red-400 text-sm">
                                     {inviteError}
                                 </div>
                             )}
 
                             <form onSubmit={handleInvite} className="space-y-6">
                                 <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Email</label>
+                                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Email</label>
                                     <input
                                         autoFocus
                                         type="email"
@@ -311,12 +311,12 @@ export default function TeamSettingsPage() {
                                         value={inviteEmail}
                                         onChange={(e) => setInviteEmail(e.target.value)}
                                         placeholder="colleague@example.com"
-                                        className="w-full bg-background/50 border border-border rounded-xl p-3 text-white placeholder:text-slate-600 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary mt-2"
+                                        className="w-full bg-background/50 border border-border rounded-xl p-3 text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary mt-2"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Role</label>
+                                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Role</label>
                                     <div className="grid grid-cols-1 gap-2 mt-2">
                                         {((['ADMIN', 'MANAGER', 'STAFF', 'ANALYST'] as Role[]).filter(r => currentUser?.role !== 'ADMIN' || r !== 'ADMIN')).map(role => (
                                             <button
@@ -331,10 +331,10 @@ export default function TeamSettingsPage() {
                                                     "flex items-center justify-between p-3 rounded-xl border text-left transition-all",
                                                     inviteRole === role
                                                         ? "bg-primary/10 border-primary"
-                                                        : "bg-background/30 border-border hover:bg-slate-800/60"
+                                                        : "bg-background/30 border-border hover:bg-muted/60"
                                                 )}
                                             >
-                                                <span className={cn("font-medium text-sm", inviteRole === role ? "text-primary" : "text-white")}>
+                                                <span className={cn("font-medium text-sm", inviteRole === role ? "text-primary" : "text-foreground")}>
                                                     {ROLE_DEFINITIONS[role].label}
                                                 </span>
                                                 {inviteRole === role && <CheckCircle2 className="w-4 h-4 text-primary" />}
@@ -345,13 +345,13 @@ export default function TeamSettingsPage() {
 
                                 {inviteRole === 'MANAGER' && (
                                     <div>
-                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Assign Venues</label>
-                                        <p className="text-xs text-slate-500 mt-1 mb-2">Select which venues this manager can access.</p>
+                                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Assign Venues</label>
+                                        <p className="text-xs text-muted-foreground mt-1 mb-2">Select which venues this manager can access.</p>
                                         <div className="max-h-40 overflow-y-auto space-y-2 mt-2">
                                             {venues.filter(v => v.business_id === activeBusiness.id).map(venue => (
                                                 <label
                                                     key={venue.id}
-                                                    className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-slate-800/40 cursor-pointer"
+                                                    className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-muted/40 cursor-pointer"
                                                 >
                                                     <input
                                                         type="checkbox"
@@ -362,11 +362,11 @@ export default function TeamSettingsPage() {
                                                         }}
                                                         className="rounded border-border"
                                                     />
-                                                    <span className="text-sm text-white">{venue.name}</span>
+                                                    <span className="text-sm text-foreground">{venue.name}</span>
                                                 </label>
                                             ))}
                                             {venues.filter(v => v.business_id === activeBusiness.id).length === 0 && (
-                                                <p className="text-xs text-slate-500">No venues yet. Add venues in Venues settings first.</p>
+                                                <p className="text-xs text-muted-foreground">No venues yet. Add venues in Venues settings first.</p>
                                             )}
                                         </div>
                                     </div>
@@ -374,13 +374,13 @@ export default function TeamSettingsPage() {
 
                                 {inviteRole === 'STAFF' && (
                                     <div>
-                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Assign Areas</label>
-                                        <p className="text-xs text-slate-500 mt-1 mb-2">Select which areas this staff member can access.</p>
+                                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Assign Areas</label>
+                                        <p className="text-xs text-muted-foreground mt-1 mb-2">Select which areas this staff member can access.</p>
                                         <div className="max-h-40 overflow-y-auto space-y-2 mt-2">
                                             {areas.filter(a => venues.some(v => v.id === a.venue_id && v.business_id === activeBusiness.id)).map(area => (
                                                 <label
                                                     key={area.id}
-                                                    className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-slate-800/40 cursor-pointer"
+                                                    className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-muted/40 cursor-pointer"
                                                 >
                                                     <input
                                                         type="checkbox"
@@ -391,11 +391,11 @@ export default function TeamSettingsPage() {
                                                         }}
                                                         className="rounded border-border"
                                                     />
-                                                    <span className="text-sm text-white">{area.name}</span>
+                                                    <span className="text-sm text-foreground">{area.name}</span>
                                                 </label>
                                             ))}
                                             {areas.filter(a => venues.some(v => v.id === a.venue_id && v.business_id === activeBusiness.id)).length === 0 && (
-                                                <p className="text-xs text-slate-500">No areas yet. Add venues and areas first.</p>
+                                                <p className="text-xs text-muted-foreground">No areas yet. Add venues and areas first.</p>
                                             )}
                                         </div>
                                     </div>
@@ -421,7 +421,7 @@ export default function TeamSettingsPage() {
             {/* Edit member modal (role + assignments together) */}
             <AnimatePresence>
                 {editMember && activeBusiness && editMember.role !== 'OWNER' && (
-                    <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+                    <div className="fixed inset-0 bg-background/90 backdrop-blur-sm z-50 flex items-center justify-center p-6">
                         <motion.div
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
@@ -430,16 +430,16 @@ export default function TeamSettingsPage() {
                         >
                             <button
                                 onClick={() => { setEditMember(null); }}
-                                className="absolute top-6 right-6 text-slate-500 hover:text-white"
+                                className="absolute top-6 right-6 text-muted-foreground hover:text-foreground"
                             >
                                 <XCircle className="w-6 h-6" />
                             </button>
-                            <h2 className="text-xl font-bold text-white mb-2">Edit member</h2>
-                            <p className="text-sm text-slate-400 mb-6">{editMember.name || editMember.email}</p>
+                            <h2 className="text-xl font-bold text-foreground mb-2">Edit member</h2>
+                            <p className="text-sm text-muted-foreground mb-6">{editMember.name || editMember.email}</p>
 
                             <div className="space-y-6">
                                 <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Role</label>
+                                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Role</label>
                                     <div className="grid grid-cols-1 gap-2 mt-2">
                                         {((['ADMIN', 'MANAGER', 'STAFF', 'ANALYST'] as Role[]).filter(r => currentUser?.role !== 'ADMIN' || r !== 'ADMIN')).map(role => (
                                             <button
@@ -452,10 +452,10 @@ export default function TeamSettingsPage() {
                                                 }}
                                                 className={cn(
                                                     "flex items-center justify-between p-3 rounded-xl border text-left transition-all",
-                                                    editRole === role ? "bg-primary/10 border-primary" : "bg-background/30 border-border hover:bg-slate-800/60"
+                                                    editRole === role ? "bg-primary/10 border-primary" : "bg-background/30 border-border hover:bg-muted/60"
                                                 )}
                                             >
-                                                <span className={cn("font-medium text-sm", editRole === role ? "text-primary" : "text-white")}>
+                                                <span className={cn("font-medium text-sm", editRole === role ? "text-primary" : "text-foreground")}>
                                                     {ROLE_DEFINITIONS[role].label}
                                                 </span>
                                                 {editRole === role && <CheckCircle2 className="w-4 h-4 text-primary" />}
@@ -466,11 +466,11 @@ export default function TeamSettingsPage() {
 
                                 {editRole === 'MANAGER' && (
                                     <div>
-                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Assign Venues</label>
-                                        <p className="text-xs text-slate-500 mt-1 mb-2">Select which venues this manager can access.</p>
+                                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Assign Venues</label>
+                                        <p className="text-xs text-muted-foreground mt-1 mb-2">Select which venues this manager can access.</p>
                                         <div className="max-h-40 overflow-y-auto space-y-2 mt-2">
                                             {venues.filter(v => v.business_id === activeBusiness.id).map(venue => (
-                                                <label key={venue.id} className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-slate-800/40 cursor-pointer">
+                                                <label key={venue.id} className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-muted/40 cursor-pointer">
                                                     <input
                                                         type="checkbox"
                                                         checked={editVenueIds.includes(venue.id)}
@@ -480,11 +480,11 @@ export default function TeamSettingsPage() {
                                                         }}
                                                         className="rounded border-border"
                                                     />
-                                                    <span className="text-sm text-white">{venue.name}</span>
+                                                    <span className="text-sm text-foreground">{venue.name}</span>
                                                 </label>
                                             ))}
                                             {venues.filter(v => v.business_id === activeBusiness.id).length === 0 && (
-                                                <p className="text-xs text-slate-500">No venues yet.</p>
+                                                <p className="text-xs text-muted-foreground">No venues yet.</p>
                                             )}
                                         </div>
                                     </div>
@@ -492,11 +492,11 @@ export default function TeamSettingsPage() {
 
                                 {editRole === 'STAFF' && (
                                     <div>
-                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Assign Areas</label>
-                                        <p className="text-xs text-slate-500 mt-1 mb-2">Select which areas this staff member can access.</p>
+                                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Assign Areas</label>
+                                        <p className="text-xs text-muted-foreground mt-1 mb-2">Select which areas this staff member can access.</p>
                                         <div className="max-h-40 overflow-y-auto space-y-2 mt-2">
                                             {areas.filter(a => venues.some(v => v.id === a.venue_id && v.business_id === activeBusiness.id)).map(area => (
-                                                <label key={area.id} className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-slate-800/40 cursor-pointer">
+                                                <label key={area.id} className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-muted/40 cursor-pointer">
                                                     <input
                                                         type="checkbox"
                                                         checked={editAreaIds.includes(area.id)}
@@ -506,11 +506,11 @@ export default function TeamSettingsPage() {
                                                         }}
                                                         className="rounded border-border"
                                                     />
-                                                    <span className="text-sm text-white">{area.name}</span>
+                                                    <span className="text-sm text-foreground">{area.name}</span>
                                                 </label>
                                             ))}
                                             {areas.filter(a => venues.some(v => v.id === a.venue_id && v.business_id === activeBusiness.id)).length === 0 && (
-                                                <p className="text-xs text-slate-500">No areas yet.</p>
+                                                <p className="text-xs text-muted-foreground">No areas yet.</p>
                                             )}
                                         </div>
                                     </div>

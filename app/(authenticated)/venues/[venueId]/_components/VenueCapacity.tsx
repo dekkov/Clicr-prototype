@@ -117,20 +117,20 @@ export default function VenueCapacity({ venueId }: { venueId: string }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-4">
                     <h3 className="text-lg font-bold">Default Limits</h3>
-                    <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl h-full flex flex-col justify-between">
+                    <div className="bg-card border border-border p-6 rounded-2xl h-full flex flex-col justify-between">
                         <div className="space-y-4">
                             <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Venue Wide Max Capacity</label>
+                                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-2">Venue Wide Max Capacity</label>
                                 <div className="flex items-center gap-4">
                                     <input
                                         type="number"
                                         value={localCapacity}
                                         onChange={(e) => setLocalCapacity(parseInt(e.target.value) || 0)}
-                                        className="w-40 bg-slate-950 px-4 py-2 rounded-lg border border-slate-800 font-mono text-white text-2xl font-bold focus:border-primary focus:outline-none"
+                                        className="w-40 bg-background px-4 py-2 rounded-lg border border-border font-mono text-foreground text-2xl font-bold focus:border-primary focus:outline-none"
                                     />
-                                    <span className="text-sm text-slate-500 font-medium">Max Guests</span>
+                                    <span className="text-sm text-muted-foreground font-medium">Max Guests</span>
                                 </div>
-                                <p className="text-xs text-slate-500 mt-2">
+                                <p className="text-xs text-muted-foreground mt-2">
                                     This is the baseline capacity when no overrides are active.
                                 </p>
                             </div>
@@ -140,8 +140,8 @@ export default function VenueCapacity({ venueId }: { venueId: string }) {
 
                 <div className="space-y-4">
                     <h3 className="text-lg font-bold">Enforcement Logic</h3>
-                    <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl space-y-4">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">When Capacity Is Reached</label>
+                    <div className="bg-card border border-border p-6 rounded-2xl space-y-4">
+                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-2">When Capacity Is Reached</label>
                         <div className="grid grid-cols-1 gap-3">
                             {[
                                 { id: 'WARN_ONLY', label: 'Warn Only', desc: 'Alert staff but allow entry.' },
@@ -155,20 +155,20 @@ export default function VenueCapacity({ venueId }: { venueId: string }) {
                                         "p-4 rounded-xl border cursor-pointer transition-all flex items-center gap-4",
                                         localMode === mode.id
                                             ? "bg-primary border-primary shadow-lg shadow-primary/25"
-                                            : "bg-slate-950 border-slate-800 hover:bg-slate-900"
+                                            : "bg-background border-border hover:bg-card"
                                     )}
                                 >
                                     <div className={cn(
                                         "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0",
-                                        localMode === mode.id ? "border-white" : "border-slate-600"
+                                        localMode === mode.id ? "border-white" : "border-border"
                                     )}>
                                         {localMode === mode.id && <div className="w-2.5 h-2.5 rounded-full bg-white" />}
                                     </div>
                                     <div>
-                                        <div className={cn("font-bold text-sm", localMode === mode.id ? "text-white" : "text-slate-300")}>
+                                        <div className={cn("font-bold text-sm", localMode === mode.id ? "text-foreground" : "text-foreground/80")}>
                                             {mode.label}
                                         </div>
-                                        <div className={cn("text-xs mt-0.5", localMode === mode.id ? "text-white/80" : "text-slate-500")}>
+                                        <div className={cn("text-xs mt-0.5", localMode === mode.id ? "text-white/80" : "text-muted-foreground")}>
                                             {mode.desc}
                                         </div>
                                     </div>
@@ -180,7 +180,7 @@ export default function VenueCapacity({ venueId }: { venueId: string }) {
             </div>
 
             {/* Save Section */}
-            <div className="flex items-center justify-end gap-4 p-4 bg-slate-900/30 border border-slate-800 rounded-xl">
+            <div className="flex items-center justify-end gap-4 p-4 bg-muted/30 border border-border rounded-xl">
                 {saveMessage && (
                     <div className={cn("text-sm font-medium animate-in fade-in slide-in-from-right-2",
                         saveMessage.type === 'success' ? "text-emerald-400" : "text-red-400"
@@ -192,7 +192,7 @@ export default function VenueCapacity({ venueId }: { venueId: string }) {
                 <button
                     onClick={handleSaveSettings}
                     disabled={isSaving}
-                    className="disabled:opacity-50 disabled:cursor-not-allowed bg-white text-slate-900 hover:bg-slate-100 font-bold py-2.5 px-6 rounded-full transition-all shadow-lg flex items-center gap-2"
+                    className="disabled:opacity-50 disabled:cursor-not-allowed bg-white text-slate-900 hover:bg-muted font-bold py-2.5 px-6 rounded-full transition-all shadow-lg flex items-center gap-2"
                 >
                     {isSaving ? <span className="animate-spin text-xl">⟳</span> : <Shield className="w-4 h-4" />}
                     {isSaving ? 'Saving...' : 'Save Capacity Rules'}
@@ -204,11 +204,11 @@ export default function VenueCapacity({ venueId }: { venueId: string }) {
                 <div className="flex justify-between items-center mb-4">
                     <div>
                         <h3 className="text-lg font-bold">Capacity Overrides</h3>
-                        <p className="text-sm text-slate-400">Temporary adjustments for special events.</p>
+                        <p className="text-sm text-muted-foreground">Temporary adjustments for special events.</p>
                     </div>
                     <button
                         onClick={() => setIsOverrideModalOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-medium transition-colors border border-slate-700"
+                        className="flex items-center gap-2 px-4 py-2 bg-muted hover:bg-muted text-foreground rounded-lg font-medium transition-colors border border-border"
                     >
                         <Plus className="w-4 h-4" />
                         Create Override
@@ -217,30 +217,30 @@ export default function VenueCapacity({ venueId }: { venueId: string }) {
 
                 <div className="space-y-3">
                     {overrides.length === 0 && (
-                        <div className="p-8 text-center bg-slate-900/30 rounded-2xl border border-slate-800 border-dashed">
-                            <Calendar className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-                            <p className="text-slate-500 text-sm">No active or upcoming overrides.</p>
+                        <div className="p-8 text-center bg-muted/30 rounded-2xl border border-border border-dashed">
+                            <Calendar className="w-8 h-8 text-muted-foreground/60 mx-auto mb-2" />
+                            <p className="text-muted-foreground text-sm">No active or upcoming overrides.</p>
                         </div>
                     )}
                     {overrides.map(override => (
-                        <div key={override.id} className="flex items-center justify-between p-4 bg-slate-900/50 border border-slate-800 rounded-xl">
+                        <div key={override.id} className="flex items-center justify-between p-4 bg-card border border-border rounded-xl">
                             <div className="flex items-center gap-4">
                                 <div className="p-2 bg-amber-500/10 text-amber-500 rounded-lg">
                                     <Clock className="w-5 h-5" />
                                 </div>
                                 <div>
-                                    <div className="bg-slate-800 text-slate-300 text-xs inline-block px-1.5 py-0.5 rounded mb-1">
+                                    <div className="bg-muted text-foreground/80 text-xs inline-block px-1.5 py-0.5 rounded mb-1">
                                         {new Date(override.start_datetime).toLocaleDateString()}
                                     </div>
-                                    <div className="font-bold text-white">
+                                    <div className="font-bold text-foreground">
                                         {override.capacity_value} Max Capacity
                                     </div>
-                                    <div className="text-xs text-slate-500">
+                                    <div className="text-xs text-muted-foreground">
                                         {override.reason || 'No reason provided'}
                                     </div>
                                 </div>
                             </div>
-                            <div className="text-right text-sm text-slate-500">
+                            <div className="text-right text-sm text-muted-foreground">
                                 {new Date(override.start_datetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(override.end_datetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </div>
                         </div>
@@ -255,64 +255,64 @@ export default function VenueCapacity({ venueId }: { venueId: string }) {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
                         onClick={() => setIsOverrideModalOpen(false)}
                     >
                         <motion.div
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.95, opacity: 0 }}
-                            className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-lg shadow-xl"
+                            className="bg-card border border-border rounded-2xl p-6 w-full max-w-lg shadow-xl"
                             onClick={e => e.stopPropagation()}
                         >
                             <h2 className="text-xl font-bold mb-4">Create Capacity Override</h2>
                             <form onSubmit={handleSaveOverride} className="space-y-4">
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-slate-400">Override Capacity</label>
+                                    <label className="text-sm font-medium text-muted-foreground">Override Capacity</label>
                                     <input
                                         type="number"
                                         value={newOverride.capacity_value}
                                         onChange={e => setNewOverride(prev => ({ ...prev, capacity_value: parseInt(e.target.value) || 0 }))}
-                                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-white text-2xl font-mono"
+                                        className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground text-2xl font-mono"
                                         placeholder="e.g. 600"
                                     />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium text-slate-400">Start Time</label>
+                                        <label className="text-sm font-medium text-muted-foreground">Start Time</label>
                                         <input
                                             type="datetime-local"
                                             value={newOverride.start_datetime || ''}
                                             onChange={e => setNewOverride(prev => ({ ...prev, start_datetime: e.target.value }))}
-                                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-white text-sm"
+                                            className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground text-sm"
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium text-slate-400">End Time</label>
+                                        <label className="text-sm font-medium text-muted-foreground">End Time</label>
                                         <input
                                             type="datetime-local"
                                             value={newOverride.end_datetime || ''}
                                             onChange={e => setNewOverride(prev => ({ ...prev, end_datetime: e.target.value }))}
-                                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-white text-sm"
+                                            className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground text-sm"
                                         />
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-slate-400">Reason (Optional)</label>
+                                    <label className="text-sm font-medium text-muted-foreground">Reason (Optional)</label>
                                     <input
                                         type="text"
                                         value={newOverride.reason || ''}
                                         onChange={e => setNewOverride(prev => ({ ...prev, reason: e.target.value }))}
-                                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-white"
+                                        className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground"
                                         placeholder="e.g. Special Event: DJ Night"
                                     />
                                 </div>
 
-                                <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-800">
+                                <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
                                     <button
                                         type="button"
                                         onClick={() => setIsOverrideModalOpen(false)}
-                                        className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+                                        className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
                                     >
                                         Cancel
                                     </button>

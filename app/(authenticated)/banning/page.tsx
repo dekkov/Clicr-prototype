@@ -104,7 +104,7 @@ export default function BanningPage() {
                 <div className="flex justify-between items-start">
                     <div>
                         <h1 className="text-3xl mb-1">Bans</h1>
-                        <p className="text-gray-400 text-sm">
+                        <p className="text-muted-foreground text-sm">
                             {totalActiveBans} active ban{totalActiveBans !== 1 ? 's' : ''} across your venues
                         </p>
                     </div>
@@ -125,17 +125,17 @@ export default function BanningPage() {
                     placeholder="Search bans..."
                     value={search}
                     onChange={e => setSearch(e.target.value)}
-                    className="w-full bg-gray-900 border border-gray-800 rounded-xl py-3 pl-12 pr-4 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full bg-card border border-border rounded-xl py-3 pl-12 pr-4 text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
             </div>
 
             {/* Filter Tabs */}
-            <div className="flex bg-gray-900 rounded-xl p-1 border border-gray-800 w-fit">
+            <div className="flex bg-card rounded-xl p-1 border border-border w-fit">
                 {(['ALL', 'ACTIVE', 'REVOKED'] as const).map(f => (
                     <button
                         key={f}
                         onClick={() => setFilter(f)}
-                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filter === f ? 'bg-gray-800 text-white shadow' : 'text-gray-400 hover:text-white'}`}
+                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filter === f ? 'bg-muted text-foreground shadow' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                         {f}
                     </button>
@@ -147,42 +147,42 @@ export default function BanningPage() {
                 {(storeLoading || loading) ? (
                     <p className="text-center text-gray-500 py-12">Loading bans...</p>
                 ) : filteredBans.length === 0 ? (
-                    <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-12 text-center">
-                        <div className="w-16 h-16 rounded-xl bg-red-900/30 border border-red-500/20 flex items-center justify-center mx-auto mb-4">
+                    <div className="bg-card border border-border rounded-xl p-12 text-center">
+                        <div className="w-16 h-16 rounded-xl bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-500/20 flex items-center justify-center mx-auto mb-4">
                             <Shield className="w-8 h-8 text-red-400" />
                         </div>
                         <h3 className="text-lg mb-2">No Bans</h3>
-                        <p className="text-gray-400 text-sm">Your ban list is currently empty.</p>
+                        <p className="text-muted-foreground text-sm">Your ban list is currently empty.</p>
                     </div>
                 ) : filteredBans.map(ban => (
                     <div
                         key={ban.id}
-                        className="bg-gray-900/50 border border-gray-800 rounded-xl p-5 flex items-start gap-4"
+                        className="bg-card border border-border rounded-xl p-5 flex items-start gap-4"
                     >
-                        <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-red-900/30 border border-red-500/20 flex items-center justify-center">
+                        <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-500/20 flex items-center justify-center">
                             <Shield className="w-6 h-6 text-red-400" />
                         </div>
 
                         <div className="flex-1 min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
-                                <span className="font-bold text-white">
+                                <span className="font-bold text-foreground">
                                     {ban.banned_persons?.first_name} {ban.banned_persons?.last_name}
                                 </span>
-                                <span className="text-xs font-medium bg-gray-800 text-gray-300 border border-gray-700 px-2 py-0.5 rounded-full">
+                                <span className="text-xs font-medium bg-muted text-foreground/80 border border-border px-2 py-0.5 rounded-full">
                                     {ban.applies_to_all_locations ? 'All Venues' : 'Venue Specific'}
                                 </span>
                                 {(ban.status === 'REMOVED' || ban.status === 'EXPIRED') && (
-                                    <span className="text-xs font-medium bg-gray-800 text-gray-500 border border-gray-700 px-2 py-0.5 rounded-full">
+                                    <span className="text-xs font-medium bg-muted text-muted-foreground border border-border px-2 py-0.5 rounded-full">
                                         {ban.status === 'EXPIRED' ? 'Expired' : 'Revoked'}
                                     </span>
                                 )}
                             </div>
 
-                            <p className="text-gray-400 text-sm italic mt-1">
+                            <p className="text-muted-foreground text-sm italic mt-1">
                                 {ban.reason_notes || ban.reason_category || '—'}
                             </p>
 
-                            <p className="text-gray-600 text-xs mt-1">
+                            <p className="text-muted-foreground/60 text-xs mt-1">
                                 Added by Staff · {new Date(ban.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                             </p>
                         </div>
@@ -190,7 +190,7 @@ export default function BanningPage() {
                         {ban.status === 'ACTIVE' && (
                             <button
                                 onClick={() => handleRevoke(ban.id)}
-                                className="flex-shrink-0 text-xs font-bold text-gray-400 hover:text-white border border-gray-700 hover:bg-gray-800 px-3 py-1.5 rounded-lg transition-colors"
+                                className="flex-shrink-0 text-xs font-bold text-muted-foreground hover:text-foreground border border-border hover:bg-muted px-3 py-1.5 rounded-lg transition-colors"
                             >
                                 Revoke
                             </button>

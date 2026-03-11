@@ -86,14 +86,14 @@ export function GettingStartedChecklist() {
         <div className="glass-panel border border-primary/20 rounded-2xl p-6 animate-in fade-in slide-in-from-top-2 duration-300">
             <div className="flex items-start justify-between mb-5">
                 <div>
-                    <h3 className="text-lg font-bold text-white">Ready for First Night</h3>
-                    <p className="text-slate-400 text-sm mt-0.5">
+                    <h3 className="text-lg font-bold text-foreground">Ready for First Night</h3>
+                    <p className="text-muted-foreground text-sm mt-0.5">
                         {completedCount} of {items.length} steps complete
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
                     {/* Progress bar */}
-                    <div className="w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden">
                         <div
                             className="h-full bg-primary rounded-full transition-all duration-500"
                             style={{ width: `${(completedCount / items.length) * 100}%` }}
@@ -101,7 +101,7 @@ export function GettingStartedChecklist() {
                     </div>
                     <button
                         onClick={handleDismiss}
-                        className="text-slate-600 hover:text-slate-300 transition-colors p-1"
+                        className="text-muted-foreground/60 hover:text-foreground/80 transition-colors p-1"
                         title="Dismiss"
                     >
                         <X className="w-4 h-4" />
@@ -115,14 +115,14 @@ export function GettingStartedChecklist() {
                         {item.completed ? (
                             <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
                         ) : (
-                            <Circle className="w-5 h-5 text-slate-600 shrink-0" />
+                            <Circle className="w-5 h-5 text-muted-foreground/60 shrink-0" />
                         )}
                         <div className="flex-1 min-w-0">
-                            <div className={`text-sm font-medium ${item.completed ? 'text-slate-500 line-through' : 'text-slate-200'}`}>
+                            <div className={`text-sm font-medium ${item.completed ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
                                 {item.label}
                             </div>
                             {!item.completed && (
-                                <div className="text-xs text-slate-600">{item.description}</div>
+                                <div className="text-xs text-muted-foreground/60">{item.description}</div>
                             )}
                         </div>
                         {!item.completed && item.href && (

@@ -36,17 +36,17 @@ function TestScanModal({ onClose }: { onClose: () => void }) {
     }, [scanInput]);
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
-            <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-xl" onClick={e => e.stopPropagation()}>
-                <h3 className="text-lg font-bold text-white mb-2">Test Bluetooth Scanner</h3>
-                <p className="text-sm text-slate-400 mb-4">Scan an ID with your Bluetooth scanner. The scanner types into this page.</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4" onClick={onClose}>
+            <div className="bg-card border border-border rounded-2xl max-w-md w-full p-6 shadow-xl" onClick={e => e.stopPropagation()}>
+                <h3 className="text-lg font-bold text-foreground mb-2">Test Bluetooth Scanner</h3>
+                <p className="text-sm text-muted-foreground mb-4">Scan an ID with your Bluetooth scanner. The scanner types into this page.</p>
                 <input
                     ref={inputRef}
                     type="text"
                     value={scanInput}
                     onChange={e => setScanInput(e.target.value)}
                     placeholder="Focus here, then scan..."
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-600 mb-4"
+                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground placeholder-muted-foreground mb-4"
                     autoFocus
                 />
                 {status === 'success' && (
@@ -61,7 +61,7 @@ function TestScanModal({ onClose }: { onClose: () => void }) {
                         <span className="font-medium">Invalid scan. Try a different ID or check scanner.</span>
                     </div>
                 )}
-                <button onClick={onClose} className="w-full py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-medium">
+                <button onClick={onClose} className="w-full py-2 rounded-xl bg-muted hover:bg-muted text-foreground font-medium">
                     Close
                 </button>
             </div>
@@ -87,13 +87,13 @@ export default function ScanningPage() {
 
     if (!canManageSettings(currentUser?.role as Role | undefined)) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] text-slate-500">
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-muted-foreground">
                 <p className="text-base font-medium">Access restricted</p>
             </div>
         );
     }
 
-    if (!business) return <div className="p-8 text-white">Loading...</div>;
+    if (!business) return <div className="p-8 text-foreground">Loading...</div>;
 
     const handleSave = async () => {
         if (!business) return;
@@ -112,65 +112,65 @@ export default function ScanningPage() {
     return (
         <div className="space-y-6 max-w-2xl">
             <div className="flex items-center gap-4">
-                <Link href="/settings" className="p-2 bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors">
+                <Link href="/settings" className="p-2 bg-muted rounded-lg text-muted-foreground hover:text-foreground transition-colors">
                     <ArrowLeft className="w-5 h-5" />
                 </Link>
-                <h1 className="text-2xl font-bold text-white">Scanning Configuration</h1>
+                <h1 className="text-2xl font-bold text-foreground">Scanning Configuration</h1>
             </div>
 
-            <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-6">
+            <div className="bg-card border border-border rounded-xl p-6 space-y-6">
                 <div>
-                    <label className="block text-sm font-bold text-slate-400 uppercase tracking-widest mb-3">Default Scan Method</label>
+                    <label className="block text-sm font-bold text-muted-foreground uppercase tracking-widest mb-3">Default Scan Method</label>
                     <div className="grid grid-cols-3 gap-3">
                         <button type="button" onClick={() => setScanMethod('CAMERA')}
-                            className={`p-4 rounded-xl border text-left transition-all ${scanMethod === 'CAMERA' ? 'bg-primary/10 border-primary' : 'bg-slate-800 border-slate-700 hover:bg-slate-700'}`}>
-                            <div className={`font-bold text-sm ${scanMethod === 'CAMERA' ? 'text-primary' : 'text-white'}`}>Phone Camera</div>
-                            <div className="text-xs text-slate-500 mt-1">Use device camera to scan IDs</div>
+                            className={`p-4 rounded-xl border text-left transition-all ${scanMethod === 'CAMERA' ? 'bg-primary/10 border-primary' : 'bg-muted border-border hover:bg-muted'}`}>
+                            <div className={`font-bold text-sm ${scanMethod === 'CAMERA' ? 'text-primary' : 'text-foreground'}`}>Phone Camera</div>
+                            <div className="text-xs text-muted-foreground mt-1">Use device camera to scan IDs</div>
                         </button>
                         <button type="button" onClick={() => setScanMethod('BLUETOOTH')}
-                            className={`p-4 rounded-xl border text-left transition-all ${scanMethod === 'BLUETOOTH' ? 'bg-primary/10 border-primary' : 'bg-slate-800 border-slate-700 hover:bg-slate-700'}`}>
-                            <div className={`font-bold text-sm ${scanMethod === 'BLUETOOTH' ? 'text-primary' : 'text-white'}`}>Bluetooth Scanner</div>
-                            <div className="text-xs text-slate-500 mt-1">External hardware scanner</div>
+                            className={`p-4 rounded-xl border text-left transition-all ${scanMethod === 'BLUETOOTH' ? 'bg-primary/10 border-primary' : 'bg-muted border-border hover:bg-muted'}`}>
+                            <div className={`font-bold text-sm ${scanMethod === 'BLUETOOTH' ? 'text-primary' : 'text-foreground'}`}>Bluetooth Scanner</div>
+                            <div className="text-xs text-muted-foreground mt-1">External hardware scanner</div>
                         </button>
                         <button type="button" onClick={() => setScanMethod('NFC')}
-                            className={`p-4 rounded-xl border text-left transition-all ${scanMethod === 'NFC' ? 'bg-primary/10 border-primary' : 'bg-slate-800 border-slate-700 hover:bg-slate-700'}`}>
-                            <div className={`font-bold text-sm ${scanMethod === 'NFC' ? 'text-primary' : 'text-white'}`}>NFC</div>
-                            <div className="text-xs text-slate-500 mt-1">Passports &amp; international IDs</div>
+                            className={`p-4 rounded-xl border text-left transition-all ${scanMethod === 'NFC' ? 'bg-primary/10 border-primary' : 'bg-muted border-border hover:bg-muted'}`}>
+                            <div className={`font-bold text-sm ${scanMethod === 'NFC' ? 'text-primary' : 'text-foreground'}`}>NFC</div>
+                            <div className="text-xs text-muted-foreground mt-1">Passports &amp; international IDs</div>
                         </button>
                     </div>
                 </div>
 
-                <div className="flex items-center justify-between bg-slate-800/50 p-4 rounded-xl border border-slate-700">
+                <div className="flex items-center justify-between bg-muted/50 p-4 rounded-xl border border-border">
                     <div>
-                        <div className="font-bold text-white text-sm">Enable ID scanning on all devices</div>
-                        <div className="text-xs text-slate-500 mt-1">New devices will have scanning enabled by default</div>
+                        <div className="font-bold text-foreground text-sm">Enable ID scanning on all devices</div>
+                        <div className="text-xs text-muted-foreground mt-1">New devices will have scanning enabled by default</div>
                     </div>
                     <button type="button" onClick={() => setScanEnabled(!scanEnabled)}
-                        className={`w-12 h-7 rounded-full transition-all relative ${scanEnabled ? 'bg-primary' : 'bg-slate-600'}`}>
+                        className={`w-12 h-7 rounded-full transition-all relative ${scanEnabled ? 'bg-primary' : 'bg-muted'}`}>
                         <div className={`w-5 h-5 rounded-full bg-white absolute top-1 transition-all ${scanEnabled ? 'left-6' : 'left-1'}`} />
                     </button>
                 </div>
 
                 <button onClick={handleSave} disabled={isSaving}
-                    className="flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all disabled:opacity-50">
+                    className="flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary/90 text-foreground font-bold rounded-xl transition-all disabled:opacity-50">
                     {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     {saved ? 'Saved!' : isSaving ? 'Saving...' : 'Save Scan Config'}
                 </button>
             </div>
 
             {scanMethod === 'BLUETOOTH' && (
-                <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-4">
+                <div className="bg-card border border-border rounded-xl p-6 space-y-4">
                     <div className="flex items-center gap-2">
                         <Bluetooth className="w-5 h-5 text-primary" />
-                        <h2 className="text-lg font-bold text-white">Bluetooth Scanner Setup</h2>
+                        <h2 className="text-lg font-bold text-foreground">Bluetooth Scanner Setup</h2>
                     </div>
-                    <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
-                        <div className="font-bold text-white text-sm mb-2">1. Pair your scanner</div>
-                        <p className="text-sm text-slate-400">Go to System Settings → Bluetooth and pair your scanner. Most Bluetooth ID scanners emulate a keyboard — once paired, they type into the scanner page automatically.</p>
+                    <div className="bg-muted/50 p-4 rounded-xl border border-border">
+                        <div className="font-bold text-foreground text-sm mb-2">1. Pair your scanner</div>
+                        <p className="text-sm text-muted-foreground">Go to System Settings → Bluetooth and pair your scanner. Most Bluetooth ID scanners emulate a keyboard — once paired, they type into the scanner page automatically.</p>
                     </div>
-                    <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
-                        <div className="font-bold text-white text-sm mb-2">2. Open the scanner page</div>
-                        <p className="text-sm text-slate-400">Navigate to Scanner, select Bluetooth mode. The page maintains focus automatically. Scan an ID to verify.</p>
+                    <div className="bg-muted/50 p-4 rounded-xl border border-border">
+                        <div className="font-bold text-foreground text-sm mb-2">2. Open the scanner page</div>
+                        <p className="text-sm text-muted-foreground">Navigate to Scanner, select Bluetooth mode. The page maintains focus automatically. Scan an ID to verify.</p>
                     </div>
                     <button
                         onClick={() => setShowTestScan(true)}
@@ -183,13 +183,13 @@ export default function ScanningPage() {
                         <button
                             type="button"
                             onClick={() => setShowTroubleshooting(!showTroubleshooting)}
-                            className="flex items-center gap-2 text-slate-400 hover:text-white text-sm transition-colors"
+                            className="flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm transition-colors"
                         >
                             {showTroubleshooting ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                             Troubleshooting tips
                         </button>
                         {showTroubleshooting && (
-                            <ul className="mt-2 text-sm text-slate-500 space-y-1 list-disc list-inside">
+                            <ul className="mt-2 text-sm text-muted-foreground space-y-1 list-disc list-inside">
                                 <li>Ensure scanner is paired and powered on</li>
                                 <li>Scanner must output AAMVA/PDF417 format (US driver licenses)</li>
                                 <li>On the scanner page, focus is locked automatically</li>
@@ -201,17 +201,17 @@ export default function ScanningPage() {
             )}
 
             {scanMethod === 'NFC' && (
-                <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-4">
+                <div className="bg-card border border-border rounded-xl p-6 space-y-4">
                     <div className="flex items-center gap-2">
                         <Wifi className="w-5 h-5 text-primary" />
-                        <h2 className="text-lg font-bold text-white">NFC Mode</h2>
+                        <h2 className="text-lg font-bold text-foreground">NFC Mode</h2>
                     </div>
-                    <div className="bg-amber-900/20 border border-amber-700/40 p-4 rounded-xl">
+                    <div className="bg-amber-100 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700/40 p-4 rounded-xl">
                         <p className="text-amber-400 text-sm font-medium">Chrome on Android only</p>
                         <p className="text-amber-600/80 text-xs mt-1">Web NFC is not supported on iOS, desktop, or other browsers.</p>
                     </div>
-                    <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
-                        <p className="text-sm text-slate-400">NFC mode reads NFC-enabled ID cards — primarily passports and some international IDs. <strong className="text-white">US driver&apos;s licenses do not have NFC chips</strong> and will not work in this mode.</p>
+                    <div className="bg-muted/50 p-4 rounded-xl border border-border">
+                        <p className="text-sm text-muted-foreground">NFC mode reads NFC-enabled ID cards — primarily passports and some international IDs. <strong className="text-foreground">US driver&apos;s licenses do not have NFC chips</strong> and will not work in this mode.</p>
                     </div>
                 </div>
             )}

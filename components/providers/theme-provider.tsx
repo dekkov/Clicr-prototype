@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 
-type Theme = "light" | "dark" | "system";
+type Theme = "light" | "dark";
 
 interface ThemeContextValue {
     theme: Theme;
@@ -14,53 +14,29 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 const STORAGE_KEY = "clicr-theme";
 
-function getSystemTheme(): "light" | "dark" {
-    if (typeof window === "undefined") return "dark";
-    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-}
-
-function resolveTheme(theme: Theme): "light" | "dark" {
-    return theme === "system" ? getSystemTheme() : theme;
-}
-
-function applyTheme(resolved: "light" | "dark") {
+function applyTheme(theme: "light" | "dark") {
     const root = document.documentElement;
     root.classList.remove("light", "dark");
-    root.classList.add(resolved);
+    root.classList.add(theme);
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-    const [theme, setThemeState] = useState<Theme>("system");
+    const [theme, setThemeState] = useState<Theme>("dark");
     const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("dark");
 
     useEffect(() => {
         const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
-        const initial = stored || "system";
+        const initial: Theme = stored === "light" || stored === "dark" ? stored : "dark";
         setThemeState(initial);
-        const resolved = resolveTheme(initial);
-        setResolvedTheme(resolved);
-        applyTheme(resolved);
+        setResolvedTheme(initial);
+        applyTheme(initial);
     }, []);
-
-    useEffect(() => {
-        const mq = window.matchMedia("(prefers-color-scheme: dark)");
-        const handler = () => {
-            if (theme === "system") {
-                const resolved = getSystemTheme();
-                setResolvedTheme(resolved);
-                applyTheme(resolved);
-            }
-        };
-        mq.addEventListener("change", handler);
-        return () => mq.removeEventListener("change", handler);
-    }, [theme]);
 
     const setTheme = useCallback((newTheme: Theme) => {
         setThemeState(newTheme);
+        setResolvedTheme(newTheme);
         localStorage.setItem(STORAGE_KEY, newTheme);
-        const resolved = resolveTheme(newTheme);
-        setResolvedTheme(resolved);
-        applyTheme(resolved);
+        applyTheme(newTheme);
     }, []);
 
     return (

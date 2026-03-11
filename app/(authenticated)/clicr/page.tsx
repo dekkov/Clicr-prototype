@@ -47,26 +47,26 @@ export default function ClicrListPage() {
                 <PageHeader canAddClicr={canAddClicr(currentUser?.role as Role | undefined)} onAddClicr={() => setShowAddClicr(true)} onBoardView={() => setShowBoardPanel(true)} />
                 <div className="space-y-6 animate-pulse">
                     <div className="flex items-center gap-4">
-                        <div className="h-6 bg-gray-800 rounded w-40" />
-                        <div className="flex-1 h-px bg-gray-800" />
+                        <div className="h-6 bg-muted rounded w-40" />
+                        <div className="flex-1 h-px bg-muted" />
                     </div>
                     <div className="space-y-3">
-                        <div className="h-4 bg-gray-800 rounded w-24" />
+                        <div className="h-4 bg-muted rounded w-24" />
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {[1, 2, 3].map(i => (
-                                <div key={i} className="bg-gray-900/50 border border-gray-800 p-6 rounded-xl space-y-3">
+                                <div key={i} className="bg-card border border-border p-6 rounded-xl space-y-3">
                                     <div className="flex items-start gap-3">
-                                        <div className="w-10 h-10 bg-gray-800 rounded-lg" />
+                                        <div className="w-10 h-10 bg-muted rounded-lg" />
                                         <div className="flex-1 space-y-1.5">
-                                            <div className="h-4 bg-gray-800 rounded w-28" />
-                                            <div className="h-3 bg-gray-800 rounded w-20" />
+                                            <div className="h-4 bg-muted rounded w-28" />
+                                            <div className="h-3 bg-muted rounded w-20" />
                                         </div>
                                     </div>
                                     <div className="flex gap-2">
-                                        <div className="h-5 bg-gray-800 rounded-full w-16" />
-                                        <div className="h-5 bg-gray-800 rounded-full w-20" />
+                                        <div className="h-5 bg-muted rounded-full w-16" />
+                                        <div className="h-5 bg-muted rounded-full w-20" />
                                     </div>
-                                    <div className="h-8 bg-gray-800 rounded w-16" />
+                                    <div className="h-8 bg-muted rounded w-16" />
                                 </div>
                             ))}
                         </div>
@@ -80,7 +80,7 @@ export default function ClicrListPage() {
         return (
             <div className="p-6 max-w-[1600px] pb-20">
                 <PageHeader canAddClicr={canAddClicr(currentUser?.role as Role | undefined)} onAddClicr={() => setShowAddClicr(true)} onBoardView={() => setShowBoardPanel(true)} />
-                <div className="p-8 text-gray-400">No Clicrs configured yet.</div>
+                <div className="p-8 text-muted-foreground">No Clicrs configured yet.</div>
             </div>
         );
     }
@@ -126,14 +126,14 @@ export default function ClicrListPage() {
             </div>
 
             {showAddClicr && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-                    <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-md space-y-4">
-                        <h3 className="text-lg font-bold text-white">Add Clicr</h3>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/60 p-4">
+                    <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md space-y-4">
+                        <h3 className="text-lg font-bold text-foreground">Add Clicr</h3>
                         <div className="space-y-3">
                             <div>
-                                <label className="text-xs font-medium text-slate-400 mb-1 block">Area</label>
+                                <label className="text-xs font-medium text-muted-foreground mb-1 block">Area</label>
                                 <select value={newClicrAreaId} onChange={e => setNewClicrAreaId(e.target.value)}
-                                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm">
+                                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground text-sm">
                                     <option value="">Select area...</option>
                                     {(venues || []).map(v => {
                                         const venueActiveAreas = (areas || []).filter(a => a.venue_id === v.id && a.is_active);
@@ -149,15 +149,15 @@ export default function ClicrListPage() {
                                 </select>
                             </div>
                             <div>
-                                <label className="text-xs font-medium text-slate-400 mb-1 block">Name</label>
+                                <label className="text-xs font-medium text-muted-foreground mb-1 block">Name</label>
                                 <input type="text" value={newClicrName} onChange={e => setNewClicrName(e.target.value)}
                                     placeholder="e.g. Front Door"
-                                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm" />
+                                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground text-sm" />
                             </div>
                             <div>
-                                <label className="text-xs font-medium text-slate-400 mb-1 block">Flow Mode</label>
+                                <label className="text-xs font-medium text-muted-foreground mb-1 block">Flow Mode</label>
                                 <select value={newClicrFlow} onChange={e => setNewClicrFlow(e.target.value as FlowMode)}
-                                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm">
+                                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground text-sm">
                                     <option value="BIDIRECTIONAL">Both (in + out)</option>
                                     <option value="IN_ONLY">In only</option>
                                     <option value="OUT_ONLY">Out only</option>
@@ -166,7 +166,7 @@ export default function ClicrListPage() {
                         </div>
                         <div className="flex gap-3 pt-2">
                             <button onClick={() => { setShowAddClicr(false); setNewClicrName(''); setNewClicrAreaId(''); }}
-                                className="flex-1 py-2 border border-slate-700 text-slate-400 hover:text-white rounded-xl text-sm font-medium transition-colors">
+                                className="flex-1 py-2 border border-border text-muted-foreground hover:text-foreground rounded-xl text-sm font-medium transition-colors">
                                 Cancel
                             </button>
                             <button onClick={async () => {
@@ -203,7 +203,7 @@ function PageHeader({ canAddClicr, onAddClicr, onBoardView }: { canAddClicr: boo
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl mb-1">Clicrs</h1>
-                    <p className="text-gray-400 text-sm">Your counting and scanning devices.</p>
+                    <p className="text-muted-foreground text-sm">Your counting and scanning devices.</p>
                 </div>
                 <div className="flex items-center gap-3">
                     {canAddClicr && (
@@ -215,7 +215,7 @@ function PageHeader({ canAddClicr, onAddClicr, onBoardView }: { canAddClicr: boo
                             Add Clicr
                         </button>
                     )}
-                    <button onClick={onBoardView} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-800/50 hover:bg-gray-800 text-sm text-gray-300 transition-colors">
+                    <button onClick={onBoardView} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-muted/50 hover:bg-muted text-sm text-foreground/80 transition-colors">
                         <LayoutGrid className="w-4 h-4" />
                         Board View
                     </button>
@@ -249,8 +249,8 @@ function ClicrCard({ clicr, area, isVenueCounter, venue, isOnBoard }: { clicr: C
 
     const isScanner = scanEnabled;
     const iconBg = isVenueCounter
-        ? 'bg-amber-950/30 border-amber-500/20'
-        : isScanner ? 'bg-purple-900/30 border-purple-500/20' : 'bg-emerald-900/30 border-emerald-500/20';
+        ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-500/20'
+        : isScanner ? 'bg-purple-100 dark:bg-purple-900/30 border-purple-200 dark:border-purple-500/20' : 'bg-emerald-100 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-500/20';
 
     return (
         <Link
@@ -258,8 +258,8 @@ function ClicrCard({ clicr, area, isVenueCounter, venue, isOnBoard }: { clicr: C
             className={cn(
                 "border rounded-xl p-6 hover:border-opacity-80 transition-colors group",
                 isVenueCounter
-                    ? "bg-amber-950/10 border-amber-500/20 hover:border-amber-500/40"
-                    : "bg-gray-900/50 border-gray-800 hover:border-gray-700"
+                    ? "bg-amber-50 dark:bg-amber-950/10 border-amber-200 dark:border-amber-500/20 hover:border-amber-500/40"
+                    : "bg-card border-border hover:border-border"
             )}
         >
             <div className="flex items-center justify-between mb-6">
@@ -278,11 +278,12 @@ function ClicrCard({ clicr, area, isVenueCounter, venue, isOnBoard }: { clicr: C
                     </div>
                     <div>
                         <div className={cn("font-medium", isVenueCounter && "text-amber-200")}>{clicr.name}</div>
-                        <div className="text-xs text-gray-400">{isVenueCounter ? 'Venue Counter' : area?.name}</div>
+                        <div className="text-xs text-muted-foreground">{isVenueCounter ? 'Venue Counter' : area?.name}</div>
                     </div>
                 </div>
-                <div className="opacity-0 group-hover:opacity-100 transition-opacity w-8 h-8 rounded-lg hover:bg-gray-800 flex items-center justify-center">
-                    <ChevronRight className="w-5 h-5 text-gray-400" />
+                <div className="opacity-0 group-hover:opacity-100 transition-opacity w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center">
+                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
+
                 </div>
             </div>
 
@@ -291,24 +292,24 @@ function ClicrCard({ clicr, area, isVenueCounter, venue, isOnBoard }: { clicr: C
                     <Wifi className="w-4 h-4 text-emerald-400" />
                     <span className="text-emerald-400">Online</span>
                 </div>
-                <div className="text-gray-400">·</div>
-                <div className="text-gray-400">{flowModeLabel}</div>
+                <div className="text-muted-foreground">·</div>
+                <div className="text-muted-foreground">{flowModeLabel}</div>
                 {scanEnabled && (
                     <>
-                        <div className="text-gray-400">·</div>
+                        <div className="text-muted-foreground">·</div>
                         <div className="text-purple-400">Scan</div>
                     </>
                 )}
                 {isOnBoard && (
                     <>
-                        <div className="text-gray-400">·</div>
+                        <div className="text-muted-foreground">·</div>
                         <div className="text-primary">On Board</div>
                     </>
                 )}
             </div>
 
-            <div className="text-sm text-gray-400">
-                <span className={cn("text-2xl", isVenueCounter ? "text-amber-300" : "text-white")}>{occupancy}</span> / {capacityDisplay} {isVenueCounter ? 'in venue' : 'in area'}
+            <div className="text-sm text-muted-foreground">
+                <span className={cn("text-2xl", isVenueCounter ? "text-amber-600 dark:text-amber-300" : "text-foreground")}>{occupancy}</span> / {capacityDisplay} {isVenueCounter ? 'in venue' : 'in area'}
             </div>
         </Link>
     );

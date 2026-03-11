@@ -50,7 +50,7 @@ export default function DebugContextPage() {
     }, []);
 
     return (
-        <div className="p-8 text-white font-mono text-xs space-y-6">
+        <div className="p-8 text-foreground font-mono text-xs space-y-6">
             <h1 className="text-xl font-bold text-red-500">SYSTEM CONTEXT TRUTH</h1>
 
             <div className="grid grid-cols-2 gap-8">
@@ -77,9 +77,9 @@ export default function DebugContextPage() {
 }
 
 const Section = ({ title, data }: { title: string, data: any }) => (
-    <div className="bg-slate-900 p-4 rounded border border-slate-800">
+    <div className="bg-card p-4 rounded border border-border">
         <h3 className="text-emerald-400 font-bold mb-2">{title}</h3>
-        <pre className="whitespace-pre-wrap text-slate-400">
+        <pre className="whitespace-pre-wrap text-muted-foreground">
             {JSON.stringify(data, null, 2)}
         </pre>
     </div>

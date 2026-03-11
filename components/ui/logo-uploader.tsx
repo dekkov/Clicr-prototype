@@ -93,7 +93,7 @@ export function LogoUploader({ currentUrl, businessId, onUpload, demoMode }: Log
                 onClick={() => inputRef.current?.click()}
                 onDrop={handleDrop}
                 onDragOver={(e) => e.preventDefault()}
-                className="relative w-24 h-24 rounded-full border-2 border-dashed border-slate-700 hover:border-primary/50 flex items-center justify-center cursor-pointer overflow-hidden transition-colors bg-slate-900/50"
+                className="relative w-24 h-24 rounded-full border-2 border-dashed border-border hover:border-primary/50 flex items-center justify-center cursor-pointer overflow-hidden transition-colors bg-card"
             >
                 {uploading ? (
                     <Loader2 className="w-6 h-6 text-primary animate-spin" />
@@ -103,15 +103,15 @@ export function LogoUploader({ currentUrl, businessId, onUpload, demoMode }: Log
                         <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); handleRemove(); }}
-                            className="absolute top-0 right-0 p-1 bg-black/60 rounded-full"
+                            className="absolute top-0 right-0 p-1 bg-background/60 rounded-full"
                         >
                             <X className="w-3 h-3 text-white" />
                         </button>
                     </>
                 ) : (
                     <div className="flex flex-col items-center gap-1">
-                        <Building2 className="w-8 h-8 text-slate-600" />
-                        <Upload className="w-3 h-3 text-slate-600" />
+                        <Building2 className="w-8 h-8 text-muted-foreground/60" />
+                        <Upload className="w-3 h-3 text-muted-foreground/60" />
                     </div>
                 )}
             </div>
@@ -128,7 +128,7 @@ export function LogoUploader({ currentUrl, businessId, onUpload, demoMode }: Log
             />
 
             {error && <p className="text-xs text-red-400">{error}</p>}
-            <p className="text-xs text-slate-500">PNG, JPG, or WEBP. Max 2MB.</p>
+            <p className="text-xs text-muted-foreground">PNG, JPG, or WEBP. Max 2MB.</p>
         </div>
     );
 }

@@ -279,15 +279,15 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
             <div className="flex items-center justify-between px-2">
                 {STEP_LABELS.map((s, i) => (
                     <React.Fragment key={s}>
-                        <div className={`flex flex-col items-center gap-2 ${i <= currentIndex ? 'text-primary' : 'text-slate-500'}`}>
+                        <div className={`flex flex-col items-center gap-2 ${i <= currentIndex ? 'text-primary' : 'text-muted-foreground'}`}>
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 text-sm font-bold
-                                ${i < currentIndex ? 'border-primary bg-primary text-white' : i === currentIndex ? 'border-primary bg-primary/10' : 'border-slate-700'}`}>
+                                ${i < currentIndex ? 'border-primary bg-primary text-white' : i === currentIndex ? 'border-primary bg-primary/10' : 'border-border'}`}>
                                 {i < currentIndex ? <Check className="w-4 h-4" /> : i + 1}
                             </div>
                             <span className="text-[10px] font-bold hidden sm:block">{STEP_DISPLAY[s]}</span>
                         </div>
                         {i < STEP_LABELS.length - 1 && (
-                            <div className={`h-0.5 flex-1 mx-2 ${i < currentIndex ? 'bg-primary' : 'bg-slate-800'}`} />
+                            <div className={`h-0.5 flex-1 mx-2 ${i < currentIndex ? 'bg-primary' : 'bg-muted'}`} />
                         )}
                     </React.Fragment>
                 ))}
@@ -295,31 +295,31 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
 
             {/* STEP 1: BUSINESS */}
             {step === 'BUSINESS' && (
-                <form onSubmit={handleCreateBusiness} className="space-y-6 bg-slate-900/50 border border-slate-800 p-8 rounded-2xl shadow-xl">
+                <form onSubmit={handleCreateBusiness} className="space-y-6 bg-card border border-border p-8 rounded-2xl shadow-xl">
                     <div className="flex items-center gap-3">
                         <Building2 className="text-primary w-6 h-6" />
-                        <h2 className="text-2xl font-bold text-white">Create your organization</h2>
+                        <h2 className="text-2xl font-bold text-foreground">Create your organization</h2>
                     </div>
-                    <p className="text-xs text-slate-500">Fields marked <span className="text-slate-400">(optional)</span> can be left blank.</p>
-                    <p className="text-slate-400 text-sm">This appears on your dashboard and reports.</p>
-                    {error && <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">{error}</div>}
+                    <p className="text-xs text-muted-foreground">Fields marked <span className="text-muted-foreground">(optional)</span> can be left blank.</p>
+                    <p className="text-muted-foreground text-sm">This appears on your dashboard and reports.</p>
+                    {error && <div className="p-3 bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl text-red-400 text-sm">{error}</div>}
                     <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 block">Organization name <span className="text-red-400">*</span></label>
+                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1 block">Organization name <span className="text-red-400">*</span></label>
                         <input
                             type="text"
                             required
                             value={businessName}
                             onChange={e => setBusinessName(e.target.value)}
                             placeholder="e.g. Nightlife Group LLC"
-                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none"
+                            className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:ring-2 focus:ring-primary/50 focus:outline-none"
                         />
                     </div>
                     <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 block">Timezone <span className="text-red-400">*</span></label>
+                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1 block">Timezone <span className="text-red-400">*</span></label>
                         <select
                             value={timezone}
                             onChange={e => setTimezone(e.target.value)}
-                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none"
+                            className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:ring-2 focus:ring-primary/50 focus:outline-none"
                         >
                             <option value="America/New_York">Eastern (New York)</option>
                             <option value="America/Chicago">Central (Chicago)</option>
@@ -331,7 +331,7 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                         </select>
                     </div>
                     <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 block">Logo <span className="text-slate-600">(optional)</span></label>
+                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1 block">Logo <span className="text-muted-foreground/60">(optional)</span></label>
                         <div className="flex justify-center mt-2">
                             <LogoUploader
                                 currentUrl={logoUrl || null}
@@ -342,7 +342,7 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                         </div>
                     </div>
                     <button type="submit" disabled={isLoading}
-                        className="w-full py-4 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                        className="w-full py-4 bg-primary hover:bg-primary/90 text-foreground font-bold rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2">
                         {isLoading ? 'Creating...' : 'Continue'} <ArrowRight className="w-4 h-4" />
                     </button>
                 </form>
@@ -350,43 +350,43 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
 
             {/* STEP 2: VENUE */}
             {step === 'VENUE' && (
-                <form onSubmit={handleCreateVenue} className="space-y-6 bg-slate-900/50 border border-slate-800 p-8 rounded-2xl shadow-xl">
+                <form onSubmit={handleCreateVenue} className="space-y-6 bg-card border border-border p-8 rounded-2xl shadow-xl">
                     <div className="flex items-center gap-3">
                         <MapPin className="text-primary w-6 h-6" />
-                        <h2 className="text-2xl font-bold text-white">Add your first venue</h2>
+                        <h2 className="text-2xl font-bold text-foreground">Add your first venue</h2>
                     </div>
-                    <p className="text-slate-400 text-sm">A venue is a physical location you track occupancy for. You can add more venues later.</p>
+                    <p className="text-muted-foreground text-sm">A venue is a physical location you track occupancy for. You can add more venues later.</p>
                     <div className="space-y-4">
                         <div>
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 block">Venue name <span className="text-red-400">*</span></label>
+                            <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1 block">Venue name <span className="text-red-400">*</span></label>
                             <input type="text" required value={venueData.name} onChange={e => setVenueData(p => ({ ...p, name: e.target.value }))}
                                 placeholder="e.g. Downtown Club"
-                                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none" />
+                                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:ring-2 focus:ring-primary/50 focus:outline-none" />
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 block">City <span className="text-slate-600">(optional)</span></label>
+                                <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1 block">City <span className="text-muted-foreground/60">(optional)</span></label>
                                 <input type="text" value={venueData.city} onChange={e => setVenueData(p => ({ ...p, city: e.target.value }))} placeholder="City"
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none" />
+                                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:ring-2 focus:ring-primary/50 focus:outline-none" />
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 block">State <span className="text-slate-600">(optional)</span></label>
+                                <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1 block">State <span className="text-muted-foreground/60">(optional)</span></label>
                                 <input type="text" value={venueData.state} onChange={e => setVenueData(p => ({ ...p, state: e.target.value }))} placeholder="State"
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none" />
+                                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:ring-2 focus:ring-primary/50 focus:outline-none" />
                             </div>
                         </div>
                         <div>
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 block">Max capacity</label>
+                            <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1 block">Max capacity</label>
                             <input type="number" value={venueData.capacity} onChange={e => setVenueData(p => ({ ...p, capacity: e.target.value }))}
                                 placeholder="500"
-                                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none" />
+                                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:ring-2 focus:ring-primary/50 focus:outline-none" />
                         </div>
                     </div>
                     <div className="flex gap-3">
-                        <button type="button" onClick={goToPrevStep} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2">
+                        <button type="button" onClick={goToPrevStep} className="flex-1 py-3 border border-border text-muted-foreground hover:text-foreground rounded-xl font-medium transition-all flex items-center justify-center gap-2">
                             <ArrowLeft className="w-4 h-4" /> Back
                         </button>
-                        <button type="submit" disabled={isLoading} className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all disabled:opacity-50">
+                        <button type="submit" disabled={isLoading} className="flex-1 py-3 bg-primary hover:bg-primary/90 text-foreground font-bold rounded-xl transition-all disabled:opacity-50">
                             Next: Areas
                         </button>
                     </div>
@@ -395,23 +395,23 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
 
             {/* STEP 3: AREAS */}
             {step === 'AREAS' && (
-                <div className="space-y-6 bg-slate-900/50 border border-slate-800 p-8 rounded-2xl shadow-xl">
+                <div className="space-y-6 bg-card border border-border p-8 rounded-2xl shadow-xl">
                     <div className="flex items-center gap-3">
                         <MapPin className="text-primary w-6 h-6" />
-                        <h2 className="text-2xl font-bold text-white">Define areas</h2>
+                        <h2 className="text-2xl font-bold text-foreground">Define areas</h2>
                     </div>
-                    <p className="text-slate-400 text-sm">Add zones like Main Floor, VIP, Patio. You can add more later.</p>
-                    {error && <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">{error}</div>}
+                    <p className="text-muted-foreground text-sm">Add zones like Main Floor, VIP, Patio. You can add more later.</p>
+                    {error && <div className="p-3 bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl text-red-400 text-sm">{error}</div>}
                     {createdAreas.length > 0 && (
                         <div className="space-y-2">
                             {createdAreas.map(a => (
-                                <div key={a.id} className="flex items-center justify-between bg-slate-800/50 px-4 py-3 rounded-lg border border-slate-700">
+                                <div key={a.id} className="flex items-center justify-between bg-muted/50 px-4 py-3 rounded-lg border border-border">
                                     {editingAreaId !== a.id ? (
                                         <>
                                             <div className="flex items-center gap-2 min-w-0">
-                                                <span className="text-white font-medium">{a.name}</span>
-                                                <span className="text-xs text-slate-500">{(a.area_type || 'main').replace(/_/g, ' ').toLowerCase()}</span>
-                                                {a.default_capacity ? <span className="text-xs text-slate-600">{a.default_capacity} cap</span> : null}
+                                                <span className="text-foreground font-medium">{a.name}</span>
+                                                <span className="text-xs text-muted-foreground">{(a.area_type || 'main').replace(/_/g, ' ').toLowerCase()}</span>
+                                                {a.default_capacity ? <span className="text-xs text-muted-foreground/60">{a.default_capacity} cap</span> : null}
                                             </div>
                                             <div className="flex items-center gap-1">
                                                 <button type="button"
@@ -421,7 +421,7 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                                                         setEditingAreaCapacity(String(a.default_capacity ?? ''));
                                                         setEditingAreaType((a.area_type as AreaType) || 'MAIN');
                                                     }}
-                                                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors" title="Rename area">
+                                                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Rename area">
                                                     <Pencil className="w-3.5 h-3.5" />
                                                 </button>
                                                 <button type="button"
@@ -430,7 +430,7 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                                                         setCreatedClicrs(prev => prev.filter(c => c.area_id !== a.id));
                                                         setClicrInputs(prev => { const next = { ...prev }; delete next[a.id]; return next; });
                                                     }}
-                                                    className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors" title="Remove area">
+                                                    className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors" title="Remove area">
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
                                             </div>
@@ -443,13 +443,13 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                                                 value={editingAreaName}
                                                 onChange={e => setEditingAreaName(e.target.value)}
                                                 onKeyDown={e => { if (e.key === 'Escape') setEditingAreaId(null); }}
-                                                className="flex-1 bg-slate-900 border border-primary/50 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                                                className="flex-1 bg-card border border-primary/50 rounded-lg px-3 py-1.5 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                                             />
                                             <div className="flex gap-2">
                                                 <select
                                                     value={editingAreaType}
                                                     onChange={e => setEditingAreaType(e.target.value as AreaType)}
-                                                    className="flex-1 bg-slate-900 border border-primary/50 rounded-lg px-2 py-1.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                                                    className="flex-1 bg-card border border-primary/50 rounded-lg px-2 py-1.5 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                                                 >
                                                     <option value="MAIN">main</option>
                                                     <option value="ENTRY">entry</option>
@@ -464,7 +464,7 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                                                     placeholder="Cap"
                                                     value={editingAreaCapacity}
                                                     onChange={e => setEditingAreaCapacity(e.target.value)}
-                                                    className="w-20 bg-slate-900 border border-primary/50 rounded-lg px-2 py-1.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                                                    className="w-20 bg-card border border-primary/50 rounded-lg px-2 py-1.5 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                                                 />
                                             </div>
                                             <div className="flex gap-2">
@@ -473,7 +473,7 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                                                     <Check className="w-3.5 h-3.5" /> Save
                                                 </button>
                                                 <button type="button" onClick={() => setEditingAreaId(null)}
-                                                    className="flex-1 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white text-sm font-medium transition-colors flex items-center justify-center gap-1">
+                                                    className="flex-1 py-1 rounded-lg bg-muted text-muted-foreground hover:text-foreground text-sm font-medium transition-colors flex items-center justify-center gap-1">
                                                     <X className="w-3.5 h-3.5" /> Cancel
                                                 </button>
                                             </div>
@@ -487,9 +487,9 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                         <input type="text" placeholder="Area name (e.g. Main Floor)" value={areaInput.name}
                             onChange={e => setAreaInput(p => ({ ...p, name: e.target.value }))}
                             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddArea(); } }}
-                            className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none text-sm" />
+                            className="flex-1 bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:ring-2 focus:ring-primary/50 focus:outline-none text-sm" />
                         <select value={areaInput.area_type} onChange={e => setAreaInput(p => ({ ...p, area_type: e.target.value as AreaType }))}
-                            className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none text-sm">
+                            className="bg-background border border-border rounded-xl px-3 py-3 text-foreground focus:ring-2 focus:ring-primary/50 focus:outline-none text-sm">
                             <option value="MAIN">main</option>
                             <option value="ENTRY">entry</option>
                             <option value="VIP">vip</option>
@@ -499,18 +499,18 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                             <option value="OTHER">other</option>
                         </select>
                         <input type="number" value={areaInput.capacity} onChange={e => setAreaInput(p => ({ ...p, capacity: e.target.value }))}
-                            className="w-24 bg-slate-950 border border-slate-800 rounded-xl px-3 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none text-sm" />
+                            className="w-24 bg-background border border-border rounded-xl px-3 py-3 text-foreground focus:ring-2 focus:ring-primary/50 focus:outline-none text-sm" />
                         <button onClick={handleAddArea} disabled={!areaInput.name}
-                            className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-sm font-medium transition-all disabled:opacity-50 flex items-center gap-1">
+                            className="px-4 py-3 bg-muted hover:bg-muted text-foreground rounded-xl text-sm font-medium transition-all disabled:opacity-50 flex items-center gap-1">
                             <Plus className="w-4 h-4" />
                         </button>
                     </div>
-                    <div className="flex gap-3 pt-2 border-t border-slate-800">
-                        <button type="button" onClick={goToPrevStep} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2">
+                    <div className="flex gap-3 pt-2 border-t border-border">
+                        <button type="button" onClick={goToPrevStep} className="flex-1 py-3 border border-border text-muted-foreground hover:text-foreground rounded-xl font-medium transition-all flex items-center justify-center gap-2">
                             <ArrowLeft className="w-4 h-4" /> Back
                         </button>
                         <button type="button" onClick={() => setStep('CLICRS')}
-                            className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all">
+                            className="flex-1 py-3 bg-primary hover:bg-primary/90 text-foreground font-bold rounded-xl transition-all">
                             {createdAreas.length > 0 ? 'Next: Clicrs' : 'Set up later'}
                         </button>
                     </div>
@@ -519,19 +519,19 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
 
             {/* STEP 4: CLICRS */}
             {step === 'CLICRS' && (
-                <div className="space-y-6 bg-slate-900/50 border border-slate-800 p-8 rounded-2xl shadow-xl">
+                <div className="space-y-6 bg-card border border-border p-8 rounded-2xl shadow-xl">
                     <div className="flex items-center gap-3">
                         <Users className="text-primary w-6 h-6" />
-                        <h2 className="text-2xl font-bold text-white">Add Clicrs</h2>
+                        <h2 className="text-2xl font-bold text-foreground">Add Clicrs</h2>
                     </div>
-                    <p className="text-slate-400 text-sm">Name your counters. The venue counter tracks overall venue occupancy.</p>
+                    <p className="text-muted-foreground text-sm">Name your counters. The venue counter tracks overall venue occupancy.</p>
 
                     {/* VENUE COUNTER — dedicated, non-deletable */}
-                    <div className="bg-amber-950/10 p-4 rounded-xl border border-amber-500/20">
+                    <div className="bg-amber-50 dark:bg-amber-950/10 p-4 rounded-xl border border-amber-200 dark:border-amber-500/20">
                         <h3 className="text-xs font-bold uppercase tracking-widest text-amber-500 mb-3">{venueData.name || 'Venue'}</h3>
                         {!editingVenueCounter ? (
                             <div className="flex items-center justify-between text-sm">
-                                <div className="flex items-center gap-2 text-amber-300">
+                                <div className="flex items-center gap-2 text-amber-600 dark:text-amber-300">
                                     <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                                     {venueCounterName}
                                     <span className="text-xs text-amber-600">Guest Flow: {venueCounterFlowMode === 'BIDIRECTIONAL' ? 'Both' : venueCounterFlowMode === 'IN_ONLY' ? 'In Only' : 'Out Only'}</span>
@@ -547,9 +547,9 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                                 <input autoFocus type="text" value={editingVCName}
                                     onChange={e => setEditingVCName(e.target.value)}
                                     onKeyDown={e => { if (e.key === 'Escape') setEditingVenueCounter(false); }}
-                                    className="flex-1 bg-slate-900 border border-amber-500/30 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
+                                    className="flex-1 bg-card border border-amber-200 dark:border-amber-500/30 rounded-lg px-3 py-1.5 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
                                 <select value={editingVCFlowMode} onChange={e => setEditingVCFlowMode(e.target.value as FlowMode)}
-                                    className="flex-1 bg-slate-900 border border-amber-500/30 rounded-lg px-2 py-1.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500">
+                                    className="flex-1 bg-card border border-amber-200 dark:border-amber-500/30 rounded-lg px-2 py-1.5 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-amber-500">
                                     <option value="BIDIRECTIONAL">Both (in + out)</option>
                                     <option value="IN_ONLY">In only</option>
                                     <option value="OUT_ONLY">Out only</option>
@@ -562,7 +562,7 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                                         <Check className="w-3.5 h-3.5" /> Save
                                     </button>
                                     <button type="button" onClick={() => setEditingVenueCounter(false)}
-                                        className="flex-1 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white text-sm font-medium transition-colors flex items-center justify-center gap-1">
+                                        className="flex-1 py-1 rounded-lg bg-muted text-muted-foreground hover:text-foreground text-sm font-medium transition-colors flex items-center justify-center gap-1">
                                         <X className="w-3.5 h-3.5" /> Cancel
                                     </button>
                                 </div>
@@ -575,26 +575,26 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                         {createdAreas.map(area => {
                             const areaClicrs = createdClicrs.filter(c => c.area_id === area.id);
                             return (
-                                <div key={area.id} className="bg-slate-950/30 p-4 rounded-xl border border-slate-800">
-                                    <h3 className="font-bold text-white mb-3">{area.name}</h3>
+                                <div key={area.id} className="bg-background/30 p-4 rounded-xl border border-border">
+                                    <h3 className="font-bold text-foreground mb-3">{area.name}</h3>
                                     {areaClicrs.map(c => (
                                         <div key={c.id} className="flex items-center justify-between mb-2 text-sm">
                                             {editingClicrId !== c.id ? (
                                                 <>
-                                                    <div className="flex items-center gap-2 text-slate-300">
+                                                    <div className="flex items-center gap-2 text-foreground/80">
                                                         <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                                                         {c.name}
-                                                        <span className="text-xs text-slate-500">Guest Flow: {c.flow_mode === 'BIDIRECTIONAL' ? 'Both' : c.flow_mode === 'IN_ONLY' ? 'In Only' : 'Out Only'}</span>
+                                                        <span className="text-xs text-muted-foreground">Guest Flow: {c.flow_mode === 'BIDIRECTIONAL' ? 'Both' : c.flow_mode === 'IN_ONLY' ? 'In Only' : 'Out Only'}</span>
                                                     </div>
                                                     <div className="flex items-center gap-1">
                                                         <button type="button"
                                                             onClick={() => { setEditingClicrId(c.id); setEditingClicrName(c.name); setEditingClicrFlowMode(c.flow_mode); }}
-                                                            className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-700 transition-colors" title="Edit">
+                                                            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Edit">
                                                             <Pencil className="w-3 h-3" />
                                                         </button>
                                                         <button type="button"
                                                             onClick={() => setCreatedClicrs(prev => prev.filter(x => x.id !== c.id))}
-                                                            className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors" title="Remove">
+                                                            className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors" title="Remove">
                                                             <Trash2 className="w-3.5 h-3.5" />
                                                         </button>
                                                     </div>
@@ -604,9 +604,9 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                                                     <input autoFocus type="text" value={editingClicrName}
                                                         onChange={e => setEditingClicrName(e.target.value)}
                                                         onKeyDown={e => { if (e.key === 'Escape') setEditingClicrId(null); }}
-                                                        className="flex-1 bg-slate-900 border border-primary/50 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
+                                                        className="flex-1 bg-card border border-primary/50 rounded-lg px-3 py-1.5 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
                                                     <select value={editingClicrFlowMode} onChange={e => setEditingClicrFlowMode(e.target.value as FlowMode)}
-                                                        className="flex-1 bg-slate-900 border border-primary/50 rounded-lg px-2 py-1.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-primary">
+                                                        className="flex-1 bg-card border border-primary/50 rounded-lg px-2 py-1.5 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary">
                                                         <option value="BIDIRECTIONAL">Both (in + out)</option>
                                                         <option value="IN_ONLY">In only</option>
                                                         <option value="OUT_ONLY">Out only</option>
@@ -617,7 +617,7 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                                                             <Check className="w-3.5 h-3.5" /> Save
                                                         </button>
                                                         <button type="button" onClick={() => setEditingClicrId(null)}
-                                                            className="flex-1 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white text-sm font-medium transition-colors flex items-center justify-center gap-1">
+                                                            className="flex-1 py-1 rounded-lg bg-muted text-muted-foreground hover:text-foreground text-sm font-medium transition-colors flex items-center justify-center gap-1">
                                                             <X className="w-3.5 h-3.5" /> Cancel
                                                         </button>
                                                     </div>
@@ -630,16 +630,16 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                                             value={clicrInputs[area.id] || ''}
                                             onChange={e => setClicrInputs(p => ({ ...p, [area.id]: e.target.value }))}
                                             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddClicr(area.id); } }}
-                                            className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-1 focus:ring-primary focus:outline-none" />
+                                            className="flex-1 bg-card border border-border rounded-lg px-3 py-2 text-foreground text-sm focus:ring-1 focus:ring-primary focus:outline-none" />
                                         <select value={clicrFlowModes[area.id] || 'BIDIRECTIONAL'}
                                             onChange={e => setClicrFlowModes(p => ({ ...p, [area.id]: e.target.value as FlowMode }))}
-                                            className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-2 text-white text-sm focus:ring-1 focus:ring-primary focus:outline-none">
+                                            className="bg-card border border-border rounded-lg px-2 py-2 text-foreground text-sm focus:ring-1 focus:ring-primary focus:outline-none">
                                             <option value="BIDIRECTIONAL">Both</option>
                                             <option value="IN_ONLY">In only</option>
                                             <option value="OUT_ONLY">Out only</option>
                                         </select>
                                         <button onClick={() => handleAddClicr(area.id)} disabled={!clicrInputs[area.id]}
-                                            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
+                                            className="px-4 py-2 bg-muted hover:bg-muted text-foreground rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
                                             Add
                                         </button>
                                     </div>
@@ -648,11 +648,11 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                         })}
                     </div>
 
-                    <div className="flex gap-3 pt-2 border-t border-slate-800">
-                        <button type="button" onClick={goToPrevStep} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2">
+                    <div className="flex gap-3 pt-2 border-t border-border">
+                        <button type="button" onClick={goToPrevStep} className="flex-1 py-3 border border-border text-muted-foreground hover:text-foreground rounded-xl font-medium transition-all flex items-center justify-center gap-2">
                             <ArrowLeft className="w-4 h-4" /> Back
                         </button>
-                        <button type="button" onClick={() => setStep('INVITE')} className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all">
+                        <button type="button" onClick={() => setStep('INVITE')} className="flex-1 py-3 bg-primary hover:bg-primary/90 text-foreground font-bold rounded-xl transition-all">
                             {createdClicrs.length > 0 ? 'Next: Invite Team' : 'Set up later'}
                         </button>
                     </div>
@@ -661,22 +661,22 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
 
             {/* STEP 5: INVITE */}
             {step === 'INVITE' && (
-                <div className="space-y-6 bg-slate-900/50 border border-slate-800 p-8 rounded-2xl shadow-xl">
+                <div className="space-y-6 bg-card border border-border p-8 rounded-2xl shadow-xl">
                     <div className="flex items-center gap-3">
                         <Mail className="text-primary w-6 h-6" />
-                        <h2 className="text-2xl font-bold text-white">Invite your team</h2>
+                        <h2 className="text-2xl font-bold text-foreground">Invite your team</h2>
                     </div>
-                    <p className="text-slate-400 text-sm">Add staff members who will help manage your venue. You can also do this later in Settings → Team.</p>
+                    <p className="text-muted-foreground text-sm">Add staff members who will help manage your venue. You can also do this later in Settings → Team.</p>
                     {invitedList.length > 0 && (
                         <div className="space-y-2">
                             {invitedList.map((inv, i) => (
-                                <div key={i} className="flex items-center justify-between bg-slate-800/50 px-4 py-3 rounded-lg border border-slate-700">
+                                <div key={i} className="flex items-center justify-between bg-muted/50 px-4 py-3 rounded-lg border border-border">
                                     <div className="flex items-center gap-3">
-                                        <span className="text-white text-sm font-mono">{inv.email}</span>
+                                        <span className="text-foreground text-sm font-mono">{inv.email}</span>
                                         <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-bold">{inv.role}</span>
                                     </div>
                                     <button type="button" onClick={() => setInvitedList(prev => prev.filter((_, j) => j !== i))}
-                                        className="text-slate-500 hover:text-red-400 transition-colors">
+                                        className="text-muted-foreground hover:text-red-400 transition-colors">
                                         <Trash2 className="w-3.5 h-3.5" />
                                     </button>
                                 </div>
@@ -686,7 +686,7 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                     <div className="space-y-3">
                         <input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
                             placeholder="colleague@example.com"
-                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none text-sm" />
+                            className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:ring-2 focus:ring-primary/50 focus:outline-none text-sm" />
                         <div className="flex gap-2">
                             {(['ADMIN', 'MANAGER', 'STAFF', 'ANALYST'] as Role[]).map(r => (
                                 <button key={r} type="button" onClick={() => {
@@ -694,7 +694,7 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                                     if (r !== 'MANAGER') setInviteVenueIds([]);
                                     if (r !== 'STAFF') setInviteAreaIds([]);
                                 }}
-                                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all border ${inviteRole === r ? 'bg-primary/10 border-primary text-primary' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}>
+                                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all border ${inviteRole === r ? 'bg-primary/10 border-primary text-primary' : 'bg-muted border-border text-muted-foreground hover:text-foreground'}`}>
                                     {r}
                                 </button>
                             ))}
@@ -703,8 +703,8 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                         {/* Venue assignment for MANAGER */}
                         {inviteRole === 'MANAGER' && venueData.name && (
                             <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Assign Venue</label>
-                                <label className="flex items-center gap-2 p-2.5 rounded-lg border border-slate-700 hover:bg-slate-800/40 cursor-pointer">
+                                <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2 block">Assign Venue</label>
+                                <label className="flex items-center gap-2 p-2.5 rounded-lg border border-border hover:bg-muted/40 cursor-pointer">
                                     <input
                                         type="checkbox"
                                         checked={inviteVenueIds.includes('__venue__')}
@@ -712,9 +712,9 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                                             if (e.target.checked) setInviteVenueIds(['__venue__']);
                                             else setInviteVenueIds([]);
                                         }}
-                                        className="rounded border-slate-600"
+                                        className="rounded border-border"
                                     />
-                                    <span className="text-sm text-white">{venueData.name}</span>
+                                    <span className="text-sm text-foreground">{venueData.name}</span>
                                 </label>
                             </div>
                         )}
@@ -722,10 +722,10 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                         {/* Area assignment for STAFF */}
                         {inviteRole === 'STAFF' && createdAreas.length > 0 && (
                             <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Assign Areas</label>
+                                <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2 block">Assign Areas</label>
                                 <div className="max-h-40 overflow-y-auto space-y-1">
                                     {createdAreas.map(area => (
-                                        <label key={area.id} className="flex items-center gap-2 p-2.5 rounded-lg border border-slate-700 hover:bg-slate-800/40 cursor-pointer">
+                                        <label key={area.id} className="flex items-center gap-2 p-2.5 rounded-lg border border-border hover:bg-muted/40 cursor-pointer">
                                             <input
                                                 type="checkbox"
                                                 checked={inviteAreaIds.includes(area.id)}
@@ -733,9 +733,9 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                                                     if (e.target.checked) setInviteAreaIds(prev => [...prev, area.id]);
                                                     else setInviteAreaIds(prev => prev.filter(id => id !== area.id));
                                                 }}
-                                                className="rounded border-slate-600"
+                                                className="rounded border-border"
                                             />
-                                            <span className="text-sm text-white">{area.name}</span>
+                                            <span className="text-sm text-foreground">{area.name}</span>
                                         </label>
                                     ))}
                                 </div>
@@ -755,16 +755,16 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                             setInviteAreaIds([]);
                         }}
                             disabled={!inviteEmail}
-                            className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-sm font-medium transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                            className="w-full py-3 bg-muted hover:bg-muted text-foreground rounded-xl text-sm font-medium transition-all disabled:opacity-50 flex items-center justify-center gap-2">
                             <Plus className="w-4 h-4" /> Add & Invite Another
                         </button>
                     </div>
-                    {error && <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">{error}</div>}
-                    <div className="flex gap-3 pt-2 border-t border-slate-800">
-                        <button type="button" onClick={() => { setError(null); goToPrevStep(); }} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2">
+                    {error && <div className="p-3 bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl text-red-400 text-sm">{error}</div>}
+                    <div className="flex gap-3 pt-2 border-t border-border">
+                        <button type="button" onClick={() => { setError(null); goToPrevStep(); }} className="flex-1 py-3 border border-border text-muted-foreground hover:text-foreground rounded-xl font-medium transition-all flex items-center justify-center gap-2">
                             <ArrowLeft className="w-4 h-4" /> Back
                         </button>
-                        <button type="button" onClick={() => { setError(null); setStep('SCAN_CONFIG'); }} className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all">
+                        <button type="button" onClick={() => { setError(null); setStep('SCAN_CONFIG'); }} className="flex-1 py-3 bg-primary hover:bg-primary/90 text-foreground font-bold rounded-xl transition-all">
                             {invitedList.length > 0 ? 'Next: Scan Config' : 'Set up later'}
                         </button>
                     </div>
@@ -773,43 +773,43 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
 
             {/* STEP 6: SCAN_CONFIG */}
             {step === 'SCAN_CONFIG' && (
-                <div className="space-y-6 bg-slate-900/50 border border-slate-800 p-8 rounded-2xl shadow-xl">
+                <div className="space-y-6 bg-card border border-border p-8 rounded-2xl shadow-xl">
                     <div className="flex items-center gap-3">
                         <Scan className="text-primary w-6 h-6" />
-                        <h2 className="text-2xl font-bold text-white">Configure scanning</h2>
+                        <h2 className="text-2xl font-bold text-foreground">Configure scanning</h2>
                     </div>
-                    <p className="text-slate-400 text-sm">Choose how your staff will scan IDs. You can change this later in settings.</p>
+                    <p className="text-muted-foreground text-sm">Choose how your staff will scan IDs. You can change this later in settings.</p>
                     <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 block">Default Scan Method</label>
+                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3 block">Default Scan Method</label>
                         <div className="grid grid-cols-2 gap-3">
                             <button type="button" onClick={() => setScanMethod('CAMERA')}
-                                className={`p-4 rounded-xl border text-left transition-all ${scanMethod === 'CAMERA' ? 'bg-primary/10 border-primary' : 'bg-slate-800 border-slate-700 hover:bg-slate-700'}`}>
-                                <div className={`font-bold text-sm ${scanMethod === 'CAMERA' ? 'text-primary' : 'text-white'}`}>Phone Camera</div>
-                                <div className="text-xs text-slate-500 mt-1">Use device camera to scan IDs</div>
+                                className={`p-4 rounded-xl border text-left transition-all ${scanMethod === 'CAMERA' ? 'bg-primary/10 border-primary' : 'bg-muted border-border hover:bg-muted'}`}>
+                                <div className={`font-bold text-sm ${scanMethod === 'CAMERA' ? 'text-primary' : 'text-foreground'}`}>Phone Camera</div>
+                                <div className="text-xs text-muted-foreground mt-1">Use device camera to scan IDs</div>
                             </button>
                             <button type="button" onClick={() => setScanMethod('BLUETOOTH')}
-                                className={`p-4 rounded-xl border text-left transition-all ${scanMethod === 'BLUETOOTH' ? 'bg-primary/10 border-primary' : 'bg-slate-800 border-slate-700 hover:bg-slate-700'}`}>
-                                <div className={`font-bold text-sm ${scanMethod === 'BLUETOOTH' ? 'text-primary' : 'text-white'}`}>Bluetooth Scanner</div>
-                                <div className="text-xs text-slate-500 mt-1">External hardware scanner</div>
+                                className={`p-4 rounded-xl border text-left transition-all ${scanMethod === 'BLUETOOTH' ? 'bg-primary/10 border-primary' : 'bg-muted border-border hover:bg-muted'}`}>
+                                <div className={`font-bold text-sm ${scanMethod === 'BLUETOOTH' ? 'text-primary' : 'text-foreground'}`}>Bluetooth Scanner</div>
+                                <div className="text-xs text-muted-foreground mt-1">External hardware scanner</div>
                             </button>
                         </div>
                     </div>
-                    <div className="flex items-center justify-between bg-slate-800/50 p-4 rounded-xl border border-slate-700">
+                    <div className="flex items-center justify-between bg-muted/50 p-4 rounded-xl border border-border">
                         <div>
-                            <div className="font-bold text-white text-sm">Enable ID scanning on all devices</div>
-                            <div className="text-xs text-slate-500 mt-1">New devices will have scanning enabled by default</div>
+                            <div className="font-bold text-foreground text-sm">Enable ID scanning on all devices</div>
+                            <div className="text-xs text-muted-foreground mt-1">New devices will have scanning enabled by default</div>
                         </div>
                         <button type="button" onClick={() => setScanEnabled(!scanEnabled)}
-                            className={`w-12 h-7 rounded-full transition-all relative ${scanEnabled ? 'bg-primary' : 'bg-slate-600'}`}>
+                            className={`w-12 h-7 rounded-full transition-all relative ${scanEnabled ? 'bg-primary' : 'bg-muted'}`}>
                             <div className={`w-5 h-5 rounded-full bg-white absolute top-1 transition-all ${scanEnabled ? 'left-6' : 'left-1'}`} />
                         </button>
                     </div>
-                    <div className="flex gap-3 pt-2 border-t border-slate-800">
-                        <button type="button" onClick={goToPrevStep} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2">
+                    <div className="flex gap-3 pt-2 border-t border-border">
+                        <button type="button" onClick={goToPrevStep} className="flex-1 py-3 border border-border text-muted-foreground hover:text-foreground rounded-xl font-medium transition-all flex items-center justify-center gap-2">
                             <ArrowLeft className="w-4 h-4" /> Back
                         </button>
                         <button type="button" onClick={() => { setScanConfigured(true); setStep('BAN_CONFIG'); }}
-                            className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all">
+                            className="flex-1 py-3 bg-primary hover:bg-primary/90 text-foreground font-bold rounded-xl transition-all">
                             Save & Next
                         </button>
                     </div>
@@ -818,59 +818,59 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
 
             {/* STEP 7: BAN_CONFIG */}
             {step === 'BAN_CONFIG' && (
-                <div className="space-y-6 bg-slate-900/50 border border-slate-800 p-8 rounded-2xl shadow-xl">
+                <div className="space-y-6 bg-card border border-border p-8 rounded-2xl shadow-xl">
                     <div className="flex items-center gap-3">
                         <Ban className="text-primary w-6 h-6" />
-                        <h2 className="text-2xl font-bold text-white">Ban policy defaults</h2>
+                        <h2 className="text-2xl font-bold text-foreground">Ban policy defaults</h2>
                     </div>
-                    <p className="text-slate-400 text-sm">Set who can create bans and default scope. Adjustable anytime in settings.</p>
+                    <p className="text-muted-foreground text-sm">Set who can create bans and default scope. Adjustable anytime in settings.</p>
                     <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 block">Who can create bans?</label>
-                        <p className="text-xs text-slate-600 mb-3">Owners and Admins can always ban. Select additional roles:</p>
+                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3 block">Who can create bans?</label>
+                        <p className="text-xs text-muted-foreground/60 mb-3">Owners and Admins can always ban. Select additional roles:</p>
                         <div className="space-y-2">
-                            <label className="flex items-center justify-between bg-slate-800/50 p-4 rounded-xl border border-slate-700 cursor-pointer">
-                                <span className="font-bold text-white text-sm">Door Managers</span>
+                            <label className="flex items-center justify-between bg-muted/50 p-4 rounded-xl border border-border cursor-pointer">
+                                <span className="font-bold text-foreground text-sm">Door Managers</span>
                                 <input type="checkbox" checked={banManagerCanBan} onChange={e => setBanManagerCanBan(e.target.checked)}
-                                    className="w-5 h-5 rounded bg-slate-700 border-slate-600 text-primary focus:ring-primary" />
+                                    className="w-5 h-5 rounded bg-muted border-border text-primary focus:ring-primary" />
                             </label>
-                            <label className="flex items-center justify-between bg-slate-800/50 p-4 rounded-xl border border-slate-700 cursor-pointer">
-                                <span className="font-bold text-white text-sm">Door Staff</span>
+                            <label className="flex items-center justify-between bg-muted/50 p-4 rounded-xl border border-border cursor-pointer">
+                                <span className="font-bold text-foreground text-sm">Door Staff</span>
                                 <input type="checkbox" checked={banStaffCanBan} onChange={e => setBanStaffCanBan(e.target.checked)}
-                                    className="w-5 h-5 rounded bg-slate-700 border-slate-600 text-primary focus:ring-primary" />
+                                    className="w-5 h-5 rounded bg-muted border-border text-primary focus:ring-primary" />
                             </label>
                         </div>
                     </div>
                     <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 block">Default ban scope</label>
+                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3 block">Default ban scope</label>
                         <div className="grid grid-cols-2 gap-3">
                             <button type="button" onClick={() => setBanScopeDefault('VENUE')}
-                                className={`p-4 rounded-xl border text-left transition-all ${banScopeDefault === 'VENUE' ? 'bg-primary/10 border-primary' : 'bg-slate-800 border-slate-700 hover:bg-slate-700'}`}>
-                                <div className={`font-bold text-sm ${banScopeDefault === 'VENUE' ? 'text-primary' : 'text-white'}`}>This venue only</div>
-                                <div className="text-xs text-slate-500 mt-1">Ban applies to a single venue</div>
+                                className={`p-4 rounded-xl border text-left transition-all ${banScopeDefault === 'VENUE' ? 'bg-primary/10 border-primary' : 'bg-muted border-border hover:bg-muted'}`}>
+                                <div className={`font-bold text-sm ${banScopeDefault === 'VENUE' ? 'text-primary' : 'text-foreground'}`}>This venue only</div>
+                                <div className="text-xs text-muted-foreground mt-1">Ban applies to a single venue</div>
                             </button>
                             <button type="button" onClick={() => setBanScopeDefault('BUSINESS')}
-                                className={`p-4 rounded-xl border text-left transition-all ${banScopeDefault === 'BUSINESS' ? 'bg-primary/10 border-primary' : 'bg-slate-800 border-slate-700 hover:bg-slate-700'}`}>
-                                <div className={`font-bold text-sm ${banScopeDefault === 'BUSINESS' ? 'text-primary' : 'text-white'}`}>All venues</div>
-                                <div className="text-xs text-slate-500 mt-1">Ban across all locations</div>
+                                className={`p-4 rounded-xl border text-left transition-all ${banScopeDefault === 'BUSINESS' ? 'bg-primary/10 border-primary' : 'bg-muted border-border hover:bg-muted'}`}>
+                                <div className={`font-bold text-sm ${banScopeDefault === 'BUSINESS' ? 'text-primary' : 'text-foreground'}`}>All venues</div>
+                                <div className="text-xs text-muted-foreground mt-1">Ban across all locations</div>
                             </button>
                         </div>
                     </div>
-                    <div className="flex items-center justify-between bg-slate-800/50 p-4 rounded-xl border border-slate-700">
+                    <div className="flex items-center justify-between bg-muted/50 p-4 rounded-xl border border-border">
                         <div>
-                            <div className="font-bold text-white text-sm">Require reason when banning</div>
-                            <div className="text-xs text-slate-500 mt-1">Staff must provide a reason for each ban</div>
+                            <div className="font-bold text-foreground text-sm">Require reason when banning</div>
+                            <div className="text-xs text-muted-foreground mt-1">Staff must provide a reason for each ban</div>
                         </div>
                         <button type="button" onClick={() => setBanReasonRequired(!banReasonRequired)}
-                            className={`w-12 h-7 rounded-full transition-all relative ${banReasonRequired ? 'bg-primary' : 'bg-slate-600'}`}>
+                            className={`w-12 h-7 rounded-full transition-all relative ${banReasonRequired ? 'bg-primary' : 'bg-muted'}`}>
                             <div className={`w-5 h-5 rounded-full bg-white absolute top-1 transition-all ${banReasonRequired ? 'left-6' : 'left-1'}`} />
                         </button>
                     </div>
-                    {error && <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">{error}</div>}
-                    <div className="flex gap-3 pt-2 border-t border-slate-800">
-                        <button type="button" onClick={goToPrevStep} disabled={isLoading} className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+                    {error && <div className="p-3 bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl text-red-400 text-sm">{error}</div>}
+                    <div className="flex gap-3 pt-2 border-t border-border">
+                        <button type="button" onClick={goToPrevStep} disabled={isLoading} className="flex-1 py-3 border border-border text-muted-foreground hover:text-foreground rounded-xl font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50">
                             <ArrowLeft className="w-4 h-4" /> Back
                         </button>
-                        <button type="button" onClick={() => finish({ saveBanConfig: true })} disabled={isLoading} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                        <button type="button" onClick={() => finish({ saveBanConfig: true })} disabled={isLoading} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-foreground font-bold rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2">
                             {isLoading ? (
                                 <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Setting up…</>
                             ) : (

@@ -76,14 +76,14 @@ export function CameraScanner({ active, onScan, onError }: CameraScannerProps) {
     return (
         <div className="flex flex-col items-center gap-4 w-full">
             {status === 'starting' && (
-                <div className="flex items-center gap-2 text-slate-400 text-sm">
+                <div className="flex items-center gap-2 text-muted-foreground text-sm">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Starting camera...
                 </div>
             )}
 
             {status === 'error' && (
-                <div className="flex items-center gap-2 text-red-400 text-sm p-3 bg-red-500/10 rounded-xl border border-red-500/20">
+                <div className="flex items-center gap-2 text-red-400 text-sm p-3 bg-red-500/10 rounded-xl border border-red-200 dark:border-red-500/20">
                     <CameraOff className="w-5 h-5 shrink-0" />
                     {errorMsg}
                 </div>
@@ -93,11 +93,11 @@ export function CameraScanner({ active, onScan, onError }: CameraScannerProps) {
             {/* [&_input]:hidden [&_select]:hidden suppresses the file-picker html5-qrcode injects */}
             <div
                 id={CONTAINER_ID}
-                className="w-full max-w-sm rounded-2xl overflow-hidden border-2 border-slate-700 [&_input]:hidden [&_select]:hidden [&_img]:hidden"
+                className="w-full max-w-sm rounded-2xl overflow-hidden border-2 border-border [&_input]:hidden [&_select]:hidden [&_img]:hidden"
             />
 
             {status === 'running' && (
-                <p className="text-slate-500 text-xs text-center">
+                <p className="text-muted-foreground text-xs text-center">
                     Point camera at the PDF417 barcode on the back of the ID — hold steady
                 </p>
             )}

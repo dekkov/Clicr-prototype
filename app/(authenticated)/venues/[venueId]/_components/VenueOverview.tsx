@@ -115,44 +115,44 @@ export default function VenueOverview({ venueId, setActiveTab }: { venueId: stri
                     value={currentOccupancy}
                     icon={Users}
                     trend={currentOccupancy > 0 ? 'up' : 'neutral'}
-                    className="bg-slate-900/50 border-slate-800"
+                    className="bg-card border-border"
                 />
                 <KpiCard
                     title="Entries (Today)"
                     value={trafficStats.ins}
                     icon={LogIn}
-                    className="bg-slate-900/50 border-slate-800 text-emerald-400"
+                    className="bg-card border-border text-emerald-400"
                 />
                 <KpiCard
                     title="Exits (Today)"
                     value={trafficStats.outs}
                     icon={LogOut}
-                    className="bg-slate-900/50 border-slate-800 text-amber-400"
+                    className="bg-card border-border text-amber-400"
                 />
                 <KpiCard
                     title="Turnarounds"
                     value={turnaroundStats.total}
                     subtext={`Net Entries: ${turnaroundStats.netEntries}`}
                     icon={RotateCcw}
-                    className="bg-slate-900/50 border-slate-800"
+                    className="bg-card border-border"
                 />
-                <div onClick={() => setActiveTab('AREAS')} className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl cursor-pointer hover:bg-slate-800/50 transition-colors">
+                <div onClick={() => setActiveTab('AREAS')} className="bg-card border border-border p-6 rounded-2xl cursor-pointer hover:bg-muted/50 transition-colors">
                     <div className="flex justify-between items-start mb-2">
                         <div className="p-2 bg-blue-500/10 rounded-lg text-blue-500">
                             <Layers className="w-5 h-5" />
                         </div>
-                        <span className="text-xs text-slate-500">View Areas</span>
+                        <span className="text-xs text-muted-foreground">View Areas</span>
                     </div>
-                    <div className="text-2xl font-bold text-white">{venueAreas.length}</div>
-                    <div className="text-xs text-slate-400 mt-1">Active Zones</div>
+                    <div className="text-2xl font-bold text-foreground">{venueAreas.length}</div>
+                    <div className="text-xs text-muted-foreground mt-1">Active Zones</div>
                 </div>
             </div>
 
             {/* Main Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Chart Section */}
-                <div className="lg:col-span-2 bg-slate-900/30 border border-slate-800 rounded-2xl p-6">
-                    <h3 className="text-lg font-bold text-white mb-6">Demographics Flow</h3>
+                <div className="lg:col-span-2 bg-muted/30 border border-border rounded-2xl p-6">
+                    <h3 className="text-lg font-bold text-foreground mb-6">Demographics Flow</h3>
                     <div className="h-[300px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={chartData}>
@@ -200,36 +200,36 @@ export default function VenueOverview({ venueId, setActiveTab }: { venueId: stri
                 {/* Right Column: Quick Actions & Top Areas */}
                 <div className="space-y-6">
                     {/* Quick Actions */}
-                    <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl">
-                        <h3 className="text-slate-400 text-sm font-medium mb-4">Quick Actions</h3>
+                    <div className="bg-card border border-border p-6 rounded-2xl">
+                        <h3 className="text-muted-foreground text-sm font-medium mb-4">Quick Actions</h3>
                         <div className="space-y-3">
                             <button
                                 onClick={() => setActiveTab('AREAS')}
-                                className="w-full flex items-center gap-3 p-3 bg-slate-800/50 hover:bg-slate-800 rounded-xl transition-colors text-left"
+                                className="w-full flex items-center gap-3 p-3 bg-muted/50 hover:bg-muted rounded-xl transition-colors text-left"
                             >
                                 <Plus className="w-4 h-4 text-primary" />
-                                <span className="text-sm font-medium text-slate-300">Add New Area</span>
+                                <span className="text-sm font-medium text-foreground/80">Add New Area</span>
                             </button>
                             <button
                                 onClick={() => setActiveTab('DEVICES')}
-                                className="w-full flex items-center gap-3 p-3 bg-slate-800/50 hover:bg-slate-800 rounded-xl transition-colors text-left"
+                                className="w-full flex items-center gap-3 p-3 bg-muted/50 hover:bg-muted rounded-xl transition-colors text-left"
                             >
                                 <MonitorSmartphone className="w-4 h-4 text-purple-400" />
-                                <span className="text-sm font-medium text-slate-300">Assign Device</span>
+                                <span className="text-sm font-medium text-foreground/80">Assign Device</span>
                             </button>
                             <button
                                 onClick={() => setActiveTab('SETTINGS')}
-                                className="w-full flex items-center gap-3 p-3 bg-slate-800/50 hover:bg-slate-800 rounded-xl transition-colors text-left"
+                                className="w-full flex items-center gap-3 p-3 bg-muted/50 hover:bg-muted rounded-xl transition-colors text-left"
                             >
-                                <Settings className="w-4 h-4 text-slate-400" />
-                                <span className="text-sm font-medium text-slate-300">Edit Venue Settings</span>
+                                <Settings className="w-4 h-4 text-muted-foreground" />
+                                <span className="text-sm font-medium text-foreground/80">Edit Venue Settings</span>
                             </button>
                         </div>
                     </div>
 
                     {/* Top Areas List (Compact) */}
-                    <div className="bg-slate-900/30 border border-slate-800 rounded-2xl p-6">
-                        <h3 className="text-sm font-bold text-slate-400 mb-4 uppercase tracking-wider">Area Status</h3>
+                    <div className="bg-muted/30 border border-border rounded-2xl p-6">
+                        <h3 className="text-sm font-bold text-muted-foreground mb-4 uppercase tracking-wider">Area Status</h3>
                         <div className="space-y-4">
                             {venueAreas.slice(0, 5).map(area => {
                                 const areaCount = area.current_occupancy || 0;
@@ -239,10 +239,10 @@ export default function VenueOverview({ venueId, setActiveTab }: { venueId: stri
                                 return (
                                     <div key={area.id}>
                                         <div className="flex justify-between items-center mb-1 text-sm">
-                                            <span className="font-medium text-slate-200">{area.name}</span>
-                                            <span className="text-slate-500">{areaCount} <span className="text-slate-700">/ {areaCap || '∞'}</span></span>
+                                            <span className="font-medium text-foreground">{area.name}</span>
+                                            <span className="text-muted-foreground">{areaCount} <span className="text-slate-700">/ {areaCap || '∞'}</span></span>
                                         </div>
-                                        <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+                                        <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
                                             <div
                                                 className={cn(
                                                     "h-full rounded-full transition-all",
@@ -254,7 +254,7 @@ export default function VenueOverview({ venueId, setActiveTab }: { venueId: stri
                                     </div>
                                 );
                             })}
-                            {venueAreas.length === 0 && <p className="text-slate-600 text-xs italic">No areas configured.</p>}
+                            {venueAreas.length === 0 && <p className="text-muted-foreground/60 text-xs italic">No areas configured.</p>}
                         </div>
                     </div>
                 </div>

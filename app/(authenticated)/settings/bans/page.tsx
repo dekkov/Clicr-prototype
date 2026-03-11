@@ -42,11 +42,11 @@ export default function BansPage() {
     return (
         <div className="space-y-6">
             <div className="flex items-center gap-4 mb-6">
-                <Link href="/settings" className="p-2 bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors">
+                <Link href="/settings" className="p-2 bg-muted rounded-lg text-muted-foreground hover:text-foreground transition-colors">
                     <ArrowLeft className="w-5 h-5" />
                 </Link>
                 <div className="flex-1">
-                    <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                    <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
                         <History className="w-8 h-8 text-primary" />
                         Ban History
                     </h1>
@@ -59,13 +59,13 @@ export default function BansPage() {
             {/* Filters */}
             <div className="flex gap-4">
                 <div className="relative flex-1 max-w-md">
-                    <Search className="absolute left-3 top-3 w-5 h-5 text-slate-500" />
+                    <Search className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
                     <input
                         type="text"
                         placeholder="Search by user name..."
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 py-3 text-white focus:border-primary outline-none"
+                        className="w-full bg-card border border-border rounded-xl pl-10 pr-4 py-3 text-foreground focus:border-primary outline-none"
                     />
                 </div>
             </div>
@@ -73,7 +73,7 @@ export default function BansPage() {
             {/* Bans Table */}
             <div className="glass-panel rounded-xl overflow-hidden">
                 <table className="w-full text-left">
-                    <thead className="bg-slate-900/50 text-slate-400 text-xs uppercase tracking-wider font-bold">
+                    <thead className="bg-card text-muted-foreground text-xs uppercase tracking-wider font-bold">
                         <tr>
                             <th className="p-4">User</th>
                             <th className="p-4">Scope</th>
@@ -83,45 +83,45 @@ export default function BansPage() {
                             <th className="p-4 text-right">Actions</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800">
+                    <tbody className="divide-y divide-border">
                         {filteredBans.map(ban => {
                             const isBusiness = ban.scope_type === 'BUSINESS';
                             const status = ban.status;
 
                             return (
-                                <tr key={ban.id} className="hover:bg-slate-800/30 transition-colors">
+                                <tr key={ban.id} className="hover:bg-muted/30 transition-colors">
                                     <td className="p-4">
-                                        <div className="font-bold text-white">{getUserName(ban.user_id)}</div>
-                                        <div className="text-xs text-slate-500">ID: {ban.user_id}</div>
+                                        <div className="font-bold text-foreground">{getUserName(ban.user_id)}</div>
+                                        <div className="text-xs text-muted-foreground">ID: {ban.user_id}</div>
                                     </td>
                                     <td className="p-4">
                                         {isBusiness ? (
-                                            <span className="inline-flex items-center gap-1 text-red-400 font-bold text-xs bg-red-950/20 px-2 py-1 rounded-full border border-red-900/30">
+                                            <span className="inline-flex items-center gap-1 text-red-400 font-bold text-xs bg-red-50 dark:bg-red-950/20 px-2 py-1 rounded-full border border-red-200 dark:border-red-900/30">
                                                 Business Wide
                                             </span>
                                         ) : (
-                                            <span className="inline-flex items-center gap-1 text-orange-400 font-bold text-xs bg-orange-950/20 px-2 py-1 rounded-full border border-orange-900/30">
+                                            <span className="inline-flex items-center gap-1 text-orange-400 font-bold text-xs bg-orange-50 dark:bg-orange-950/20 px-2 py-1 rounded-full border border-orange-200 dark:border-orange-900/30">
                                                 {ban.scope_venue_ids.length} Venue(s)
                                             </span>
                                         )}
                                         {!isBusiness && (
-                                            <div className="text-xs text-slate-500 mt-1 max-w-[200px] truncate" title={getVenueNames(ban.scope_venue_ids)}>
+                                            <div className="text-xs text-muted-foreground mt-1 max-w-[200px] truncate" title={getVenueNames(ban.scope_venue_ids)}>
                                                 {getVenueNames(ban.scope_venue_ids)}
                                             </div>
                                         )}
                                     </td>
                                     <td className="p-4">
-                                        <div className="text-sm text-white">{ban.reason_category}</div>
-                                        <div className="text-xs text-slate-500 truncate max-w-[200px]">{ban.reason_text}</div>
+                                        <div className="text-sm text-foreground">{ban.reason_category}</div>
+                                        <div className="text-xs text-muted-foreground truncate max-w-[200px]">{ban.reason_text}</div>
                                     </td>
-                                    <td className="p-4 text-sm text-slate-400">
+                                    <td className="p-4 text-sm text-muted-foreground">
                                         {format(new Date(ban.starts_at), 'MMM d, yyyy')}
                                     </td>
                                     <td className="p-4">
                                         <span className={cn("px-2 py-1 rounded-full text-xs font-bold uppercase",
-                                            status === 'ACTIVE' ? "bg-red-500/10 text-red-500 border border-red-500/20" :
-                                                status === 'REVOKED' ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" :
-                                                    "bg-slate-500/10 text-slate-500"
+                                            status === 'ACTIVE' ? "bg-red-500/10 text-red-500 border border-red-200 dark:border-red-500/20" :
+                                                status === 'REVOKED' ? "bg-emerald-500/10 text-emerald-500 border border-emerald-200 dark:border-emerald-500/20" :
+                                                    "bg-muted-foreground/10 text-muted-foreground"
                                         )}>
                                             {status}
                                         </span>
@@ -145,7 +145,7 @@ export default function BansPage() {
                         })}
                         {filteredBans.length === 0 && (
                             <tr>
-                                <td colSpan={6} className="p-8 text-center text-slate-500 italic">
+                                <td colSpan={6} className="p-8 text-center text-muted-foreground italic">
                                     No bans found.
                                 </td>
                             </tr>
@@ -156,18 +156,18 @@ export default function BansPage() {
 
             {/* Revoke Modal */}
             {showRevokeModal && selectedBan && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-md">
-                        <h2 className="text-xl font-bold text-white mb-4">Restore Access?</h2>
-                        <p className="text-slate-400 mb-6">
-                            This will immediately restore access for <strong className="text-white">{getUserName(selectedBan.user_id)}</strong>.
+                <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md">
+                        <h2 className="text-xl font-bold text-foreground mb-4">Restore Access?</h2>
+                        <p className="text-muted-foreground mb-6">
+                            This will immediately restore access for <strong className="text-foreground">{getUserName(selectedBan.user_id)}</strong>.
                         </p>
 
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm text-slate-400 mb-1">Reason for Unban</label>
+                                <label className="block text-sm text-muted-foreground mb-1">Reason for Unban</label>
                                 <select
-                                    className="w-full bg-black border border-slate-800 rounded-lg p-3 text-white"
+                                    className="w-full bg-background border border-border rounded-lg p-3 text-foreground"
                                     value={revokeReason}
                                     onChange={e => setRevokeReason(e.target.value)}
                                 >
@@ -181,7 +181,7 @@ export default function BansPage() {
                             <div className="flex justify-end gap-3 mt-6">
                                 <button
                                     onClick={() => setShowRevokeModal(false)}
-                                    className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+                                    className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
                                 >
                                     Cancel
                                 </button>

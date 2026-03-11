@@ -58,8 +58,8 @@ export default function SupportPage() {
         <div className="space-y-6 max-w-5xl mx-auto p-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-white">Support Center</h1>
-                    <p className="text-slate-400 mt-1">Get help with technical issues, billing, or feature requests.</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Support Center</h1>
+                    <p className="text-muted-foreground mt-1">Get help with technical issues, billing, or feature requests.</p>
                 </div>
                 <Button onClick={() => setIsCreating(true)} className="bg-indigo-600 hover:bg-indigo-500">
                     <Plus className="mr-2 h-4 w-4" />
@@ -68,7 +68,7 @@ export default function SupportPage() {
             </div>
 
             {isCreating ? (
-                <Card className="bg-slate-900 border-slate-800">
+                <Card className="bg-card border-border">
                     <CardHeader>
                         <CardTitle>Create New Ticket</CardTitle>
                         <CardDescription>Describe your issue in detail so we can help you faster.</CardDescription>
@@ -79,8 +79,8 @@ export default function SupportPage() {
                                 <div className="h-12 w-12 rounded-full bg-emerald-500/10 flex items-center justify-center">
                                     <CheckCircle2 className="h-6 w-6 text-emerald-500" />
                                 </div>
-                                <h3 className="text-xl font-medium text-white">Ticket Submitted!</h3>
-                                <p className="text-slate-400 text-center">We'll respond to your email shortly.</p>
+                                <h3 className="text-xl font-medium text-foreground">Ticket Submitted!</h3>
+                                <p className="text-muted-foreground text-center">We'll respond to your email shortly.</p>
                             </div>
                         ) : (
                             <form onSubmit={handleSubmit} className="space-y-4">
@@ -115,7 +115,7 @@ export default function SupportPage() {
 
                                 <div className="space-y-2">
                                     <Label htmlFor="subject">Subject</Label>
-                                    <Input id="subject" placeholder="Brief summary of the issue" required className="bg-slate-950 border-slate-800" />
+                                    <Input id="subject" placeholder="Brief summary of the issue" required className="bg-background border-border" />
                                 </div>
 
                                 <div className="space-y-2">
@@ -123,7 +123,7 @@ export default function SupportPage() {
                                     <Textarea
                                         id="description"
                                         placeholder="Please maintain state compliance..."
-                                        className="h-32 bg-slate-950 border-slate-800"
+                                        className="h-32 bg-background border-border"
                                         required
                                     />
                                 </div>
@@ -141,18 +141,18 @@ export default function SupportPage() {
             ) : (
                 <div className="grid grid-cols-1 gap-4">
                     {tickets.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center p-12 border border-dashed border-slate-800 rounded-lg bg-slate-950/50">
-                            <MessageSquare className="h-10 w-10 text-slate-600 mb-4" />
-                            <h3 className="text-lg font-medium text-white">No Open Tickets</h3>
-                            <p className="text-slate-400 max-w-sm text-center mt-2">
+                        <div className="flex flex-col items-center justify-center p-12 border border-dashed border-border rounded-lg bg-background/50">
+                            <MessageSquare className="h-10 w-10 text-muted-foreground mb-4" />
+                            <h3 className="text-lg font-medium text-foreground">No Open Tickets</h3>
+                            <p className="text-muted-foreground max-w-sm text-center mt-2">
                                 Good news! You have no pending support requests.
                             </p>
                         </div>
                     ) : (
                         <div className="space-y-4">
-                            <h2 className="text-xl font-bold text-white mb-4">Your Tickets</h2>
+                            <h2 className="text-xl font-bold text-foreground mb-4">Your Tickets</h2>
                             {tickets.map(ticket => (
-                                <div key={ticket.id} className="bg-slate-900 border border-slate-800 rounded-lg p-4 hover:border-slate-700 transition-colors cursor-pointer">
+                                <div key={ticket.id} className="bg-card border border-border rounded-lg p-4 hover:border-border transition-colors cursor-pointer">
                                     <div className="flex justify-between items-start mb-2">
                                         <div className="flex items-center gap-2">
                                             <span className={`px-2 py-0.5 rounded textxs font-bold uppercase ${ticket.priority === 'CRITICAL' ? 'bg-red-900 text-red-200' :
@@ -161,16 +161,16 @@ export default function SupportPage() {
                                                 }`}>
                                                 {ticket.priority}
                                             </span>
-                                            <span className="text-slate-500 text-xs font-mono">#{ticket.id.slice(0, 8)}</span>
+                                            <span className="text-muted-foreground text-xs font-mono">#{ticket.id.slice(0, 8)}</span>
                                         </div>
-                                        <span className={`text-xs font-bold px-2 py-1 rounded-full ${ticket.status === 'OPEN' ? 'bg-green-900/30 text-green-400' : 'bg-slate-800 text-slate-400'
+                                        <span className={`text-xs font-bold px-2 py-1 rounded-full ${ticket.status === 'OPEN' ? 'bg-green-100 dark:bg-green-900/30 text-green-400' : 'bg-muted text-muted-foreground'
                                             }`}>
                                             {ticket.status}
                                         </span>
                                     </div>
-                                    <h3 className="text-white font-semibold">{ticket.subject}</h3>
-                                    <p className="text-slate-400 text-sm mt-1 line-clamp-2">{ticket.messages[0].message_text}</p>
-                                    <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
+                                    <h3 className="text-foreground font-semibold">{ticket.subject}</h3>
+                                    <p className="text-muted-foreground text-sm mt-1 line-clamp-2">{ticket.messages[0].message_text}</p>
+                                    <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
                                         <span>{ticket.category}</span>
                                         <span>{new Date(ticket.created_at).toLocaleDateString()}</span>
                                     </div>
@@ -179,11 +179,11 @@ export default function SupportPage() {
                         </div>
                     )}
 
-                    <div className="bg-blue-950/30 border border-blue-900/50 p-4 rounded-lg flex items-start gap-4">
+                    <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 p-4 rounded-lg flex items-start gap-4">
                         <AlertCircle className="h-5 w-5 text-blue-400 mt-0.5" />
                         <div>
                             <h4 className="font-semibold text-blue-200">Compliance Notice</h4>
-                            <p className="text-sm text-blue-300/80 mt-1">
+                            <p className="text-sm text-blue-600 dark:text-blue-300/80 mt-1">
                                 Your ID scanning data retention is currently set to <strong>7 Days (TX Rule)</strong>.
                                 Changes to retention policies usually take 24 hours to propagate across all devices.
                             </p>

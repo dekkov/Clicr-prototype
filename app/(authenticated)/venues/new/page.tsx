@@ -157,58 +157,58 @@ export default function NewVenuePage() {
     // --- RENDERERS ---
 
     const renderVenueForm = () => (
-        <form onSubmit={handleCreateVenue} className="space-y-6 bg-slate-900/50 border border-slate-800 p-8 rounded-2xl shadow-xl animate-fade-in">
-            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+        <form onSubmit={handleCreateVenue} className="space-y-6 bg-card border border-border p-8 rounded-2xl shadow-xl animate-fade-in">
+            <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
                 <Building2 className="text-primary" /> Step 1: New Venue
             </h2>
 
             {activeBusiness && (
-                <div className="flex items-center gap-2 text-sm text-slate-400 border-b border-slate-800 pb-4 mb-2">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground border-b border-border pb-4 mb-2">
                     <Building2 className="w-4 h-4" />
-                    <span>Adding to <span className="font-medium text-white">{activeBusiness.name}</span></span>
+                    <span>Adding to <span className="font-medium text-foreground">{activeBusiness.name}</span></span>
                 </div>
             )}
 
             <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-300">Venue Name</label>
+                <label className="text-sm font-medium text-foreground/80">Venue Name</label>
                 <input
                     type="text"
                     required
                     value={venueData.name}
                     onChange={e => setVenueData({ ...venueData, name: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none"
+                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:ring-2 focus:ring-primary/50 focus:outline-none"
                     placeholder="e.g. Downtown Club"
                 />
             </div>
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-300">City <span className="text-slate-600">(optional)</span></label>
+                    <label className="text-sm font-medium text-foreground/80">City <span className="text-muted-foreground/60">(optional)</span></label>
                     <input
                         type="text"
                         value={venueData.city}
                         onChange={e => setVenueData({ ...venueData, city: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none"
+                        className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:ring-2 focus:ring-primary/50 focus:outline-none"
                         placeholder="City"
                     />
                 </div>
                 <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-300">State <span className="text-slate-600">(optional)</span></label>
+                    <label className="text-sm font-medium text-foreground/80">State <span className="text-muted-foreground/60">(optional)</span></label>
                     <input
                         type="text"
                         value={venueData.state}
                         onChange={e => setVenueData({ ...venueData, state: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none"
+                        className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:ring-2 focus:ring-primary/50 focus:outline-none"
                         placeholder="State"
                     />
                 </div>
             </div>
             <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-300">Total Capacity Limit</label>
+                <label className="text-sm font-medium text-foreground/80">Total Capacity Limit</label>
                 <input
                     type="number"
                     value={venueData.capacity}
                     onChange={e => setVenueData({ ...venueData, capacity: parseInt(e.target.value) || 0 })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none"
+                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:ring-2 focus:ring-primary/50 focus:outline-none"
                     placeholder="500"
                 />
             </div>
@@ -216,7 +216,7 @@ export default function NewVenuePage() {
                 <button
                     type="button"
                     onClick={() => router.push('/venues')}
-                    className="flex-1 py-3 border border-slate-700 text-slate-400 hover:text-white rounded-xl font-medium transition-all"
+                    className="flex-1 py-3 border border-border text-muted-foreground hover:text-foreground rounded-xl font-medium transition-all"
                 >
                     Skip for now
                 </button>
@@ -233,32 +233,32 @@ export default function NewVenuePage() {
 
     const renderAreasStep = () => (
         <div className="space-y-8 animate-fade-in">
-            <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl shadow-xl space-y-6">
-                <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+            <div className="bg-card border border-border p-8 rounded-2xl shadow-xl space-y-6">
+                <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
                     <MapPin className="text-primary" /> Step 2: Define Areas
                 </h2>
-                <p className="text-slate-400 text-sm">Create distinct zones for your venue (e.g. "Main Floor", "VIP Lounge", "Patio").</p>
+                <p className="text-muted-foreground text-sm">Create distinct zones for your venue (e.g. "Main Floor", "VIP Lounge", "Patio").</p>
 
                 {createdAreas.length > 0 && (
                     <div className="space-y-2">
                         {createdAreas.map(area => (
-                            <div key={area.id} className="bg-slate-800/50 px-4 py-3 rounded-lg border border-slate-700">
+                            <div key={area.id} className="bg-muted/50 px-4 py-3 rounded-lg border border-border">
                                 {editingAreaId !== area.id ? (
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2 min-w-0">
-                                            <span className="text-white font-medium">{area.name}</span>
-                                            <span className="text-xs text-slate-500">{(area.area_type || 'main').replace(/_/g, ' ').toLowerCase()}</span>
-                                            {(area.default_capacity ?? 0) > 0 && <span className="text-xs text-slate-600">· cap {area.default_capacity}</span>}
+                                            <span className="text-foreground font-medium">{area.name}</span>
+                                            <span className="text-xs text-muted-foreground">{(area.area_type || 'main').replace(/_/g, ' ').toLowerCase()}</span>
+                                            {(area.default_capacity ?? 0) > 0 && <span className="text-xs text-muted-foreground/60">· cap {area.default_capacity}</span>}
                                         </div>
                                         <div className="flex items-center gap-1">
                                             <button type="button"
                                                 onClick={() => { setEditingAreaId(area.id); setEditingAreaName(area.name); setEditingAreaCapacity(String(area.default_capacity ?? '')); setEditingAreaType((area.area_type as AreaType) || 'MAIN'); }}
-                                                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
+                                                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
                                                 <Pencil className="w-3.5 h-3.5" />
                                             </button>
                                             <button type="button"
                                                 onClick={() => { setCreatedAreas(prev => prev.filter(x => x.id !== area.id)); setCreatedClicrs(prev => prev.filter(c => c.area_id !== area.id)); setClicrInputs(prev => { const n = { ...prev }; delete n[area.id]; return n; }); }}
-                                                className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+                                                className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors">
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
                                         </div>
@@ -268,10 +268,10 @@ export default function NewVenuePage() {
                                         <input autoFocus type="text" value={editingAreaName}
                                             onChange={e => setEditingAreaName(e.target.value)}
                                             onKeyDown={e => { if (e.key === 'Escape') setEditingAreaId(null); }}
-                                            className="flex-1 bg-slate-900 border border-primary/50 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
+                                            className="flex-1 bg-card border border-primary/50 rounded-lg px-3 py-1.5 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
                                         <div className="flex gap-2">
                                             <select value={editingAreaType} onChange={e => setEditingAreaType(e.target.value as AreaType)}
-                                                className="flex-1 bg-slate-900 border border-primary/50 rounded-lg px-2 py-1.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-primary">
+                                                className="flex-1 bg-card border border-primary/50 rounded-lg px-2 py-1.5 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary">
                                                 <option value="MAIN">main</option>
                                                 <option value="ENTRY">entry</option>
                                                 <option value="VIP">vip</option>
@@ -282,7 +282,7 @@ export default function NewVenuePage() {
                                             </select>
                                             <input type="number" placeholder="Cap" value={editingAreaCapacity}
                                                 onChange={e => setEditingAreaCapacity(e.target.value)}
-                                                className="w-20 bg-slate-900 border border-primary/50 rounded-lg px-2 py-1.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
+                                                className="w-20 bg-card border border-primary/50 rounded-lg px-2 py-1.5 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
                                         </div>
                                         <div className="flex gap-2">
                                             <button type="button" onClick={() => handleSaveArea(area.id)}
@@ -290,7 +290,7 @@ export default function NewVenuePage() {
                                                 <Check className="w-3.5 h-3.5" /> Save
                                             </button>
                                             <button type="button" onClick={() => setEditingAreaId(null)}
-                                                className="flex-1 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white text-sm font-medium transition-colors flex items-center justify-center gap-1">
+                                                className="flex-1 py-1 rounded-lg bg-muted text-muted-foreground hover:text-foreground text-sm font-medium transition-colors flex items-center justify-center gap-1">
                                                 <X className="w-3.5 h-3.5" /> Cancel
                                             </button>
                                         </div>
@@ -301,49 +301,49 @@ export default function NewVenuePage() {
                     </div>
                 )}
 
-                <div className="bg-slate-950/50 p-4 rounded-xl border border-dashed border-slate-700 space-y-4">
+                <div className="bg-background/50 p-4 rounded-xl border border-dashed border-border space-y-4">
                     <div className="grid grid-cols-3 gap-4">
                         <div className="col-span-2 space-y-1">
-                            <label className="text-xs font-medium text-slate-400">Area Name</label>
+                            <label className="text-xs font-medium text-muted-foreground">Area Name</label>
                             <input
                                 type="text"
                                 placeholder="e.g. VIP Lounge"
                                 value={areaInput.name}
                                 onChange={e => setAreaInput({ ...areaInput, name: e.target.value })}
-                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-1 focus:ring-primary focus:outline-none"
+                                className="w-full bg-card border border-border rounded-lg px-3 py-2 text-foreground text-sm focus:ring-1 focus:ring-primary focus:outline-none"
                             />
                         </div>
                         <div className="col-span-1 space-y-1">
-                            <label className="text-xs font-medium text-slate-400">Capacity</label>
+                            <label className="text-xs font-medium text-muted-foreground">Capacity</label>
                             <input
                                 type="number"
                                 value={areaInput.capacity}
                                 onChange={e => setAreaInput({ ...areaInput, capacity: parseInt(e.target.value) || 0 })}
-                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-1 focus:ring-primary focus:outline-none"
+                                className="w-full bg-card border border-border rounded-lg px-3 py-2 text-foreground text-sm focus:ring-1 focus:ring-primary focus:outline-none"
                             />
                         </div>
                     </div>
                     <button
                         onClick={handleAddArea}
                         disabled={!areaInput.name || isLoading}
-                        className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white font-medium rounded-lg transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+                        className="w-full py-2 bg-muted hover:bg-muted text-foreground font-medium rounded-lg transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50"
                     >
                         <Plus className="w-4 h-4" /> Add This Area
                     </button>
                 </div>
 
-                <div className="pt-4 border-t border-slate-800 flex justify-between">
+                <div className="pt-4 border-t border-border flex justify-between">
                     <button
                         onClick={handleFinish}
                         disabled={isLoading}
-                        className="px-6 py-3 text-slate-400 hover:text-white transition-colors text-sm font-medium disabled:opacity-50"
+                        className="px-6 py-3 text-muted-foreground hover:text-foreground transition-colors text-sm font-medium disabled:opacity-50"
                     >
                         Skip for now
                     </button>
                     <button
                         onClick={nextToClicrs}
                         disabled={isLoading}
-                        className="px-8 py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl shadow-lg shadow-primary/25 transition-all disabled:opacity-50"
+                        className="px-8 py-3 bg-primary hover:bg-primary/90 text-foreground font-bold rounded-xl shadow-lg shadow-primary/25 transition-all disabled:opacity-50"
                     >
                         Next: Configure Clicrs
                     </button>
@@ -354,41 +354,41 @@ export default function NewVenuePage() {
 
     const renderClicrsStep = () => (
         <div className="space-y-8 animate-fade-in">
-            <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl shadow-xl space-y-6">
-                <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+            <div className="bg-card border border-border p-8 rounded-2xl shadow-xl space-y-6">
+                <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
                     <Users className="text-primary" /> Step 3: Add Clicrs
                 </h2>
-                <p className="text-slate-400 text-sm">How many counters do you need for each area? Name them for your staff (e.g. "Front Door", "Stairs").</p>
+                <p className="text-muted-foreground text-sm">How many counters do you need for each area? Name them for your staff (e.g. "Front Door", "Stairs").</p>
 
                 <div className="space-y-6">
                     {createdAreas.map(area => {
                         const areaClicrs = createdClicrs.filter(c => c.area_id === area.id);
                         return (
-                            <div key={area.id} className="bg-slate-950/30 p-4 rounded-xl border border-slate-800">
-                                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                                    <MapPin className="w-4 h-4 text-slate-400" /> {area.name}
+                            <div key={area.id} className="bg-background/30 p-4 rounded-xl border border-border">
+                                <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+                                    <MapPin className="w-4 h-4 text-muted-foreground" /> {area.name}
                                 </h3>
 
                                 {areaClicrs.length > 0 && (
                                     <div className="mb-4 space-y-2">
                                         {areaClicrs.map(clicr => (
-                                            <div key={clicr.id} className="bg-slate-800/40 px-3 py-2 rounded-lg border border-slate-700/50">
+                                            <div key={clicr.id} className="bg-muted/40 px-3 py-2 rounded-lg border border-border/50">
                                                 {editingClicrId !== clicr.id ? (
                                                     <div className="flex items-center justify-between text-sm">
-                                                        <div className="flex items-center gap-2 text-slate-300">
+                                                        <div className="flex items-center gap-2 text-foreground/80">
                                                             <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                                                             <span className="font-medium">{clicr.name}</span>
-                                                            <span className="text-xs text-slate-500">{clicr.flow_mode === 'BIDIRECTIONAL' ? 'Both' : clicr.flow_mode === 'IN_ONLY' ? 'In Only' : 'Out Only'}</span>
+                                                            <span className="text-xs text-muted-foreground">{clicr.flow_mode === 'BIDIRECTIONAL' ? 'Both' : clicr.flow_mode === 'IN_ONLY' ? 'In Only' : 'Out Only'}</span>
                                                         </div>
                                                         <div className="flex items-center gap-1">
                                                             <button type="button"
                                                                 onClick={() => { setEditingClicrId(clicr.id); setEditingClicrName(clicr.name); setEditingClicrFlow(clicr.flow_mode); }}
-                                                                className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-700 transition-colors">
+                                                                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
                                                                 <Pencil className="w-3 h-3" />
                                                             </button>
                                                             <button type="button"
                                                                 onClick={() => setCreatedClicrs(prev => prev.filter(x => x.id !== clicr.id))}
-                                                                className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+                                                                className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors">
                                                                 <Trash2 className="w-3.5 h-3.5" />
                                                             </button>
                                                         </div>
@@ -398,9 +398,9 @@ export default function NewVenuePage() {
                                                         <input autoFocus type="text" value={editingClicrName}
                                                             onChange={e => setEditingClicrName(e.target.value)}
                                                             onKeyDown={e => { if (e.key === 'Escape') setEditingClicrId(null); }}
-                                                            className="flex-1 bg-slate-900 border border-primary/50 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
+                                                            className="flex-1 bg-card border border-primary/50 rounded-lg px-3 py-1.5 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
                                                         <select value={editingClicrFlow} onChange={e => setEditingClicrFlow(e.target.value as FlowMode)}
-                                                            className="flex-1 bg-slate-900 border border-primary/50 rounded-lg px-2 py-1.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-primary">
+                                                            className="flex-1 bg-card border border-primary/50 rounded-lg px-2 py-1.5 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary">
                                                             <option value="BIDIRECTIONAL">Both (in + out)</option>
                                                             <option value="IN_ONLY">In only</option>
                                                             <option value="OUT_ONLY">Out only</option>
@@ -411,7 +411,7 @@ export default function NewVenuePage() {
                                                                 <Check className="w-3.5 h-3.5" /> Save
                                                             </button>
                                                             <button type="button" onClick={() => setEditingClicrId(null)}
-                                                                className="flex-1 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white text-sm font-medium transition-colors flex items-center justify-center gap-1">
+                                                                className="flex-1 py-1 rounded-lg bg-muted text-muted-foreground hover:text-foreground text-sm font-medium transition-colors flex items-center justify-center gap-1">
                                                                 <X className="w-3.5 h-3.5" /> Cancel
                                                             </button>
                                                         </div>
@@ -429,11 +429,11 @@ export default function NewVenuePage() {
                                         value={clicrInputs[area.id] || ''}
                                         onChange={e => setClicrInputs({ ...clicrInputs, [area.id]: e.target.value })}
                                         onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddClicr(area.id); } }}
-                                        className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-1 focus:ring-primary focus:outline-none"
+                                        className="flex-1 bg-card border border-border rounded-lg px-3 py-2 text-foreground text-sm focus:ring-1 focus:ring-primary focus:outline-none"
                                     />
                                     <select value={clicrFlowModes[area.id] || 'BIDIRECTIONAL'}
                                         onChange={e => setClicrFlowModes(p => ({ ...p, [area.id]: e.target.value as FlowMode }))}
-                                        className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-2 text-white text-sm focus:ring-1 focus:ring-primary focus:outline-none">
+                                        className="bg-card border border-border rounded-lg px-2 py-2 text-foreground text-sm focus:ring-1 focus:ring-primary focus:outline-none">
                                         <option value="BIDIRECTIONAL">Both</option>
                                         <option value="IN_ONLY">In only</option>
                                         <option value="OUT_ONLY">Out only</option>
@@ -441,7 +441,7 @@ export default function NewVenuePage() {
                                     <button
                                         onClick={() => handleAddClicr(area.id)}
                                         disabled={!clicrInputs[area.id]}
-                                        className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                                        className="px-4 py-2 bg-muted hover:bg-muted text-foreground rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                                     >
                                         Add
                                     </button>
@@ -451,18 +451,18 @@ export default function NewVenuePage() {
                     })}
                 </div>
 
-                <div className="pt-4 border-t border-slate-800 flex justify-between">
+                <div className="pt-4 border-t border-border flex justify-between">
                     <button
                         onClick={handleFinish}
                         disabled={isLoading}
-                        className="px-6 py-3 text-slate-400 hover:text-white transition-colors text-sm font-medium disabled:opacity-50"
+                        className="px-6 py-3 text-muted-foreground hover:text-foreground transition-colors text-sm font-medium disabled:opacity-50"
                     >
                         Skip for now
                     </button>
                     <button
                         onClick={handleFinish}
                         disabled={isLoading}
-                        className="px-8 py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl shadow-lg shadow-green-500/20 transition-all flex items-center gap-2 disabled:opacity-50"
+                        className="px-8 py-3 bg-green-600 hover:bg-green-500 text-foreground font-bold rounded-xl shadow-lg shadow-green-500/20 transition-all flex items-center gap-2 disabled:opacity-50"
                     >
                         {isLoading && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
                         <Check className="w-5 h-5" /> Finish Setup
@@ -477,20 +477,20 @@ export default function NewVenuePage() {
             <div className="flex items-center gap-3 mb-8">
                 <button
                     onClick={() => router.push('/venues')}
-                    className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                    className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                 >
                     <ArrowLeft className="w-5 h-5" />
                 </button>
                 <div className="flex items-center gap-6">
                     {(['VENUE', 'AREAS', 'CLICRS'] as Step[]).map((s, i) => (
                         <React.Fragment key={s}>
-                            <div className={`flex flex-col items-center gap-1 ${step === s ? 'text-primary' : 'text-slate-500'}`}>
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 text-sm font-bold ${step === s ? 'border-primary bg-primary/10' : ((['AREAS', 'CLICRS'] as Step[]).indexOf(s) < (['VENUE', 'AREAS', 'CLICRS'] as Step[]).indexOf(step) ? 'border-primary bg-primary text-white' : 'border-slate-700')}`}>
+                            <div className={`flex flex-col items-center gap-1 ${step === s ? 'text-primary' : 'text-muted-foreground'}`}>
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 text-sm font-bold ${step === s ? 'border-primary bg-primary/10' : ((['AREAS', 'CLICRS'] as Step[]).indexOf(s) < (['VENUE', 'AREAS', 'CLICRS'] as Step[]).indexOf(step) ? 'border-primary bg-primary text-white' : 'border-border')}`}>
                                     {i + 1}
                                 </div>
                                 <span className="text-xs font-bold">{s === 'VENUE' ? 'Venue' : s === 'AREAS' ? 'Areas' : 'Clicrs'}</span>
                             </div>
-                            {i < 2 && <div className={`h-0.5 w-8 ${(['AREAS', 'CLICRS'] as Step[]).indexOf(s) < (['VENUE', 'AREAS', 'CLICRS'] as Step[]).indexOf(step) ? 'bg-primary' : 'bg-slate-800'}`} />}
+                            {i < 2 && <div className={`h-0.5 w-8 ${(['AREAS', 'CLICRS'] as Step[]).indexOf(s) < (['VENUE', 'AREAS', 'CLICRS'] as Step[]).indexOf(step) ? 'bg-primary' : 'bg-muted'}`} />}
                         </React.Fragment>
                     ))}
                 </div>

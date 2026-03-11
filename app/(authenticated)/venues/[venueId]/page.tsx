@@ -46,7 +46,7 @@ export default function VenueDetailPage() {
 
     if (isLoading) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[50vh] text-slate-500 gap-4">
+            <div className="flex flex-col items-center justify-center min-h-[50vh] text-muted-foreground gap-4">
                 <RefreshCw className="w-8 h-8 animate-spin text-primary" />
                 <p>Loading venue details...</p>
             </div>
@@ -55,12 +55,12 @@ export default function VenueDetailPage() {
 
     if (!venue) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[50vh] text-slate-500 gap-4">
+            <div className="flex flex-col items-center justify-center min-h-[50vh] text-muted-foreground gap-4">
                 <ShieldAlert className="w-12 h-12 text-slate-700" />
                 <div className="text-center">
-                    <h2 className="text-xl font-bold text-white mb-2">Venue Not Found</h2>
+                    <h2 className="text-xl font-bold text-foreground mb-2">Venue Not Found</h2>
                     <p className="max-w-md mx-auto mb-4">
-                        We couldn't find a venue with ID <code className="bg-slate-800 px-1 py-0.5 rounded text-xs">{venueId}</code>.
+                        We couldn't find a venue with ID <code className="bg-muted px-1 py-0.5 rounded text-xs">{venueId}</code>.
                         It may have been deleted or you don't have permission to view it.
                     </p>
                     <div className="flex items-center justify-center gap-4">
@@ -83,20 +83,20 @@ export default function VenueDetailPage() {
             <div className="flex items-center gap-4">
                 <button
                     onClick={() => router.push('/dashboard')}
-                    className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
+                    className="p-2 hover:bg-muted rounded-lg text-muted-foreground hover:text-foreground transition-colors"
                 >
                     <ArrowLeft className="w-5 h-5" />
                 </button>
                 <div>
-                    <h1 className="text-2xl font-bold text-white">{venue.name}</h1>
-                    <p className="text-sm text-slate-400">
+                    <h1 className="text-2xl font-bold text-foreground">{venue.name}</h1>
+                    <p className="text-sm text-muted-foreground">
                         {venue.city ? `${venue.city}, ${venue.state}` : 'No Location Set'} • {venue.status}
                     </p>
                 </div>
             </div>
 
             {/* Tabs */}
-            <div className="border-b border-slate-800 flex gap-1 overflow-x-auto">
+            <div className="border-b border-border flex gap-1 overflow-x-auto">
                 {TABS.map(tab => {
                     const Icon = tab.icon;
                     const isActive = activeTab === tab.id;
@@ -107,8 +107,8 @@ export default function VenueDetailPage() {
                             className={cn(
                                 "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-all whitespace-nowrap rounded-t-lg",
                                 isActive
-                                    ? "border-primary bg-slate-800 !text-white shadow-lg"
-                                    : "border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/50"
+                                    ? "border-primary bg-muted !text-foreground shadow-lg"
+                                    : "border-transparent text-muted-foreground hover:text-foreground hover:bg-card"
                             )}
                         >
                             <Icon className={cn("w-4 h-4", isActive ? "text-primary" : "text-current")} />

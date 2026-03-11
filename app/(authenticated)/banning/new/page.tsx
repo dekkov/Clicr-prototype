@@ -44,13 +44,13 @@ export default function NewBanPage() {
 
     return (
         <div className="p-8 max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <Link href="/banning" className="text-slate-400 hover:text-white flex items-center gap-2 text-sm font-bold">
+            <Link href="/banning" className="text-muted-foreground hover:text-foreground flex items-center gap-2 text-sm font-bold">
                 <ArrowLeft className="w-4 h-4" /> Back to List
             </Link>
 
             <div>
-                <h1 className="text-3xl font-bold text-white">Manual Ban Entry</h1>
-                <p className="text-slate-400 mt-1">
+                <h1 className="text-3xl font-bold text-foreground">Manual Ban Entry</h1>
+                <p className="text-muted-foreground mt-1">
                     Add a ban by Manually entering ID details. This calculates the hash without scanning.
                 </p>
             </div>
@@ -58,52 +58,52 @@ export default function NewBanPage() {
             <form onSubmit={handleSubmit} className="space-y-8">
 
                 {/* section: Identity */}
-                <section className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-                    <h2 className="text-lg font-bold text-white border-b border-slate-800 pb-2 mb-4">Patron Details</h2>
+                <section className="bg-card border border-border rounded-2xl p-6 space-y-4">
+                    <h2 className="text-lg font-bold text-foreground border-b border-border pb-2 mb-4">Patron Details</h2>
 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <label className="text-xs font-bold uppercase text-slate-500">State / Region</label>
+                            <label className="text-xs font-bold uppercase text-muted-foreground">State / Region</label>
                             <input
                                 required
                                 type="text"
                                 maxLength={2}
                                 placeholder="CA"
                                 value={state} onChange={e => setState(e.target.value.toUpperCase())}
-                                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white font-mono"
+                                className="w-full bg-background border border-border rounded-lg p-3 text-foreground font-mono"
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-xs font-bold uppercase text-slate-500">Date of Birth</label>
+                            <label className="text-xs font-bold uppercase text-muted-foreground">Date of Birth</label>
                             <input
                                 required
                                 type="date"
                                 value={dob} onChange={e => setDob(e.target.value)}
-                                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white font-mono"
+                                className="w-full bg-background border border-border rounded-lg p-3 text-foreground font-mono"
                             />
                         </div>
                     </div>
                     <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase text-slate-500">ID Number</label>
+                        <label className="text-xs font-bold uppercase text-muted-foreground">ID Number</label>
                         <input
                             required
                             type="text"
                             placeholder="D1234567"
                             value={idNumber} onChange={e => setIdNumber(e.target.value)}
-                            className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white font-mono"
+                            className="w-full bg-background border border-border rounded-lg p-3 text-foreground font-mono"
                         />
                     </div>
                 </section>
 
                 {/* section: Ban Rules */}
-                <section className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-                    <h2 className="text-lg font-bold text-white border-b border-slate-800 pb-2 mb-4">Ban Rules</h2>
+                <section className="bg-card border border-border rounded-2xl p-6 space-y-4">
+                    <h2 className="text-lg font-bold text-foreground border-b border-border pb-2 mb-4">Ban Rules</h2>
 
                     <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase text-slate-500">Reason</label>
+                        <label className="text-xs font-bold uppercase text-muted-foreground">Reason</label>
                         <select
                             value={reason} onChange={e => setReason(e.target.value)}
-                            className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white"
+                            className="w-full bg-background border border-border rounded-lg p-3 text-foreground"
                         >
                             <option value="AGGRESSIVE">Aggressive Behavior</option>
                             <option value="THEFT">Theft / Stealing</option>
@@ -114,15 +114,15 @@ export default function NewBanPage() {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase text-slate-500">Notes (Internal)</label>
+                        <label className="text-xs font-bold uppercase text-muted-foreground">Notes (Internal)</label>
                         <textarea
                             value={notes} onChange={e => setNotes(e.target.value)}
                             placeholder="Describe what happened..."
-                            className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white h-24"
+                            className="w-full bg-background border border-border rounded-lg p-3 text-foreground h-24"
                         />
                     </div>
 
-                    <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl flex items-start gap-3">
+                    <div className="bg-red-500/10 border border-red-200 dark:border-red-500/20 p-4 rounded-xl flex items-start gap-3">
                         <AlertTriangle className="w-5 h-5 text-red-500 shrink-0" />
                         <p className="text-sm text-red-200">
                             This will immediately block this ID from entering <strong>All Venues</strong> in your business.
@@ -132,13 +132,13 @@ export default function NewBanPage() {
                 </section>
 
                 <div className="flex justify-end gap-4">
-                    <Link href="/banning" className="px-6 py-3 rounded-xl font-bold text-slate-400 hover:text-white transition-colors">
+                    <Link href="/banning" className="px-6 py-3 rounded-xl font-bold text-muted-foreground hover:text-foreground transition-colors">
                         Cancel
                     </Link>
                     <button
                         disabled={submitting}
                         type="submit"
-                        className="px-8 py-3 bg-red-600 rounded-xl font-bold text-white hover:bg-red-500 shadow-lg shadow-red-900/20 disabled:opacity-50 flex items-center gap-2"
+                        className="px-8 py-3 bg-red-600 rounded-xl font-bold text-foreground hover:bg-red-500 shadow-lg shadow-red-900/20 disabled:opacity-50 flex items-center gap-2"
                     >
                         {submitting ? 'Saving...' : 'Confirm Ban'} <Save className="w-4 h-4" />
                     </button>

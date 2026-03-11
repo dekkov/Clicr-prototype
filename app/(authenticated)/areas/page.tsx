@@ -199,9 +199,9 @@ export default function AreasPage() {
             <div className="p-6 max-w-[1600px]">
                 <div className="mb-8">
                     <h1 className="text-3xl mb-1">Areas</h1>
-                    <p className="text-gray-400 text-sm">All areas across your venues.</p>
+                    <p className="text-muted-foreground text-sm">All areas across your venues.</p>
                 </div>
-                <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-10 text-center text-gray-400">
+                <div className="bg-card border border-border rounded-xl p-10 text-center text-muted-foreground">
                     Select a business from the sidebar.
                 </div>
             </div>
@@ -213,17 +213,17 @@ export default function AreasPage() {
             <div className="p-6 max-w-[1600px]">
                 <div className="mb-8">
                     <h1 className="text-3xl mb-1">Areas</h1>
-                    <p className="text-gray-400 text-sm">All areas across your venues.</p>
+                    <p className="text-muted-foreground text-sm">All areas across your venues.</p>
                 </div>
                 <div className="space-y-4 animate-pulse">
-                    <div className="h-5 bg-gray-800 rounded w-32" />
+                    <div className="h-5 bg-muted rounded w-32" />
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {[1, 2, 3].map(i => (
-                            <div key={i} className="bg-gray-900/50 border border-gray-800 rounded-xl p-6 space-y-3">
-                                <div className="h-4 bg-gray-800 rounded w-24" />
-                                <div className="h-10 bg-gray-800 rounded w-16" />
-                                <div className="h-2 bg-gray-800 rounded-full" />
-                                <div className="h-3 bg-gray-800 rounded w-full" />
+                            <div key={i} className="bg-card border border-border rounded-xl p-6 space-y-3">
+                                <div className="h-4 bg-muted rounded w-24" />
+                                <div className="h-10 bg-muted rounded w-16" />
+                                <div className="h-2 bg-muted rounded-full" />
+                                <div className="h-3 bg-muted rounded w-full" />
                             </div>
                         ))}
                     </div>
@@ -251,17 +251,17 @@ export default function AreasPage() {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                         <h1 className="text-3xl mb-1">Areas</h1>
-                        <p className="text-gray-400 text-sm">All areas across your venues.</p>
+                        <p className="text-muted-foreground text-sm">All areas across your venues.</p>
                     </div>
                     <div className="flex items-center gap-3">
                         <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <input
                                 type="text"
                                 placeholder="Search areas..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                className="bg-gray-900 border border-gray-800 rounded-lg pl-10 pr-4 py-2 text-white focus:border-purple-500 outline-none"
+                                className="bg-card border border-border rounded-lg pl-10 pr-4 py-2 text-foreground focus:border-purple-500 outline-none"
                             />
                         </div>
                         {canEdit && (
@@ -279,14 +279,14 @@ export default function AreasPage() {
 
             {/* Venue Groups - Design */}
             {venueGroups.length === 0 ? (
-                <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-10 text-center text-gray-400">
+                <div className="bg-card border border-border rounded-xl p-10 text-center text-muted-foreground">
                     No areas found.
                 </div>
             ) : (
                 venueGroups.map(({ venue, areas: venueAreas }) => (
                     <section key={venue.id} className="space-y-8">
                         <div className="mb-4">
-                            <span className="text-xs font-bold uppercase tracking-widest text-sky-400 bg-sky-500/10 border border-sky-500/20 px-3 py-1.5 rounded-full">Venue — {venue.name}</span>
+                            <span className="text-xs font-bold uppercase tracking-widest text-sky-400 bg-sky-500/10 border border-sky-200 dark:border-sky-500/20 px-3 py-1.5 rounded-full">Venue — {venue.name}</span>
                         </div>
 
                         <div className="space-y-6">
@@ -301,7 +301,7 @@ export default function AreasPage() {
                                 .map(([type, typeAreas]) => [type, [...typeAreas].sort((a, b) => a.name.localeCompare(b.name))] as const)
                                 .map(([type, typeAreas]) => (
                                     <div key={type}>
-                                        <h3 className="text-xs font-bold uppercase tracking-widest mb-3 text-gray-500">
+                                        <h3 className="text-xs font-bold uppercase tracking-widest mb-3 text-muted-foreground">
                                             {AREA_TYPE_LABELS[type] ?? type}
                                         </h3>
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -319,11 +319,11 @@ export default function AreasPage() {
                                                 return (
                                                     <div
                                                         key={area.id}
-                                                        className="border rounded-xl p-6 hover:border-gray-700 transition-colors bg-gray-900/50 border-gray-800"
+                                                        className="border rounded-xl p-6 hover:border-border transition-colors bg-card border-border"
                                                     >
                                                         <div className="flex items-center justify-between mb-6">
                                                             <div className="flex items-center gap-3">
-                                                                <div className="w-10 h-10 rounded-lg bg-purple-900/30 border border-purple-500/20 flex items-center justify-center">
+                                                                <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-500/20 flex items-center justify-center">
                                                                     <Layers className="w-5 h-5 text-purple-400" />
                                                                 </div>
                                                                 <div className="text-lg">{area.name}</div>
@@ -332,7 +332,7 @@ export default function AreasPage() {
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => router.push(`/clicr/board/area-${area.id}`)}
-                                                                    className="w-8 h-8 rounded-lg hover:bg-gray-800 flex items-center justify-center transition-colors"
+                                                                    className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center transition-colors"
                                                                     aria-label="Board View"
                                                                     title="Open board view"
                                                                 >
@@ -340,18 +340,18 @@ export default function AreasPage() {
                                                                 </button>
                                                                 <button
                                                                     type="button"
-                                                                    className="w-8 h-8 rounded-lg hover:bg-gray-800 flex items-center justify-center transition-colors"
+                                                                    className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center transition-colors"
                                                                     aria-label="Refresh"
                                                                 >
-                                                                    <RefreshCw className="w-4 h-4 text-gray-400" />
+                                                                    <RefreshCw className="w-4 h-4 text-muted-foreground" />
                                                                 </button>
                                                                 {canEdit && (
                                                                     <button
                                                                         onClick={() => openConfigModal(area)}
-                                                                        className="w-8 h-8 rounded-lg hover:bg-gray-800 flex items-center justify-center transition-colors"
+                                                                        className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center transition-colors"
                                                                         title="Configure area"
                                                                     >
-                                                                        <Settings2 className="w-4 h-4 text-gray-400" />
+                                                                        <Settings2 className="w-4 h-4 text-muted-foreground" />
                                                                     </button>
                                                                 )}
                                                             </div>
@@ -359,10 +359,10 @@ export default function AreasPage() {
 
                                                         <div className="mb-4">
                                                             <div className="text-4xl mb-2">{liveOcc}</div>
-                                                            <div className="text-sm text-gray-400 mb-4">
+                                                            <div className="text-sm text-muted-foreground mb-4">
                                                                 of {capacity || '—'} · {pct}% full
                                                             </div>
-                                                            <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+                                                            <div className="h-2 bg-muted rounded-full overflow-hidden">
                                                                 <div
                                                                     className="h-full bg-emerald-500 rounded-full transition-all"
                                                                     style={{ width: `${Math.min(pct, 100)}%` }}
@@ -381,12 +381,12 @@ export default function AreasPage() {
                                                                     <span>{traffic.total_out}</span>
                                                                 </div>
                                                             </div>
-                                                            <div className="text-gray-400">{deviceCount} device{deviceCount !== 1 ? 's' : ''}</div>
+                                                            <div className="text-muted-foreground">{deviceCount} device{deviceCount !== 1 ? 's' : ''}</div>
                                                         </div>
 
                                                         <div className="flex items-center gap-2">
                                                             {area.shift_mode === 'AUTO' ? (
-                                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-500/10 text-amber-400 text-[11px] font-medium border border-amber-500/20">
+                                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-500/10 text-amber-400 text-[11px] font-medium border border-amber-200 dark:border-amber-500/20">
                                                                     <Settings2 className="w-3 h-3" />
                                                                     Auto {area.auto_reset_time ?? ''}
                                                                 </span>
@@ -395,7 +395,7 @@ export default function AreasPage() {
                                                                     {activeShiftId && activeShiftAreaId === area.id ? (
                                                                         <button
                                                                             onClick={() => endShift(activeShiftId)}
-                                                                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-red-500/10 hover:bg-red-500/20 text-red-400 text-[11px] font-medium border border-red-500/20 transition-colors"
+                                                                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-red-500/10 hover:bg-red-500/20 text-red-400 text-[11px] font-medium border border-red-200 dark:border-red-500/20 transition-colors"
                                                                         >
                                                                             <Square className="w-3 h-3" />
                                                                             End Shift
@@ -404,7 +404,7 @@ export default function AreasPage() {
                                                                         <button
                                                                             onClick={() => handleStartShift(area)}
                                                                             disabled={startingShiftAreaId === area.id}
-                                                                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[11px] font-medium border border-emerald-500/20 transition-colors disabled:opacity-50"
+                                                                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[11px] font-medium border border-emerald-200 dark:border-emerald-500/20 transition-colors disabled:opacity-50"
                                                                         >
                                                                             {startingShiftAreaId === area.id ? (
                                                                                 <span className="w-3 h-3 border-2 border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin" />
@@ -416,7 +416,7 @@ export default function AreasPage() {
                                                                     )}
                                                                 </div>
                                                             ) : (
-                                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-800 text-gray-500 text-[11px] font-medium border border-gray-700">
+                                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-muted text-muted-foreground text-[11px] font-medium border border-border">
                                                                     Manual
                                                                 </span>
                                                             )}
@@ -449,20 +449,20 @@ export default function AreasPage() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
                         onClick={() => setIsCreateOpen(false)}
                     >
                         <motion.div
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.95, opacity: 0 }}
-                            className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-lg shadow-xl"
+                            className="bg-card border border-border rounded-2xl p-6 w-full max-w-lg shadow-xl"
                             onClick={e => e.stopPropagation()}
                         >
                             <h2 className="text-xl font-bold mb-4">Create Area</h2>
                             <form onSubmit={handleCreateArea} className="space-y-4">
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-gray-400">Venue</label>
+                                    <label className="text-sm font-medium text-muted-foreground">Venue</label>
                                     <div className="relative">
                                         <select
                                             value={newArea.venue_id}
@@ -473,34 +473,34 @@ export default function AreasPage() {
                                                 }));
                                             }}
                                             required
-                                            className="w-full appearance-none bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 pr-10"
+                                            className="w-full appearance-none bg-background border border-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-purple-500/50 pr-10"
                                         >
                                             <option value="">Select a venue…</option>
                                             {venues.map(v => (
                                                 <option key={v.id} value={v.id}>{v.name}</option>
                                             ))}
                                         </select>
-                                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+                                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-gray-400">Area Name</label>
+                                    <label className="text-sm font-medium text-muted-foreground">Area Name</label>
                                     <input
                                         type="text"
                                         value={newArea.name}
                                         onChange={e => setNewArea(prev => ({ ...prev, name: e.target.value }))}
-                                        className="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                        className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                                         placeholder="e.g. Main Floor"
                                         required
                                     />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium text-gray-400">Type</label>
+                                        <label className="text-sm font-medium text-muted-foreground">Type</label>
                                         <select
                                             value={newArea.area_type}
                                             onChange={e => setNewArea(prev => ({ ...prev, area_type: e.target.value as AreaType }))}
-                                            className="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                            className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                                         >
                                             <option value="MAIN">main</option>
                                             <option value="ENTRY">entry</option>
@@ -512,18 +512,18 @@ export default function AreasPage() {
                                         </select>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium text-gray-400">Capacity</label>
+                                        <label className="text-sm font-medium text-muted-foreground">Capacity</label>
                                         <input
                                             type="number"
                                             value={newArea.default_capacity || ''}
                                             onChange={e => setNewArea(prev => ({ ...prev, default_capacity: parseInt(e.target.value) || 0 }))}
-                                            className="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                            className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                                             placeholder="0 for unlimited"
                                         />
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-gray-400">Counting Mode</label>
+                                    <label className="text-sm font-medium text-muted-foreground">Counting Mode</label>
                                     <div className="grid grid-cols-3 gap-2">
                                         {(['MANUAL', 'AUTO_FROM_SCANS', 'BOTH'] as CountingMode[]).map(mode => (
                                             <button
@@ -533,8 +533,8 @@ export default function AreasPage() {
                                                 className={cn(
                                                     "px-2 py-2 rounded-lg text-xs font-medium border transition-colors",
                                                     newArea.counting_mode === mode
-                                                        ? "bg-purple-900/30 text-purple-400 border-purple-500/50"
-                                                        : "bg-gray-950 border-gray-800 text-gray-400 hover:bg-gray-900"
+                                                        ? "bg-purple-100 dark:bg-purple-900/30 text-purple-400 border-purple-200 dark:border-purple-500/50"
+                                                        : "bg-background border-border text-muted-foreground hover:bg-card"
                                                 )}
                                             >
                                                 {mode.replace(/_/g, ' ')}
@@ -543,7 +543,7 @@ export default function AreasPage() {
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-gray-400">Shift Mode</label>
+                                    <label className="text-sm font-medium text-muted-foreground">Shift Mode</label>
                                     <div className="grid grid-cols-2 gap-2">
                                         {(['MANUAL', 'AUTO'] as ShiftMode[]).map(mode => (
                                             <button
@@ -553,8 +553,8 @@ export default function AreasPage() {
                                                 className={cn(
                                                     "px-3 py-2 rounded-lg text-xs font-medium border transition-colors",
                                                     newArea.shift_mode === mode
-                                                        ? "bg-purple-900/30 text-purple-400 border-purple-500/50"
-                                                        : "bg-gray-950 border-gray-800 text-gray-400 hover:bg-gray-900"
+                                                        ? "bg-purple-100 dark:bg-purple-900/30 text-purple-400 border-purple-200 dark:border-purple-500/50"
+                                                        : "bg-background border-border text-muted-foreground hover:bg-card"
                                                 )}
                                             >
                                                 {mode === 'MANUAL' ? 'Manual Start' : 'Auto (Scheduled)'}
@@ -569,7 +569,7 @@ export default function AreasPage() {
                                                     type="time"
                                                     value={newArea.auto_reset_time ?? '09:00'}
                                                     onChange={e => setNewArea(prev => ({ ...prev, auto_reset_time: e.target.value }))}
-                                                    className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                                                 />
                                             </div>
                                             <div className="space-y-1">
@@ -577,7 +577,7 @@ export default function AreasPage() {
                                                 <select
                                                     value={newArea.auto_reset_timezone}
                                                     onChange={e => setNewArea(prev => ({ ...prev, auto_reset_timezone: e.target.value }))}
-                                                    className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none"
+                                                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none"
                                                 >
                                                     {TIMEZONES.map(tz => (
                                                         <option key={tz.value} value={tz.value}>{tz.label}</option>
@@ -587,11 +587,11 @@ export default function AreasPage() {
                                         </div>
                                     )}
                                 </div>
-                                <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-800">
+                                <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
                                     <button
                                         type="button"
                                         onClick={() => setIsCreateOpen(false)}
-                                        className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+                                        className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
                                     >
                                         Cancel
                                     </button>
@@ -612,15 +612,15 @@ export default function AreasPage() {
 
             {/* Cascading Clicr Prompt — shown after area creation */}
             {justCreatedAreaId && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900 border border-primary/20 rounded-xl p-4 shadow-xl w-full max-w-md space-y-3">
-                    <p className="text-sm text-slate-300">Add Clicrs to <span className="font-bold text-white">{areas.find(a => a.id === justCreatedAreaId)?.name}</span>?</p>
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-card border border-primary/20 rounded-xl p-4 shadow-xl w-full max-w-md space-y-3">
+                    <p className="text-sm text-foreground/80">Add Clicrs to <span className="font-bold text-foreground">{areas.find(a => a.id === justCreatedAreaId)?.name}</span>?</p>
                     <div className="flex gap-2">
                         <input type="text" placeholder="Clicr name" value={cascadeClicrName}
                             onChange={e => setCascadeClicrName(e.target.value)}
                             onKeyDown={e => { if (e.key === 'Enter' && cascadeClicrName.trim()) { e.preventDefault(); addClicr({ id: crypto.randomUUID(), area_id: justCreatedAreaId, name: cascadeClicrName.trim(), flow_mode: cascadeClicrFlow, active: true, current_count: 0 }); setCascadeClicrName(''); } }}
-                            className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm" />
+                            className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-foreground text-sm" />
                         <select value={cascadeClicrFlow} onChange={e => setCascadeClicrFlow(e.target.value as FlowMode)}
-                            className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-2 text-white text-sm">
+                            className="bg-background border border-border rounded-lg px-2 py-2 text-foreground text-sm">
                             <option value="BIDIRECTIONAL">Both</option>
                             <option value="IN_ONLY">In only</option>
                             <option value="OUT_ONLY">Out only</option>
@@ -634,7 +634,7 @@ export default function AreasPage() {
                             Add
                         </button>
                     </div>
-                    <button onClick={() => setJustCreatedAreaId(null)} className="text-xs text-slate-500 hover:text-slate-300">Done adding clicrs</button>
+                    <button onClick={() => setJustCreatedAreaId(null)} className="text-xs text-muted-foreground hover:text-foreground/80">Done adding clicrs</button>
                 </div>
             )}
 
@@ -645,35 +645,35 @@ export default function AreasPage() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
                         onClick={() => { setAddClicrAreaId(null); setNewClicrName(''); setNewClicrFlow('BIDIRECTIONAL'); }}
                     >
                         <motion.div
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.95, opacity: 0 }}
-                            className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-md shadow-xl"
+                            className="bg-card border border-border rounded-2xl p-6 w-full max-w-md shadow-xl"
                             onClick={e => e.stopPropagation()}
                         >
                             <h2 className="text-xl font-bold mb-1">Add Clicr</h2>
-                            <p className="text-sm text-gray-400 mb-4">
-                                Adding to <span className="text-white font-medium">{areas.find(a => a.id === addClicrAreaId)?.name}</span>
+                            <p className="text-sm text-muted-foreground mb-4">
+                                Adding to <span className="text-foreground font-medium">{areas.find(a => a.id === addClicrAreaId)?.name}</span>
                             </p>
                             <form onSubmit={handleAddClicr} className="space-y-4">
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-gray-400">Clicr Name</label>
+                                    <label className="text-sm font-medium text-muted-foreground">Clicr Name</label>
                                     <input
                                         type="text"
                                         value={newClicrName}
                                         onChange={e => setNewClicrName(e.target.value)}
-                                        className="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                        className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                                         placeholder="e.g. Front Door"
                                         required
                                         autoFocus
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-gray-400">Flow Mode</label>
+                                    <label className="text-sm font-medium text-muted-foreground">Flow Mode</label>
                                     <div className="grid grid-cols-3 gap-2">
                                         {(['BIDIRECTIONAL', 'IN_ONLY', 'OUT_ONLY'] as FlowMode[]).map(mode => (
                                             <button
@@ -684,7 +684,7 @@ export default function AreasPage() {
                                                     "px-2 py-2 rounded-lg text-xs font-medium border transition-colors",
                                                     newClicrFlow === mode
                                                         ? "bg-primary/20 text-primary border-primary/50"
-                                                        : "bg-gray-950 border-gray-800 text-gray-400 hover:bg-gray-900"
+                                                        : "bg-background border-border text-muted-foreground hover:bg-card"
                                                 )}
                                             >
                                                 {mode === 'BIDIRECTIONAL' ? 'Both' : mode === 'IN_ONLY' ? 'In Only' : 'Out Only'}
@@ -692,11 +692,11 @@ export default function AreasPage() {
                                         ))}
                                     </div>
                                 </div>
-                                <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-800">
+                                <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
                                     <button
                                         type="button"
                                         onClick={() => { setAddClicrAreaId(null); setNewClicrName(''); setNewClicrFlow('BIDIRECTIONAL'); }}
-                                        className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+                                        className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
                                     >
                                         Cancel
                                     </button>
@@ -722,44 +722,44 @@ export default function AreasPage() {
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
-                            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+                            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
                             onClick={() => { setConfigAreaId(null); setConfirmDelete(false); }}
                         >
                             <motion.div
                                 initial={{ scale: 0.95, opacity: 0 }}
                                 animate={{ scale: 1, opacity: 1 }}
                                 exit={{ scale: 0.95, opacity: 0 }}
-                                className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-lg shadow-xl"
+                                className="bg-card border border-border rounded-2xl p-6 w-full max-w-lg shadow-xl"
                                 onClick={e => e.stopPropagation()}
                             >
                                 <h2 className="text-xl font-bold mb-1">Configure Area</h2>
-                                <p className="text-sm text-gray-400 mb-4">{configArea?.name}</p>
+                                <p className="text-sm text-muted-foreground mb-4">{configArea?.name}</p>
                                 <div className="space-y-4">
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium text-gray-400">Name</label>
+                                        <label className="text-sm font-medium text-muted-foreground">Name</label>
                                         <input
                                             type="text"
                                             value={configName}
                                             onChange={e => setConfigName(e.target.value)}
-                                            className="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                            className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium text-gray-400">Capacity</label>
+                                        <label className="text-sm font-medium text-muted-foreground">Capacity</label>
                                         <input
                                             type="number"
                                             value={configCapacity || ''}
                                             onChange={e => setConfigCapacity(parseInt(e.target.value) || 0)}
-                                            className="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                            className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                                             placeholder="0 for unlimited"
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium text-gray-400">Type</label>
+                                        <label className="text-sm font-medium text-muted-foreground">Type</label>
                                         <select
                                             value={configAreaType}
                                             onChange={e => setConfigAreaType(e.target.value as AreaType)}
-                                            className="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                            className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                                         >
                                             <option value="MAIN">Main Floor</option>
                                             <option value="ENTRY">Entry</option>
@@ -771,7 +771,7 @@ export default function AreasPage() {
                                         </select>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium text-gray-400">Counting Mode</label>
+                                        <label className="text-sm font-medium text-muted-foreground">Counting Mode</label>
                                         <div className="grid grid-cols-3 gap-2">
                                             {(['MANUAL', 'AUTO_FROM_SCANS', 'BOTH'] as CountingMode[]).map(mode => (
                                                 <button key={mode} type="button"
@@ -779,15 +779,15 @@ export default function AreasPage() {
                                                     className={cn(
                                                         "px-2 py-2 rounded-lg text-xs font-medium border transition-colors",
                                                         configCountingMode === mode
-                                                            ? "bg-purple-900/30 text-purple-400 border-purple-500/50"
-                                                            : "bg-gray-950 border-gray-800 text-gray-400 hover:bg-gray-900"
+                                                            ? "bg-purple-100 dark:bg-purple-900/30 text-purple-400 border-purple-200 dark:border-purple-500/50"
+                                                            : "bg-background border-border text-muted-foreground hover:bg-card"
                                                     )}
                                                 >{mode.replace(/_/g, ' ')}</button>
                                             ))}
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium text-gray-400">Shift Mode</label>
+                                        <label className="text-sm font-medium text-muted-foreground">Shift Mode</label>
                                         <div className="grid grid-cols-2 gap-2">
                                             {(['MANUAL', 'AUTO'] as ShiftMode[]).map(mode => (
                                                 <button key={mode} type="button"
@@ -795,8 +795,8 @@ export default function AreasPage() {
                                                     className={cn(
                                                         "px-3 py-2 rounded-lg text-xs font-medium border transition-colors",
                                                         configShiftMode === mode
-                                                            ? "bg-purple-900/30 text-purple-400 border-purple-500/50"
-                                                            : "bg-gray-950 border-gray-800 text-gray-400 hover:bg-gray-900"
+                                                            ? "bg-purple-100 dark:bg-purple-900/30 text-purple-400 border-purple-200 dark:border-purple-500/50"
+                                                            : "bg-background border-border text-muted-foreground hover:bg-card"
                                                     )}
                                                 >{mode === 'MANUAL' ? 'Manual Start' : 'Auto (Scheduled)'}</button>
                                             ))}
@@ -807,13 +807,13 @@ export default function AreasPage() {
                                                     <label className="text-[11px] font-bold text-amber-400 uppercase tracking-widest">Time</label>
                                                     <input type="time" value={configAutoTime}
                                                         onChange={e => setConfigAutoTime(e.target.value)}
-                                                        className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50" />
+                                                        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50" />
                                                 </div>
                                                 <div className="space-y-1">
                                                     <label className="text-[11px] font-bold text-amber-400 uppercase tracking-widest">Timezone</label>
                                                     <select value={configAutoTz}
                                                         onChange={e => setConfigAutoTz(e.target.value)}
-                                                        className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none">
+                                                        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none">
                                                         {TIMEZONES.map(tz => (
                                                             <option key={tz.value} value={tz.value}>{tz.label}</option>
                                                         ))}
@@ -822,18 +822,18 @@ export default function AreasPage() {
                                             </div>
                                         )}
                                     </div>
-                                    <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-800">
+                                    <div className="flex justify-between items-center mt-6 pt-4 border-t border-border">
                                         {canDelete ? (
                                             !confirmDelete ? (
                                                 <button type="button" onClick={() => setConfirmDelete(true)}
-                                                    className="px-4 py-2 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 text-sm font-medium transition-colors">
+                                                    className="px-4 py-2 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-sm font-medium transition-colors">
                                                     Delete Area
                                                 </button>
                                             ) : (
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-xs text-red-400">Are you sure?</span>
                                                     <button type="button" onClick={() => setConfirmDelete(false)}
-                                                        className="px-3 py-1.5 rounded-lg text-gray-400 hover:text-white border border-gray-700 text-xs font-medium transition-colors">
+                                                        className="px-3 py-1.5 rounded-lg text-muted-foreground hover:text-foreground border border-border text-xs font-medium transition-colors">
                                                         Cancel
                                                     </button>
                                                     <button type="button" onClick={handleDeleteArea} disabled={isDeletingArea}
@@ -845,7 +845,7 @@ export default function AreasPage() {
                                         ) : <span />}
                                         <div className="flex gap-3">
                                             <button type="button" onClick={() => { setConfigAreaId(null); setConfirmDelete(false); }}
-                                                className="px-4 py-2 text-gray-400 hover:text-white transition-colors">
+                                                className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors">
                                                 Cancel
                                             </button>
                                             <button type="button" onClick={handleSaveConfig} disabled={isSavingConfig}

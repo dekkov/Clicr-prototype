@@ -85,7 +85,7 @@ export function BoardSelectPanel({ open, onClose }: Props) {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-black/60 z-40"
+                        className="fixed inset-0 bg-background/60 z-40"
                         onClick={handleClose}
                     />
 
@@ -94,12 +94,12 @@ export function BoardSelectPanel({ open, onClose }: Props) {
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
                         transition={{ type: 'spring', damping: 25, stiffness: 250 }}
-                        className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-[#12151e] border-l border-slate-800 z-50 flex flex-col"
+                        className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-card border-l border-border z-50 flex flex-col"
                     >
                         {/* Header */}
-                        <div className="flex items-center justify-between p-6 border-b border-slate-800 shrink-0">
-                            <h2 className="text-xl font-bold text-white">Board View</h2>
-                            <button onClick={handleClose} className="text-slate-500 hover:text-white transition-colors">
+                        <div className="flex items-center justify-between p-6 border-b border-border shrink-0">
+                            <h2 className="text-xl font-bold text-foreground">Board View</h2>
+                            <button onClick={handleClose} className="text-muted-foreground hover:text-foreground transition-colors">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
@@ -109,7 +109,7 @@ export function BoardSelectPanel({ open, onClose }: Props) {
                             {/* MY BOARDS */}
                             {boards.length > 0 && (
                                 <div>
-                                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">My Boards</h3>
+                                    <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">My Boards</h3>
                                     <div className="space-y-2">
                                         {boards.map(board => {
                                             const firstClicr = clicrs.find(c => board.device_ids.includes(c.id));
@@ -121,13 +121,13 @@ export function BoardSelectPanel({ open, onClose }: Props) {
                                                 <button
                                                     key={board.id}
                                                     onClick={() => navigateToBoard(board.id)}
-                                                    className="w-full flex items-center justify-between p-4 rounded-xl border border-slate-800 hover:border-slate-600 bg-slate-900/30 transition-all text-left"
+                                                    className="w-full flex items-center justify-between p-4 rounded-xl border border-border hover:border-border bg-muted/30 transition-all text-left"
                                                 >
                                                     <div>
-                                                        <div className="text-white font-bold">{board.name}</div>
-                                                        {context && <div className="text-xs text-slate-500 mt-0.5">{context}</div>}
+                                                        <div className="text-foreground font-bold">{board.name}</div>
+                                                        {context && <div className="text-xs text-muted-foreground mt-0.5">{context}</div>}
                                                     </div>
-                                                    <span className="text-xs text-slate-600">{board.device_ids.length} clicker{board.device_ids.length !== 1 ? 's' : ''}</span>
+                                                    <span className="text-xs text-muted-foreground/60">{board.device_ids.length} clicker{board.device_ids.length !== 1 ? 's' : ''}</span>
                                                 </button>
                                             );
                                         })}
@@ -137,18 +137,18 @@ export function BoardSelectPanel({ open, onClose }: Props) {
 
                             {/* SELECT DEVICES */}
                             <div>
-                                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">
-                                    Select Devices <span className="text-slate-600">({selectedIds.length}/5)</span>
+                                <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">
+                                    Select Devices <span className="text-muted-foreground/60">({selectedIds.length}/5)</span>
                                 </h3>
                                 <div className="space-y-5">
                                     {venueGroups.map(({ venue, venueCounters, venueAreas }) => (
                                         <div key={venue.id}>
-                                            <div className="text-sm font-bold text-slate-400 mb-2">{venue.name}</div>
+                                            <div className="text-sm font-bold text-muted-foreground mb-2">{venue.name}</div>
 
                                             {/* Venue counters */}
                                             {venueCounters.length > 0 && (
                                                 <div className="mb-2">
-                                                    <div className="text-xs font-bold text-slate-600 uppercase tracking-wider px-1 mb-1">Venue Counter</div>
+                                                    <div className="text-xs font-bold text-muted-foreground/60 uppercase tracking-wider px-1 mb-1">Venue Counter</div>
                                                     <div className="space-y-1">
                                                         {venueCounters.map(clicr => (
                                                             <button
@@ -159,16 +159,16 @@ export function BoardSelectPanel({ open, onClose }: Props) {
                                                                     "w-full flex items-center gap-2.5 p-2.5 rounded-lg border text-left text-sm transition-all",
                                                                     selectedIds.includes(clicr.id)
                                                                         ? "bg-primary/10 border-primary"
-                                                                        : "bg-slate-800 border-slate-700 hover:bg-slate-700"
+                                                                        : "bg-muted border-border hover:bg-muted"
                                                                 )}
                                                             >
                                                                 <div className={cn(
                                                                     "w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors",
-                                                                    selectedIds.includes(clicr.id) ? "bg-primary border-primary" : "border-slate-600"
+                                                                    selectedIds.includes(clicr.id) ? "bg-primary border-primary" : "border-border"
                                                                 )}>
                                                                     {selectedIds.includes(clicr.id) && <Check className="w-3 h-3 text-black" />}
                                                                 </div>
-                                                                <span className={selectedIds.includes(clicr.id) ? 'text-primary font-bold' : 'text-white'}>
+                                                                <span className={selectedIds.includes(clicr.id) ? 'text-primary font-bold' : 'text-foreground'}>
                                                                     {clicr.name}
                                                                 </span>
                                                             </button>
@@ -180,7 +180,7 @@ export function BoardSelectPanel({ open, onClose }: Props) {
                                             {/* Areas with devices */}
                                             {venueAreas.map(({ area, devices }) => (
                                                 <div key={area.id} className="mb-2">
-                                                    <div className="text-xs font-bold text-slate-600 uppercase tracking-wider px-1 mb-1">{area.name}</div>
+                                                    <div className="text-xs font-bold text-muted-foreground/60 uppercase tracking-wider px-1 mb-1">{area.name}</div>
                                                     <div className="space-y-1">
                                                         {devices.map(clicr => (
                                                             <button
@@ -191,16 +191,16 @@ export function BoardSelectPanel({ open, onClose }: Props) {
                                                                     "w-full flex items-center gap-2.5 p-2.5 rounded-lg border text-left text-sm transition-all",
                                                                     selectedIds.includes(clicr.id)
                                                                         ? "bg-primary/10 border-primary"
-                                                                        : "bg-slate-800 border-slate-700 hover:bg-slate-700"
+                                                                        : "bg-muted border-border hover:bg-muted"
                                                                 )}
                                                             >
                                                                 <div className={cn(
                                                                     "w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors",
-                                                                    selectedIds.includes(clicr.id) ? "bg-primary border-primary" : "border-slate-600"
+                                                                    selectedIds.includes(clicr.id) ? "bg-primary border-primary" : "border-border"
                                                                 )}>
                                                                     {selectedIds.includes(clicr.id) && <Check className="w-3 h-3 text-black" />}
                                                                 </div>
-                                                                <span className={selectedIds.includes(clicr.id) ? 'text-primary font-bold' : 'text-white'}>
+                                                                <span className={selectedIds.includes(clicr.id) ? 'text-primary font-bold' : 'text-foreground'}>
                                                                     {clicr.name}
                                                                 </span>
                                                             </button>
@@ -215,13 +215,13 @@ export function BoardSelectPanel({ open, onClose }: Props) {
                         </div>
 
                         {/* Sticky bottom: name + create */}
-                        <div className="shrink-0 p-6 border-t border-slate-800 space-y-3">
+                        <div className="shrink-0 p-6 border-t border-border space-y-3">
                             <input
                                 type="text"
                                 value={boardName}
                                 onChange={e => setBoardName(e.target.value)}
                                 placeholder="Board name"
-                                className="w-full bg-black/50 border border-slate-700 rounded-xl p-3 text-white placeholder:text-slate-600 focus:border-primary focus:outline-none text-sm"
+                                className="w-full bg-background/50 border border-border rounded-xl p-3 text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none text-sm"
                             />
                             <button
                                 onClick={handleCreate}

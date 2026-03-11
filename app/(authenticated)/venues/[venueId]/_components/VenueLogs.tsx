@@ -47,13 +47,13 @@ export default function VenueLogs({ venueId }: { venueId: string }) {
             <h2 className="text-xl font-bold">Audit Logs</h2>
             <div className="space-y-4">
                 {allEntries.length === 0 && (
-                    <div className="p-8 text-center bg-slate-900/30 rounded-2xl border border-slate-800 border-dashed">
-                        <FileText className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-                        <p className="text-slate-500 text-sm">No audit logs recorded yet.</p>
+                    <div className="p-8 text-center bg-muted/30 rounded-2xl border border-border border-dashed">
+                        <FileText className="w-8 h-8 text-muted-foreground/60 mx-auto mb-2" />
+                        <p className="text-muted-foreground text-sm">No audit logs recorded yet.</p>
                     </div>
                 )}
                 {allEntries.map(entry => (
-                    <div key={entry.id} className="p-4 bg-slate-900/50 border border-slate-800 rounded-xl">
+                    <div key={entry.id} className="p-4 bg-card border border-border rounded-xl">
                         <div className="flex justify-between items-start">
                             <div className="flex items-center gap-2">
                                 {entry.type === 'TURNAROUND' && (
@@ -62,21 +62,21 @@ export default function VenueLogs({ venueId }: { venueId: string }) {
                                 <span className={cn(
                                     "text-sm font-bold px-2 py-0.5 rounded",
                                     entry.type === 'TURNAROUND'
-                                        ? "bg-purple-900/50 text-purple-300"
-                                        : "bg-slate-800 text-white"
+                                        ? "bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-300"
+                                        : "bg-muted text-foreground"
                                 )}>
                                     {entry.action}
                                 </span>
-                                <span className="text-slate-400 text-sm">
+                                <span className="text-muted-foreground text-sm">
                                     by {userMap[entry.userId] || 'Unknown'}
                                 </span>
                             </div>
-                            <span className="text-xs text-slate-500">
+                            <span className="text-xs text-muted-foreground">
                                 {new Date(entry.timestamp).toLocaleString()}
                             </span>
                         </div>
                         {entry.details && (
-                            <pre className="mt-2 text-[10px] text-slate-500 bg-black/30 p-2 rounded overflow-x-auto">
+                            <pre className="mt-2 text-[10px] text-muted-foreground bg-background/30 p-2 rounded overflow-x-auto">
                                 {JSON.stringify(entry.details, null, 2)}
                             </pre>
                         )}

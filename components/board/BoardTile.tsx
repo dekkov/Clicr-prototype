@@ -28,13 +28,13 @@ export function BoardTile({ clicr, area, venue, label, onTap }: BoardTileProps) 
     const pct = hasCapacity ? Math.min(100, Math.round((occupancy / capacity) * 100)) : null;
 
     // Status color based on fill percentage
-    const statusColor = pct === null ? 'text-white'
+    const statusColor = pct === null ? 'text-foreground'
         : pct >= 100 ? 'text-red-400'
         : pct >= 90 ? 'text-amber-400'
-        : pct >= 80 ? 'text-amber-300'
-        : 'text-white';
+        : pct >= 80 ? 'text-amber-600 dark:text-amber-300'
+        : 'text-foreground';
 
-    const barColor = pct === null ? 'bg-slate-600'
+    const barColor = pct === null ? 'bg-muted'
         : pct >= 100 ? 'bg-red-500'
         : pct >= 90 ? 'bg-amber-400'
         : pct >= 80 ? 'bg-amber-300'
@@ -53,7 +53,7 @@ export function BoardTile({ clicr, area, venue, label, onTap }: BoardTileProps) 
 
     return (
         <div className={cn(
-            "relative bg-[#0c0f16] border border-white/[0.06] rounded-2xl flex flex-col items-center justify-center p-6 min-h-[240px]",
+            "relative bg-background border border-white/[0.06] rounded-2xl flex flex-col items-center justify-center p-6 min-h-[240px]",
             "shadow-lg", glowColor
         )}>
             {/* Venue counter badge */}
@@ -75,11 +75,11 @@ export function BoardTile({ clicr, area, venue, label, onTap }: BoardTileProps) 
 
             {/* Capacity info */}
             <div className="w-full max-w-[220px] mb-5">
-                <div className="text-[11px] text-slate-500 text-center mb-2 tabular-nums">
+                <div className="text-[11px] text-muted-foreground text-center mb-2 tabular-nums">
                     {hasCapacity ? (
-                        <><span className="text-slate-400 font-medium">{pct}%</span>{' '}&middot; {occupancy} of {capacity}</>
+                        <><span className="text-muted-foreground font-medium">{pct}%</span>{' '}&middot; {occupancy} of {capacity}</>
                     ) : (
-                        <span className="text-slate-600">No capacity set</span>
+                        <span className="text-muted-foreground/60">No capacity set</span>
                     )}
                 </div>
                 {hasCapacity && (
@@ -96,25 +96,25 @@ export function BoardTile({ clicr, area, venue, label, onTap }: BoardTileProps) 
             <div className="grid grid-cols-2 gap-2 w-full max-w-[220px]">
                 <button
                     onClick={() => handleTap(1, 'M')}
-                    className="py-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-sm font-bold border border-emerald-500/20 active:scale-[0.96] transition-all"
+                    className="py-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-sm font-bold border border-emerald-200 dark:border-emerald-500/20 active:scale-[0.96] transition-all"
                 >
                     + M
                 </button>
                 <button
                     onClick={() => handleTap(1, 'F')}
-                    className="py-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-sm font-bold border border-emerald-500/20 active:scale-[0.96] transition-all"
+                    className="py-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-sm font-bold border border-emerald-200 dark:border-emerald-500/20 active:scale-[0.96] transition-all"
                 >
                     + F
                 </button>
                 <button
                     onClick={() => handleTap(-1, 'M')}
-                    className="py-3 rounded-xl bg-white/[0.03] hover:bg-red-500/10 text-slate-400 hover:text-red-400 text-sm font-bold border border-white/[0.06] hover:border-red-500/20 active:scale-[0.96] transition-all"
+                    className="py-3 rounded-xl bg-white/[0.03] hover:bg-red-500/10 text-muted-foreground hover:text-red-400 text-sm font-bold border border-white/[0.06] hover:border-red-500/20 active:scale-[0.96] transition-all"
                 >
                     &minus; M
                 </button>
                 <button
                     onClick={() => handleTap(-1, 'F')}
-                    className="py-3 rounded-xl bg-white/[0.03] hover:bg-red-500/10 text-slate-400 hover:text-red-400 text-sm font-bold border border-white/[0.06] hover:border-red-500/20 active:scale-[0.96] transition-all"
+                    className="py-3 rounded-xl bg-white/[0.03] hover:bg-red-500/10 text-muted-foreground hover:text-red-400 text-sm font-bold border border-white/[0.06] hover:border-red-500/20 active:scale-[0.96] transition-all"
                 >
                     &minus; F
                 </button>

@@ -15,7 +15,6 @@ import {
     Ban,
     Moon,
     Sun,
-    Monitor,
     Bell,
     ChevronDown,
     Check,
@@ -85,15 +84,15 @@ function VenueSelector() {
     if (venues.length === 0) return null;
     if (venues.length === 1) {
         return (
-            <div className="w-full flex items-center gap-3 rounded-lg bg-purple-900/30 p-3">
-                <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center shrink-0">
+            <div className="w-full flex items-center gap-3 rounded-lg bg-purple-100 dark:bg-purple-900/30 p-3">
+                <div className="w-8 h-8 rounded-lg bg-purple-400 dark:bg-purple-600 flex items-center justify-center shrink-0">
                     <span className="text-sm font-semibold text-white">
                         {(venues[0].name.charAt(0) || '?').toUpperCase()}
                     </span>
                 </div>
                 <div className="flex-1 min-w-0">
-                    <div className="text-sm text-white truncate">{venues[0].name}</div>
-                    <div className="text-xs text-gray-400">Venue</div>
+                    <div className="text-sm text-foreground truncate">{venues[0].name}</div>
+                    <div className="text-xs text-muted-foreground">Venue</div>
                 </div>
             </div>
         );
@@ -103,21 +102,21 @@ function VenueSelector() {
         <div ref={containerRef} className="relative">
             <button
                 onClick={() => setOpen(prev => !prev)}
-                className="w-full flex items-center gap-3 rounded-lg bg-purple-900/30 p-3 hover:bg-purple-900/40 transition-colors text-left cursor-pointer"
+                className="w-full flex items-center gap-3 rounded-lg bg-purple-100 dark:bg-purple-900/30 p-3 hover:bg-purple-200 dark:hover:bg-purple-900/40 transition-colors text-left cursor-pointer"
             >
-                <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-purple-400 dark:bg-purple-600 flex items-center justify-center shrink-0">
                     <span className="text-sm font-semibold text-white">
                         {selectedVenue ? (selectedVenue.name.charAt(0) || '?').toUpperCase() : '?'}
                     </span>
                 </div>
                 <div className="flex-1 min-w-0 text-left">
-                    <div className="text-sm text-white truncate">{selectedVenue ? selectedVenue.name : 'Select Venue'}</div>
-                    <div className="text-xs text-gray-400">{venues.length} venues</div>
+                    <div className="text-sm text-foreground truncate">{selectedVenue ? selectedVenue.name : 'Select Venue'}</div>
+                    <div className="text-xs text-muted-foreground">{venues.length} venues</div>
                 </div>
-                <ChevronDown className={cn("w-4 h-4 text-gray-400 shrink-0 transition-transform", open && "rotate-180")} />
+                <ChevronDown className={cn("w-4 h-4 text-muted-foreground shrink-0 transition-transform", open && "rotate-180")} />
             </button>
             {open && (
-                <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-gray-900 border border-gray-800 rounded-lg shadow-xl overflow-hidden">
+                <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-card border border-border rounded-lg shadow-xl overflow-hidden">
                     {venues.map(venue => {
                         const isSelected = venue.id === activeVenueId;
                         return (
@@ -126,12 +125,12 @@ function VenueSelector() {
                                 onClick={() => handleSelect(venue.id)}
                                 className={cn(
                                     "w-full flex items-center gap-2.5 px-3 py-2.5 transition-colors text-left",
-                                    isSelected ? "bg-purple-900/40 text-white" : "text-gray-300 hover:bg-gray-800/60"
+                                    isSelected ? "bg-purple-100 dark:bg-purple-900/40 text-foreground" : "text-foreground/70 hover:bg-muted"
                                 )}
                             >
                                 <div className={cn(
                                     "w-7 h-7 rounded-md flex items-center justify-center shrink-0 text-xs font-bold",
-                                    isSelected ? "bg-purple-600 text-white" : "bg-gray-700 text-gray-200"
+                                    isSelected ? "bg-purple-600 text-white" : "bg-muted text-foreground"
                                 )}>
                                     {(venue.name.charAt(0) || '?').toUpperCase()}
                                 </div>
@@ -183,8 +182,8 @@ function BusinessSelector() {
             <button
                 onClick={() => canToggle && setOpen(prev => !prev)}
                 className={cn(
-                    "w-full flex items-center gap-3 rounded-lg bg-purple-900/30 p-3 transition-colors text-left",
-                    canToggle ? "hover:bg-purple-900/40 cursor-pointer" : "cursor-default"
+                    "w-full flex items-center gap-3 rounded-lg bg-purple-100 dark:bg-purple-900/30 p-3 transition-colors text-left",
+                    canToggle ? "hover:bg-purple-200 dark:hover:bg-purple-900/40 cursor-pointer" : "cursor-default"
                 )}
             >
                 {activeBusiness?.logo_url ? (
@@ -195,31 +194,31 @@ function BusinessSelector() {
                     />
                 ) : (
                     <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center shrink-0">
-                        <span className="text-sm font-semibold text-white">
+                        <span className="text-sm font-semibold text-foreground">
                             {activeBusiness ? (activeBusiness.name.charAt(0) || '?').toUpperCase() : '?'}
                         </span>
                     </div>
                 )}
                 <div className="flex-1 min-w-0 text-left">
-                    <div className="text-sm text-white truncate">
+                    <div className="text-sm text-foreground truncate">
                         {activeBusiness ? activeBusiness.name : 'Select Business'}
                     </div>
                     {activeBusiness && (
-                        <div className="text-xs text-gray-400">
+                        <div className="text-xs text-muted-foreground">
                             {venueCount} {venueCount === 1 ? 'venue' : 'venues'}
                         </div>
                     )}
                 </div>
                 {canToggle && (
                     <ChevronDown className={cn(
-                        "w-4 h-4 text-gray-400 shrink-0 transition-transform",
+                        "w-4 h-4 text-muted-foreground shrink-0 transition-transform",
                         open && "rotate-180"
                     )} />
                 )}
             </button>
 
             {open && canToggle && (
-                <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-gray-900 border border-gray-800 rounded-lg shadow-xl overflow-hidden">
+                <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-card border border-border rounded-lg shadow-xl overflow-hidden">
                     {businesses.map(biz => {
                         const isSelected = activeBusiness?.id === biz.id;
                         return (
@@ -229,8 +228,8 @@ function BusinessSelector() {
                                 className={cn(
                                     "w-full flex items-center gap-2.5 px-3 py-2.5 transition-colors text-left",
                                     isSelected
-                                        ? "bg-purple-900/40 text-white"
-                                        : "text-gray-300 hover:bg-gray-800/60"
+                                        ? "bg-purple-100 dark:bg-purple-900/40 text-foreground"
+                                        : "text-foreground/70 hover:bg-muted"
                                 )}
                             >
                                 {biz.logo_url ? (
@@ -242,7 +241,7 @@ function BusinessSelector() {
                                 ) : (
                                     <div className={cn(
                                         "w-7 h-7 rounded-md flex items-center justify-center shrink-0 text-xs font-bold",
-                                        isSelected ? "bg-purple-600 text-white" : "bg-gray-700 text-gray-200"
+                                        isSelected ? "bg-purple-600 text-white" : "bg-muted text-foreground"
                                     )}>
                                         {(biz.name.charAt(0) || '?').toUpperCase()}
                                     </div>
@@ -254,13 +253,13 @@ function BusinessSelector() {
                     })}
                     {hasMinRole(currentUser?.role as Role | undefined, 'ADMIN') && (
                         <>
-                            <div className="border-t border-gray-700" />
+                            <div className="border-t border-border" />
                             <Link
                                 href="/businesses/new"
                                 onClick={() => setOpen(false)}
-                                className="w-full flex items-center gap-2.5 px-3 py-2.5 transition-colors text-left text-gray-400 hover:bg-gray-800/60 hover:text-white"
+                                className="w-full flex items-center gap-2.5 px-3 py-2.5 transition-colors text-left text-muted-foreground hover:bg-muted hover:text-foreground"
                             >
-                                <div className="w-7 h-7 rounded-md flex items-center justify-center shrink-0 bg-gray-800 border border-dashed border-gray-600">
+                                <div className="w-7 h-7 rounded-md flex items-center justify-center shrink-0 bg-muted border border-dashed border-border">
                                     <Plus className="w-3.5 h-3.5" />
                                 </div>
                                 <span className="text-sm">Add New Business</span>
@@ -375,7 +374,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                                 href={item.href}
                                 className={cn(
                                     "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
-                                    isActive ? "bg-purple-900/40 text-foreground" : "text-foreground/60 hover:text-foreground hover:bg-gray-200 dark:hover:bg-gray-800/50"
+                                    isActive ? "bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-foreground" : "text-foreground/60 hover:text-foreground hover:bg-muted"
                                 )}
                             >
                                 <Icon className="w-5 h-5 shrink-0" />
@@ -389,7 +388,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <div className="px-3 py-4 border-t border-border space-y-1 shrink-0">
                     <button
                         onClick={handleSignOut}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-foreground/60 hover:text-foreground hover:bg-gray-200 dark:hover:bg-gray-800/50 transition-colors"
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-foreground/60 hover:text-foreground hover:bg-muted transition-colors"
                     >
                         <LogOut className="w-5 h-5 shrink-0" />
                         <span>Sign out</span>
@@ -407,23 +406,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     </div>
                     <div className="hidden md:block flex-1" />
                     <button
-                        onClick={() => {
-                            const next = theme === "system" ? "light" : theme === "light" ? "dark" : "system";
-                            setTheme(next);
-                        }}
-                        className="w-10 h-10 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800 flex items-center justify-center transition-colors"
-                        title={`Theme: ${theme}`}
+                        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                        className="w-10 h-10 rounded-lg hover:bg-gray-200 dark:hover:bg-muted flex items-center justify-center transition-colors"
+                        title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
                     >
-                        {theme === "system" ? (
-                            <Monitor className="w-5 h-5 text-gray-400" />
-                        ) : theme === "light" ? (
+                        {theme === "dark" ? (
                             <Sun className="w-5 h-5 text-amber-400" />
                         ) : (
-                            <Moon className="w-5 h-5 text-gray-400" />
+                            <Moon className="w-5 h-5 text-muted-foreground" />
                         )}
                     </button>
-                    <button className="w-10 h-10 rounded-lg hover:bg-gray-800 flex items-center justify-center transition-colors relative" aria-label="Notifications">
-                        <Bell className="w-5 h-5 text-gray-400" />
+                    <button className="w-10 h-10 rounded-lg hover:bg-muted flex items-center justify-center transition-colors relative" aria-label="Notifications">
+                        <Bell className="w-5 h-5 text-muted-foreground" />
                         <span className="absolute top-2 right-2 w-2 h-2 bg-blue-500 rounded-full" />
                     </button>
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center text-sm font-semibold shrink-0">
@@ -451,12 +445,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                                 href={item.href}
                                 className={cn(
                                     "flex flex-col items-center gap-1 p-2 rounded-xl transition-all w-14",
-                                    isActive ? "text-purple-400" : "text-gray-500 hover:text-gray-300"
+                                    isActive ? "text-purple-400" : "text-gray-500 hover:text-foreground/80"
                                 )}
                             >
                                 <div className={cn(
                                     "p-1.5 rounded-full transition-all",
-                                    isActive ? "bg-purple-900/40" : "bg-transparent"
+                                    isActive ? "bg-purple-100 dark:bg-purple-900/40" : "bg-transparent"
                                 )}>
                                     <item.icon className="w-5 h-5" />
                                 </div>

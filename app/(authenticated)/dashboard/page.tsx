@@ -49,8 +49,8 @@ const KpiCard = ({
 
 const AgeBand = ({ band, count, max }: { band: string; count: number; max: number }) => (
     <div className="flex items-center gap-4">
-        <div className="w-16 text-sm text-gray-400">{band}</div>
-        <div className="flex-1 h-10 bg-gray-800 rounded-lg overflow-hidden">
+        <div className="w-16 text-sm text-muted-foreground">{band}</div>
+        <div className="flex-1 h-10 bg-purple-100 dark:bg-muted rounded-lg overflow-hidden">
             <div
                 className="h-full bg-gradient-to-r from-purple-600 to-purple-500 rounded-lg transition-all"
                 style={{ width: `${max > 0 ? (count / max) * 100 : 0}%` }}
@@ -74,7 +74,7 @@ const GenderBreakdown = ({ events }: { events: CountEvent[] }) => {
     return (
         <div className="bg-card border border-border rounded-xl p-6">
             <div className="flex items-center gap-2 mb-1">
-                <Users className="w-4 h-4 text-gray-400" />
+                <Users className="w-4 h-4 text-muted-foreground" />
                 <span className="text-lg">Gender Breakdown</span>
             </div>
             <p className="text-xs text-gray-500 mb-4">Based on gender-tagged entries tonight</p>
@@ -104,7 +104,7 @@ const GenderBreakdown = ({ events }: { events: CountEvent[] }) => {
 const HourlyTraffic = ({ data, colors }: { data: { hour: string; entries: number; exits: number }[]; colors: { grid: string; text: string; tooltipBg: string; tooltipBorder: string } }) => (
     <div className="bg-card border border-border rounded-xl p-6">
         <div className="flex items-center gap-2 mb-1">
-            <TrendingUp className="w-4 h-4 text-gray-400" />
+            <TrendingUp className="w-4 h-4 text-muted-foreground" />
             <span className="text-lg">Hourly Traffic</span>
         </div>
         <p className="text-xs text-gray-500 mb-4">Entries vs. exits by hour</p>
@@ -128,7 +128,7 @@ const HourlyTraffic = ({ data, colors }: { data: { hour: string; entries: number
 const OccupancyOverTime = ({ data, peak, colors }: { data: { hour: string; occupancy: number }[]; peak: number; colors: { grid: string; text: string; tooltipBg: string; tooltipBorder: string } }) => (
     <div className="bg-card border border-border rounded-xl p-6">
         <div className="flex items-center gap-2 mb-1">
-            <TrendingUp className="w-4 h-4 text-gray-400" />
+            <TrendingUp className="w-4 h-4 text-muted-foreground" />
             <span className="text-lg">Occupancy Over Time</span>
         </div>
         <p className="text-xs text-gray-500 mb-4">Net occupancy by hour · peak marker shown</p>
@@ -163,8 +163,8 @@ const HEATMAP_DAYS = [
     { label: 'Sun', jsDay: 0 },
 ];
 const INTENSITY_CLASSES = [
-    'bg-gray-800',
-    'bg-purple-900/60',
+    'bg-zinc-200 dark:bg-muted',
+    'bg-purple-200/70 dark:bg-purple-900/60',
     'bg-purple-700/60',
     'bg-purple-600/80',
     'bg-purple-500',
@@ -192,12 +192,12 @@ const PeakTimesHeatmap = ({ data, loading }: { data: HeatmapData; loading: boole
     return (
         <div className="bg-card border border-border rounded-xl p-6">
             <div className="flex items-center gap-2 mb-1">
-                <Calendar className="w-4 h-4 text-gray-400" />
+                <Calendar className="w-4 h-4 text-muted-foreground" />
                 <span className="text-lg">Peak Times Heatmap</span>
             </div>
             <p className="text-xs text-gray-500 mb-4">Entry density by day × hour (all time)</p>
             {loading ? (
-                <div className="h-40 animate-pulse bg-gray-800/50 rounded-lg" />
+                <div className="h-40 animate-pulse bg-muted rounded-lg" />
             ) : Object.keys(data).length === 0 ? (
                 <p className="text-sm text-gray-600 italic text-center py-8">No historical data yet. Data appears after events are recorded.</p>
             ) : (
@@ -286,14 +286,14 @@ const TrafficFlow = ({
 }) => {
     const max = Math.max(totalEntries, 1);
     const funnelRows = [
-        { label: 'Total Entries', value: totalEntries, color: 'bg-indigo-500', textColor: 'text-white' },
-        { label: 'IDs Scanned', value: totalScans, color: 'bg-indigo-400', textColor: 'text-white' },
-        { label: 'Accepted', value: accepted, color: 'bg-emerald-500', textColor: 'text-emerald-300' },
-        { label: 'Denied', value: denied, color: 'bg-orange-500', textColor: 'text-orange-300' },
-        { label: 'Banned', value: banned, color: 'bg-red-500', textColor: 'text-red-300' },
-        { label: 'Turnarounds', value: turnarounds, color: 'bg-amber-500', textColor: 'text-amber-300' },
-        { label: 'Net Entries', value: netAdjusted, color: 'bg-teal-500', textColor: 'text-teal-300' },
-        { label: 'Net Occupancy', value: netOcc, color: 'bg-cyan-500', textColor: 'text-cyan-300' },
+        { label: 'Total Entries', value: totalEntries, color: 'bg-indigo-500', textColor: 'text-foreground' },
+        { label: 'IDs Scanned', value: totalScans, color: 'bg-indigo-400', textColor: 'text-foreground' },
+        { label: 'Accepted', value: accepted, color: 'bg-emerald-500', textColor: 'text-emerald-600 dark:text-emerald-300' },
+        { label: 'Denied', value: denied, color: 'bg-orange-500', textColor: 'text-orange-600 dark:text-orange-300' },
+        { label: 'Banned', value: banned, color: 'bg-red-500', textColor: 'text-red-600 dark:text-red-300' },
+        { label: 'Turnarounds', value: turnarounds, color: 'bg-amber-500', textColor: 'text-amber-600 dark:text-amber-300' },
+        { label: 'Net Entries', value: netAdjusted, color: 'bg-teal-500', textColor: 'text-teal-600 dark:text-teal-300' },
+        { label: 'Net Occupancy', value: netOcc, color: 'bg-cyan-500', textColor: 'text-cyan-600 dark:text-cyan-300' },
     ];
     return (
         <div className="bg-card border border-border rounded-xl p-6">
@@ -304,8 +304,8 @@ const TrafficFlow = ({
             <div className="space-y-2 mb-6">
                 {funnelRows.map(row => (
                     <div key={row.label} className="flex items-center gap-3">
-                        <div className="w-28 text-xs text-gray-400 shrink-0">{row.label}</div>
-                        <div className="flex-1 h-6 bg-gray-800 rounded overflow-hidden">
+                        <div className="w-28 text-xs text-muted-foreground shrink-0">{row.label}</div>
+                        <div className="flex-1 h-6 bg-muted rounded overflow-hidden">
                             <div
                                 className={cn('h-full rounded transition-all', row.color)}
                                 style={{ width: `${(row.value / max) * 100}%` }}
@@ -321,11 +321,11 @@ const TrafficFlow = ({
                 {areaDistrib.length === 0 && <p className="text-xs text-gray-600 italic">No entries yet.</p>}
                 {areaDistrib.map(a => (
                     <div key={a.name} className="flex items-center gap-3">
-                        <div className="w-28 text-xs text-gray-400 truncate shrink-0">{a.name}</div>
-                        <div className="flex-1 h-5 bg-gray-800 rounded overflow-hidden">
+                        <div className="w-28 text-xs text-muted-foreground truncate shrink-0">{a.name}</div>
+                        <div className="flex-1 h-5 bg-muted rounded overflow-hidden">
                             <div className="h-full bg-purple-600 rounded" style={{ width: `${a.pct}%` }} />
                         </div>
-                        <div className="w-10 text-right text-xs text-gray-400">{a.pct}%</div>
+                        <div className="w-10 text-right text-xs text-muted-foreground">{a.pct}%</div>
                     </div>
                 ))}
             </div>
@@ -345,24 +345,24 @@ const OperationalWorkflow = () => (
         <p className="text-xs text-gray-500 mb-6">How the system updates in real time</p>
         <div className="flex flex-col items-center gap-3 select-none">
             <div className="flex items-center gap-2">
-                <WorkflowNode label="ID Scan" icon="🪪" color="border-gray-600 bg-gray-800 text-gray-200" />
+                <WorkflowNode label="ID Scan" icon="🪪" color="border-border bg-muted text-foreground" />
                 <span className="text-gray-600">→</span>
-                <WorkflowNode label="Verify" icon="✓" color="border-emerald-800 bg-emerald-900/30 text-emerald-300" />
+                <WorkflowNode label="Verify" icon="✓" color="border-emerald-300 dark:border-emerald-800 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-300" />
                 <span className="text-gray-600">→</span>
-                <WorkflowNode label="Ban Check" icon="🛡" color="border-amber-800 bg-amber-900/30 text-amber-300" />
+                <WorkflowNode label="Ban Check" icon="🛡" color="border-amber-300 dark:border-amber-800 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-300" />
             </div>
             <div className="text-gray-600 text-lg">↓</div>
             <div className="flex items-center gap-8">
-                <WorkflowNode label="✓ Accept" icon="" color="border-emerald-700 bg-emerald-900/40 text-emerald-300" />
-                <WorkflowNode label="✗ Deny" icon="" color="border-red-700 bg-red-900/40 text-red-300" />
+                <WorkflowNode label="✓ Accept" icon="" color="border-emerald-300 dark:border-emerald-700 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-300" />
+                <WorkflowNode label="✗ Deny" icon="" color="border-red-300 dark:border-red-700 bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300" />
             </div>
             <div className="text-gray-600 text-lg">↓</div>
             <div className="flex items-center gap-2">
-                <WorkflowNode label="Add to Count" icon="📊" color="border-blue-800 bg-blue-900/30 text-blue-300" />
+                <WorkflowNode label="Add to Count" icon="📊" color="border-blue-300 dark:border-blue-800 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300" />
                 <span className="text-gray-600">→</span>
-                <WorkflowNode label="Event Log" icon="📋" color="border-purple-800 bg-purple-900/30 text-purple-300" />
+                <WorkflowNode label="Event Log" icon="📋" color="border-purple-300 dark:border-purple-800 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300" />
                 <span className="text-gray-600">→</span>
-                <WorkflowNode label="Reports" icon="📈" color="border-indigo-800 bg-indigo-900/30 text-indigo-300" />
+                <WorkflowNode label="Reports" icon="📈" color="border-indigo-300 dark:border-indigo-800 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300" />
             </div>
         </div>
     </div>
@@ -377,7 +377,7 @@ const LiveVenues = ({ data, onViewAll }: {
         <div className="bg-card border border-border rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-gray-400" />
+                    <MapPin className="w-4 h-4 text-muted-foreground" />
                     <span className="text-lg">Live Venues</span>
                 </div>
                 <button
@@ -405,7 +405,7 @@ const LiveVenues = ({ data, onViewAll }: {
                                 <div className="flex justify-between text-xs text-gray-500 mb-1">
                                     <span>{pctFull}% full</span>
                                 </div>
-                                <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                                     <div
                                         className={cn(
                                             'h-full rounded-full transition-all',
@@ -766,15 +766,15 @@ export default function DashboardPage() {
     if (isLoading) {
         return (
             <div className="space-y-8 animate-pulse">
-                <div className="h-10 w-64 bg-slate-800 rounded-xl" />
+                <div className="h-10 w-64 bg-muted rounded-xl" />
                 <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
                     {[1, 2, 3, 4].map((i) => (
-                        <div key={i} className="glass-panel p-5 rounded-2xl border border-slate-800 h-32" />
+                        <div key={i} className="glass-panel p-5 rounded-2xl border border-border h-32" />
                     ))}
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div className="glass-panel p-6 rounded-2xl border border-slate-800 h-64" />
-                    <div className="glass-panel p-6 rounded-2xl border border-slate-800 h-64" />
+                    <div className="glass-panel p-6 rounded-2xl border border-border h-64" />
+                    <div className="glass-panel p-6 rounded-2xl border border-border h-64" />
                 </div>
             </div>
         );
@@ -784,7 +784,7 @@ export default function DashboardPage() {
     if (activeBusiness === null && businesses.length > 0) {
         return (
             <div className="flex items-center justify-center h-64">
-                <p className="text-slate-400 text-lg">Select a business from the sidebar to view insights</p>
+                <p className="text-muted-foreground text-lg">Select a business from the sidebar to view insights</p>
             </div>
         );
     }
@@ -802,15 +802,15 @@ export default function DashboardPage() {
             {/* Page Header - Design */}
             <div className="mb-8">
                 <div className="flex items-center gap-4 mb-2">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-900/50 to-blue-900/50 border border-purple-500/20 flex items-center justify-center">
-                        <TrendingUp className="w-6 h-6 text-purple-400" />
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-100 to-blue-100 dark:from-purple-900/50 dark:to-blue-900/50 border border-purple-200 dark:border-purple-500/20 flex items-center justify-center">
+                        <TrendingUp className="w-6 h-6 text-purple-600 dark:text-purple-400" />
                     </div>
                     <div className="flex-1">
                         <h1 className="text-3xl mb-1">Live Insights</h1>
                         <p className="text-foreground/60 text-sm">Real-time data from all connected devices.</p>
                     </div>
                     <div className="flex items-center gap-3">
-                        <button className="px-4 py-2 rounded-lg bg-gray-800/50 hover:bg-gray-800 transition-colors flex items-center gap-2 text-sm">
+                        <button className="px-4 py-2 rounded-lg bg-card border border-border hover:bg-muted transition-colors flex items-center gap-2 text-sm text-foreground">
                             <Calendar className="w-4 h-4" />
                             <span>Tonight</span>
                         </button>
@@ -824,14 +824,14 @@ export default function DashboardPage() {
                                 }
                             }}
                             className={cn(
-                                "px-4 py-2 rounded-lg bg-gray-800/50 hover:bg-gray-800 transition-colors flex items-center gap-2 text-sm",
+                                "px-4 py-2 rounded-lg bg-card border border-border hover:bg-muted transition-colors flex items-center gap-2 text-sm text-foreground",
                                 isResetting && "opacity-50 cursor-not-allowed"
                             )}
                         >
                             <RefreshCw className={cn("w-4 h-4", isResetting && "animate-spin")} />
                             <span>Reset Data</span>
                         </button>
-                        <button className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 transition-colors flex items-center gap-2 text-sm">
+                        <button className="px-4 py-2 rounded-lg bg-purple-500 hover:bg-purple-600 dark:bg-purple-600 dark:hover:bg-purple-700 text-white transition-colors flex items-center gap-2 text-sm">
                             <Download className="w-4 h-4" />
                             <span>Export</span>
                         </button>
@@ -884,7 +884,7 @@ export default function DashboardPage() {
                     <div className="flex items-center gap-3 mb-6">
                         <div className="text-lg">Age Distribution</div>
                     </div>
-                    <div className="text-sm text-gray-400 mb-6">ID scans accepted · Tonight</div>
+                    <div className="text-sm text-muted-foreground mb-6">ID scans accepted · Tonight</div>
                     <div className="space-y-3">
                         {Object.entries(ageDistribution).map(([band, count]) => (
                             <AgeBand
@@ -919,13 +919,13 @@ export default function DashboardPage() {
                                     {entry.gender && (
                                         <span className={cn(
                                             "text-[10px] font-bold px-1 rounded",
-                                            entry.gender === 'M' ? "bg-blue-900/60 text-blue-300" : "bg-pink-900/60 text-pink-300"
+                                            entry.gender === 'M' ? "bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-300" : "bg-pink-100 dark:bg-pink-900/60 text-pink-600 dark:text-pink-300"
                                         )}>
                                             {entry.gender}
                                         </span>
                                     )}
                                 </div>
-                                <div className="text-sm text-gray-300">
+                                <div className="text-sm text-foreground/80">
                                     {entry.areaId ? areaMap[entry.areaId] ?? 'Unknown Area' : '—'}
                                 </div>
                                 <div className="text-xs text-gray-500">{formatTime(entry.ts)}</div>

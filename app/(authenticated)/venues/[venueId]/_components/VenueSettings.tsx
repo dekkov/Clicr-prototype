@@ -24,23 +24,23 @@ export default function VenueSettings({ venueId }: { venueId: string }) {
 
             <form onSubmit={handleSave} className="space-y-6">
                 {/* General Info */}
-                <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl space-y-4">
-                    <h3 className="text-lg font-semibold text-white">General Information</h3>
+                <div className="bg-card border border-border p-6 rounded-2xl space-y-4">
+                    <h3 className="text-lg font-semibold text-foreground">General Information</h3>
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-400">Venue Name</label>
+                        <label className="text-sm font-medium text-muted-foreground">Venue Name</label>
                         <input
                             type="text"
                             value={formData.name || ''}
                             onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-white"
+                            className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground"
                         />
                     </div>
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-400">Timezone</label>
+                        <label className="text-sm font-medium text-muted-foreground">Timezone</label>
                         <select
                             value={formData.timezone || 'America/New_York'}
                             onChange={e => setFormData(prev => ({ ...prev, timezone: e.target.value }))}
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-white"
+                            className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground"
                         >
                             <option value="America/New_York">Eastern Time (US & Canada)</option>
                             <option value="America/Chicago">Central Time (US & Canada)</option>
@@ -50,36 +50,36 @@ export default function VenueSettings({ venueId }: { venueId: string }) {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-400">City</label>
+                            <label className="text-sm font-medium text-muted-foreground">City</label>
                             <input
                                 type="text"
                                 value={formData.city || ''}
                                 onChange={e => setFormData(prev => ({ ...prev, city: e.target.value }))}
-                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-white"
+                                className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground"
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-400">State</label>
+                            <label className="text-sm font-medium text-muted-foreground">State</label>
                             <input
                                 type="text"
                                 value={formData.state || ''}
                                 onChange={e => setFormData(prev => ({ ...prev, state: e.target.value }))}
-                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-white"
+                                className="w-full bg-background border border-border rounded-lg px-4 py-2 text-foreground"
                             />
                         </div>
                     </div>
                 </div>
 
                 {/* Status Toggle */}
-                <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl flex items-center justify-between">
+                <div className="bg-card border border-border p-6 rounded-2xl flex items-center justify-between">
                     <div>
-                        <h3 className="text-lg font-semibold text-white">Venue Status</h3>
-                        <p className="text-sm text-slate-400">Inactive venues are hidden from standard reports.</p>
+                        <h3 className="text-lg font-semibold text-foreground">Venue Status</h3>
+                        <p className="text-sm text-muted-foreground">Inactive venues are hidden from standard reports.</p>
                     </div>
                     <button
                         type="button"
                         onClick={() => setFormData(prev => ({ ...prev, status: prev.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE' }))}
-                        className={`px-4 py-2 rounded-lg font-bold transition-colors ${formData.status === 'ACTIVE' ? 'bg-emerald-500/20 text-emerald-500' : 'bg-slate-800 text-slate-400'}`}
+                        className={`px-4 py-2 rounded-lg font-bold transition-colors ${formData.status === 'ACTIVE' ? 'bg-emerald-500/20 text-emerald-500' : 'bg-muted text-muted-foreground'}`}
                     >
                         {formData.status}
                     </button>

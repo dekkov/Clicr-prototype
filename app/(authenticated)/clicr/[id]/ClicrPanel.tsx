@@ -57,7 +57,7 @@ const ConfigModalBody = React.memo(function ConfigModalBody({
     return (
         <>
             <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Counter Name</label>
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Counter Name</label>
                 <input
                     type="text"
                     value={name}
@@ -69,13 +69,13 @@ const ConfigModalBody = React.memo(function ConfigModalBody({
             <div className="space-y-2">
                 <div className="flex justify-between items-center bg-card p-3 rounded-xl border border-border">
                     <span className="text-sm font-bold text-foreground">Classify Scans</span>
-                    <button type="button" onClick={handleClassifyToggle} className={cn("w-12 h-7 rounded-full relative transition-colors", classifyMode ? "bg-emerald-500" : "bg-slate-700")}>
+                    <button type="button" onClick={handleClassifyToggle} className={cn("w-12 h-7 rounded-full relative transition-colors", classifyMode ? "bg-emerald-500" : "bg-muted")}>
                         <div className="absolute left-1 top-1 w-5 h-5 bg-white rounded-full shadow-md transition-transform" style={{ transform: classifyMode ? "translateX(20px)" : "translateX(0px)" }} />
                     </button>
                 </div>
             </div>
             <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Remote Tap Link</label>
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Remote Tap Link</label>
                 {snap.hasTapToken ? (
                     <div className="space-y-2">
                         <div className="flex gap-2">
@@ -89,8 +89,8 @@ const ConfigModalBody = React.memo(function ConfigModalBody({
                 )}
             </div>
             <div className="grid grid-cols-2 gap-3 pt-2">
-                <button type="button" onClick={snap.onCancel} className="py-3 rounded-xl text-slate-400 bg-[#1e2330] hover:bg-[#2a3040] font-semibold text-sm transition-colors">Cancel</button>
-                <button type="button" onClick={() => snap.onSave(name)} className="py-3 rounded-xl bg-white text-black font-bold text-sm hover:bg-slate-200 shadow-lg transition-all active:scale-95">Save Changes</button>
+                <button type="button" onClick={snap.onCancel} className="py-3 rounded-xl text-foreground/60 bg-card border border-border hover:bg-border font-semibold text-sm transition-colors">Cancel</button>
+                <button type="button" onClick={() => snap.onSave(name)} className="py-3 rounded-xl bg-white text-black font-bold text-sm hover:bg-muted shadow-lg transition-all active:scale-95">Save Changes</button>
             </div>
         </>
     );
@@ -611,7 +611,7 @@ export default function ClicrPanel({
                         <ScanLine className="w-4 h-4 text-indigo-400 shrink-0" />
                         <h1 className="text-base font-bold text-foreground leading-none truncate">{clicr.name}</h1>
                     </div>
-                    <p className="text-xs text-slate-500 mt-0.5 truncate">
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
                         {currentArea?.name}{venue ? ` · ${venue.name}` : ''}
                     </p>
                 </div>
@@ -649,14 +649,14 @@ export default function ClicrPanel({
                     <div className={cn(
                         "flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap",
                         isDemoMode
-                            ? "bg-slate-800/60 text-slate-400 border border-slate-700/50"
+                            ? "bg-muted/60 text-muted-foreground border border-border/50"
                             : isRealtimeConnected
-                                ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                                : "bg-slate-800/60 text-slate-500 border border-slate-700/50"
+                                ? "bg-emerald-500/15 text-emerald-400 border border-emerald-200 dark:border-emerald-500/30"
+                                : "bg-muted/60 text-muted-foreground border border-border/50"
                     )}>
                         <div className={cn(
                             "w-1.5 h-1.5 rounded-full shrink-0",
-                            isDemoMode ? "bg-slate-500" : isRealtimeConnected ? "bg-emerald-400 animate-pulse" : "bg-slate-500"
+                            isDemoMode ? "bg-muted-foreground" : isRealtimeConnected ? "bg-emerald-400 animate-pulse" : "bg-muted-foreground"
                         )} />
                         {isDemoMode ? 'Demo' : isRealtimeConnected ? 'Realtime' : 'Offline'}
                     </div>
@@ -697,7 +697,7 @@ export default function ClicrPanel({
                 {/* Right slot — fixed width, right-aligned pill */}
                 <div className="w-[90px] flex justify-end">
                     {!clicr.scan_enabled && (
-                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold bg-red-500/15 text-red-400 border border-red-500/30 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold bg-red-500/15 text-red-400 border border-red-200 dark:border-red-500/30 whitespace-nowrap">
                             <div className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
                             No Scanner
                         </div>
@@ -712,12 +712,12 @@ export default function ClicrPanel({
                 <div className={cn(
                     "rounded-2xl border p-5",
                     isVenueCounter
-                        ? "bg-amber-950/20 border-amber-500/20"
+                        ? "bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-500/20"
                         : "bg-card border-border/60"
                 )}>
                     <p className={cn(
                         "text-[10px] font-bold uppercase tracking-[0.2em] text-center mb-1",
-                        isVenueCounter ? "text-amber-500" : "text-slate-500"
+                        isVenueCounter ? "text-amber-600 dark:text-amber-500" : "text-muted-foreground"
                     )}>
                         {isVenueCounter ? 'Venue Occupancy' : 'Occupancy'}
                     </p>
@@ -725,13 +725,13 @@ export default function ClicrPanel({
                     <div className="text-center">
                         <span className={cn(
                             "text-8xl font-bold leading-none tabular-nums",
-                            isVenueCounter ? "text-amber-300" : "text-foreground"
+                            isVenueCounter ? "text-amber-600 dark:text-amber-300" : "text-foreground"
                         )}>
                             {totalAreaCount}
                         </span>
                     </div>
 
-                    <p className="text-center text-slate-500 text-sm mt-1">
+                    <p className="text-center text-muted-foreground text-sm mt-1">
                         {capacity != null
                             ? `of ${capacity} · ${capacityPercent}% Full`
                             : 'No capacity set'}
@@ -756,11 +756,11 @@ export default function ClicrPanel({
                     {/* IN / OUT stats */}
                     <div className="flex justify-center gap-8 mt-3">
                         <div className="text-center">
-                            <span className="text-xs text-slate-500 font-bold uppercase tracking-wider block">IN</span>
+                            <span className="text-xs text-muted-foreground font-bold uppercase tracking-wider block">IN</span>
                             <span className="text-emerald-400 font-bold text-lg">+{globalIn}</span>
                         </div>
                         <div className="text-center">
-                            <span className="text-xs text-slate-500 font-bold uppercase tracking-wider block">OUT</span>
+                            <span className="text-xs text-muted-foreground font-bold uppercase tracking-wider block">OUT</span>
                             <span className="text-red-400 font-bold text-lg">-{globalOut}</span>
                         </div>
                     </div>
@@ -776,8 +776,8 @@ export default function ClicrPanel({
                                 onClick={() => handleIn('M')}
                                 className="relative overflow-hidden bg-gradient-to-br from-blue-500 to-blue-700 hover:from-blue-400 hover:to-blue-600 active:scale-[0.97] transition-all rounded-2xl border-2 border-blue-400/40 shadow-lg shadow-blue-500/20 py-8 flex flex-col items-center justify-center touch-manipulation"
                             >
-                                <span className="text-4xl font-bold text-white leading-none drop-shadow">+</span>
-                                <span className="text-white font-bold tracking-[0.2em] text-sm mt-1">MALE</span>
+                                <span className="text-4xl font-bold text-foreground leading-none drop-shadow">+</span>
+                                <span className="text-foreground font-bold tracking-[0.2em] text-sm mt-1">MALE</span>
                             </button>
 
                             {/* +FEMALE */}
@@ -785,8 +785,8 @@ export default function ClicrPanel({
                                 onClick={() => handleIn('F')}
                                 className="relative overflow-hidden bg-gradient-to-br from-pink-500 to-pink-700 hover:from-pink-400 hover:to-pink-600 active:scale-[0.97] transition-all rounded-2xl border-2 border-pink-400/40 shadow-lg shadow-pink-500/20 py-8 flex flex-col items-center justify-center touch-manipulation"
                             >
-                                <span className="text-4xl font-bold text-white leading-none drop-shadow">+</span>
-                                <span className="text-white font-bold tracking-[0.2em] text-sm mt-1">FEMALE</span>
+                                <span className="text-4xl font-bold text-foreground leading-none drop-shadow">+</span>
+                                <span className="text-foreground font-bold tracking-[0.2em] text-sm mt-1">FEMALE</span>
                             </button>
 
                             {/* -MALE */}
@@ -795,7 +795,7 @@ export default function ClicrPanel({
                                     onClick={() => handleOut('M')}
                                     className="relative overflow-hidden bg-gradient-to-br from-blue-700 to-blue-900 hover:from-blue-600 hover:to-blue-800 active:scale-[0.97] transition-all rounded-2xl border-2 border-blue-600/40 shadow-lg shadow-blue-900/20 py-5 flex items-center justify-center touch-manipulation"
                                 >
-                                    <span className="text-3xl font-bold text-white/80 leading-none">−</span>
+                                    <span className="text-3xl font-bold text-foreground/80 leading-none">−</span>
                                 </button>
                             )}
 
@@ -805,7 +805,7 @@ export default function ClicrPanel({
                                     onClick={() => handleOut('F')}
                                     className="relative overflow-hidden bg-gradient-to-br from-pink-700 to-pink-900 hover:from-pink-600 hover:to-pink-800 active:scale-[0.97] transition-all rounded-2xl border-2 border-pink-600/40 shadow-lg shadow-pink-900/20 py-5 flex items-center justify-center touch-manipulation"
                                 >
-                                    <span className="text-3xl font-bold text-white/80 leading-none">−</span>
+                                    <span className="text-3xl font-bold text-foreground/80 leading-none">−</span>
                                 </button>
                             )}
                         </div>
@@ -824,7 +824,7 @@ export default function ClicrPanel({
                                     "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all active:scale-[0.92] touch-manipulation",
                                     turnaroundFlash
                                         ? "bg-purple-500/30 text-purple-200 scale-[1.05]"
-                                        : "text-slate-400 hover:text-purple-300 hover:bg-purple-500/10"
+                                        : "text-muted-foreground hover:text-purple-300 hover:bg-purple-500/10"
                                 )}
                             >
                                 <RotateCcw className={cn("w-4 h-4 transition-transform", turnaroundFlash && "animate-spin")} />
@@ -836,7 +836,7 @@ export default function ClicrPanel({
                         {activeShiftId && activeShiftAreaId === clicr?.area_id && (
                             <button
                                 onClick={() => endShift(activeShiftId)}
-                                className="w-full py-2.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-400 text-sm font-bold border border-red-500/25 transition-colors"
+                                className="w-full py-2.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-400 text-sm font-bold border border-red-200 dark:border-red-500/25 transition-colors"
                             >
                                 End Shift
                             </button>
@@ -888,7 +888,7 @@ export default function ClicrPanel({
 
                         {/* Manual paste input */}
                         <div className="bg-card border border-border/60 rounded-2xl p-4 space-y-3">
-                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
                                 Paste / Enter Scan Data
                             </p>
                             <div className="flex gap-2">
@@ -903,7 +903,7 @@ export default function ClicrPanel({
                                 />
                                 <button
                                     onClick={handleManualScanProcess}
-                                    className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition-colors shrink-0"
+                                    className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-foreground text-sm font-semibold transition-colors shrink-0"
                                 >
                                     Process
                                 </button>
@@ -914,14 +914,14 @@ export default function ClicrPanel({
                         <div className="bg-card border border-border/60 rounded-2xl px-4 py-3.5 flex items-center justify-between">
                             <div>
                                 <p className="text-foreground font-semibold text-sm">Add to Count on Accept</p>
-                                <p className="text-slate-500 text-xs mt-0.5">Automatically adjust occupancy when ID accepted</p>
+                                <p className="text-muted-foreground text-xs mt-0.5">Automatically adjust occupancy when ID accepted</p>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setAddToCountOnAccept(v => !v)}
                                 className={cn(
                                     "w-12 h-7 rounded-full relative transition-colors shrink-0",
-                                    addToCountOnAccept ? "bg-indigo-500" : "bg-slate-700"
+                                    addToCountOnAccept ? "bg-indigo-500" : "bg-muted"
                                 )}
                             >
                                 <div
@@ -934,7 +934,7 @@ export default function ClicrPanel({
                         {/* Simulate scan (dev helper) */}
                         <button
                             onClick={handleSimulateScan}
-                            className="text-slate-600 hover:text-slate-400 text-xs text-center py-1 transition-colors"
+                            className="text-muted-foreground/60 hover:text-muted-foreground text-xs text-center py-1 transition-colors"
                         >
                             Simulate scan
                         </button>
@@ -957,7 +957,8 @@ export default function ClicrPanel({
                             status={
                                 lastScan.scan_result === 'ACCEPTED' ? 'ALLOWED' :
                                     (lastScan as any).uiMessage?.includes('BANNED') ? 'DENIED_BANNED' :
-                                        'DENIED_UNDERAGE'
+                                        (lastScan as any).uiMessage?.includes('EXPIRED') ? 'DENIED_EXPIRED' :
+                                            'DENIED_UNDERAGE'
                             }
                             data={{
                                 name: `${lastScan.first_name || 'GUEST'} ${lastScan.last_name || ''}`,
@@ -975,11 +976,11 @@ export default function ClicrPanel({
 
             {/* Config modal */}
             {showConfigModal && (
-                <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-6">
+                <div className="fixed inset-0 bg-background/90 backdrop-blur-md z-50 flex items-center justify-center p-6">
                     <div className="bg-card border border-border p-6 rounded-3xl w-full max-w-sm shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
                         <div>
                             <h3 className="text-xl font-bold text-foreground">Clicr Settings</h3>
-                            <p className="text-slate-500 text-sm">Customize your counter interface.</p>
+                            <p className="text-muted-foreground text-sm">Customize your counter interface.</p>
                         </div>
                         <ConfigModalBody configRef={configModalRef} />
                     </div>
@@ -1006,7 +1007,7 @@ export default function ClicrPanel({
                         </div>
                         <div className="space-y-6">
                             <div className="space-y-1">
-                                <label className="text-xs font-bold text-slate-500 uppercase">Context</label>
+                                <label className="text-xs font-bold text-muted-foreground uppercase">Context</label>
                                 <div className="text-xs text-foreground/80 font-mono bg-card p-2 rounded border border-border break-all">
                                     UID: {currentUser?.id}<br />
                                     BIZ: {venue?.business_id}<br />
@@ -1015,38 +1016,38 @@ export default function ClicrPanel({
                                 </div>
                             </div>
                             <div className="space-y-1">
-                                <label className="text-xs font-bold text-slate-500 uppercase">Snapshot Truth</label>
-                                <div className="p-4 bg-emerald-950/20 border border-emerald-500/30 rounded-lg text-emerald-400 font-mono text-2xl font-bold flex items-center justify-between">
+                                <label className="text-xs font-bold text-muted-foreground uppercase">Snapshot Truth</label>
+                                <div className="p-4 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-500/30 rounded-lg text-emerald-400 font-mono text-2xl font-bold flex items-center justify-between">
                                     {currentArea ? currentArea.current_occupancy : 'N/A'}
                                     <span className="text-[10px] text-emerald-600 uppercase">Server State</span>
                                 </div>
                             </div>
                             <div className="space-y-1">
-                                <label className="text-xs font-bold text-slate-500 uppercase">Realtime Status</label>
+                                <label className="text-xs font-bold text-muted-foreground uppercase">Realtime Status</label>
                                 <div className="flex items-center gap-2">
                                     <div className={cn("w-2 h-2 rounded-full", isRealtimeConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500")} />
                                     <span className="text-sm text-foreground font-mono">{debugAny?.realtimeStatus || 'UNKNOWN'}</span>
                                 </div>
                             </div>
                             <div className="space-y-1">
-                                <label className="text-xs font-bold text-slate-500 uppercase">Last 5 Writes</label>
+                                <label className="text-xs font-bold text-muted-foreground uppercase">Last 5 Writes</label>
                                 <div className="space-y-2">
                                     {debugAny?.lastWrites?.map((w: any, i: number) => (
                                         <div key={i} className="bg-card p-2 rounded text-[10px] font-mono border border-border">
                                             <div className={cn("font-bold mb-1", w.type === 'RPC_SUCCESS' ? "text-emerald-400" : "text-red-400")}>{w.type}</div>
-                                            <div className="text-slate-400 truncate">{JSON.stringify(w.payload)}</div>
+                                            <div className="text-muted-foreground truncate">{JSON.stringify(w.payload)}</div>
                                         </div>
                                     ))}
-                                    {!debugAny?.lastWrites?.length && <div className="text-xs text-slate-600 italic">No writes yet</div>}
+                                    {!debugAny?.lastWrites?.length && <div className="text-xs text-muted-foreground/60 italic">No writes yet</div>}
                                 </div>
                             </div>
                             <div className="space-y-1">
-                                <label className="text-xs font-bold text-slate-500 uppercase">Last 5 Events</label>
+                                <label className="text-xs font-bold text-muted-foreground uppercase">Last 5 Events</label>
                                 <div className="space-y-2">
                                     {debugAny?.lastEvents?.map((e: any, i: number) => (
                                         <div key={i} className="bg-card p-2 rounded text-[10px] font-mono border border-border">
                                             <div className="text-indigo-400 font-bold mb-1">{e.eventType}</div>
-                                            <div className="text-slate-400 break-all">{JSON.stringify(e.new || e.old)}</div>
+                                            <div className="text-muted-foreground break-all">{JSON.stringify(e.new || e.old)}</div>
                                         </div>
                                     ))}
                                 </div>

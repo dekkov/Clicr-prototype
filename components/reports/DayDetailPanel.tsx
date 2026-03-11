@@ -34,13 +34,13 @@ export function DayDetailPanel({ dateStr, events, scans, venueId }: Props) {
     <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden animate-[fade-in_0.3s_ease-out]">
       {/* Panel Header */}
       <div className="px-6 py-4 border-b border-white/5">
-        <h3 className="text-lg font-bold text-white">{formattedDate}</h3>
+        <h3 className="text-lg font-bold text-foreground">{formattedDate}</h3>
       </div>
 
       <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Capacity Area Chart */}
         <div className="lg:col-span-2">
-          <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">Capacity</p>
+          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-3">Capacity</p>
           <div className="h-[180px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={hourlyData} margin={{ top: 5, right: 5, bottom: 0, left: -20 }}>
@@ -92,7 +92,7 @@ export function DayDetailPanel({ dateStr, events, scans, venueId }: Props) {
 
         {/* Key Metrics */}
         <div className="flex flex-col gap-4 justify-center">
-          <p className="text-xs uppercase tracking-widest text-slate-500">Key Metrics</p>
+          <p className="text-xs uppercase tracking-widest text-muted-foreground">Key Metrics</p>
 
           {/* Gender Ratio */}
           {gender.total > 0 && (
@@ -101,7 +101,7 @@ export function DayDetailPanel({ dateStr, events, scans, venueId }: Props) {
                 <Users className="w-8 h-8 text-blue-400" />
                 <span className="text-xs text-blue-400 font-bold">{gender.malePercent}%</span>
               </div>
-              <div className="flex-1 h-2 rounded-full bg-slate-800 overflow-hidden">
+              <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-blue-500 to-pink-500 rounded-full"
                   style={{ width: `${gender.malePercent}%` }}
@@ -116,10 +116,10 @@ export function DayDetailPanel({ dateStr, events, scans, venueId }: Props) {
 
           {/* Throughput */}
           <div>
-            <div className="text-4xl font-black text-white tabular-nums">
+            <div className="text-4xl font-black text-foreground tabular-nums">
               {throughput.toLocaleString()}
             </div>
-            <div className="text-[10px] uppercase tracking-widest text-slate-500 mt-0.5">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground mt-0.5">
               Total Throughput
             </div>
           </div>
@@ -129,7 +129,7 @@ export function DayDetailPanel({ dateStr, events, scans, venueId }: Props) {
             <div className="text-2xl font-bold text-violet-400 tabular-nums">
               {peakOcc.toLocaleString()}
             </div>
-            <div className="text-[10px] uppercase tracking-widest text-slate-500 mt-0.5">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground mt-0.5">
               Peak Occupancy
             </div>
           </div>

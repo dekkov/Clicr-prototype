@@ -83,7 +83,7 @@ export function NFCScanner({ active, onScan, onError }: NFCScannerProps) {
     return (
         <div className="flex flex-col items-center gap-4 w-full">
             {status === 'unsupported' && (
-                <div className="flex flex-col items-center gap-3 py-8 border-4 border-dashed border-amber-800/40 rounded-3xl w-full bg-amber-900/10 px-6">
+                <div className="flex flex-col items-center gap-3 py-8 border-4 border-dashed border-amber-300 dark:border-amber-800/40 rounded-3xl w-full bg-amber-100 dark:bg-amber-900/10 px-6">
                     <WifiOff className="w-12 h-12 text-amber-600" />
                     <p className="text-amber-400 font-bold text-lg">NFC Not Supported</p>
                     <p className="text-amber-600/80 text-sm text-center max-w-xs">
@@ -93,23 +93,23 @@ export function NFCScanner({ active, onScan, onError }: NFCScannerProps) {
             )}
 
             {status === 'error' && (
-                <div className="flex flex-col items-center gap-3 py-8 border-4 border-dashed border-red-800/40 rounded-3xl w-full bg-red-900/10 px-6 text-center">
+                <div className="flex flex-col items-center gap-3 py-8 border-4 border-dashed border-red-300 dark:border-red-800/40 rounded-3xl w-full bg-red-100 dark:bg-red-900/10 px-6 text-center">
                     <WifiOff className="w-12 h-12 text-red-600" />
                     <p className="text-red-400 font-bold">{errorMsg}</p>
                 </div>
             )}
 
             {(status === 'starting' || status === 'listening') && (
-                <div className="flex flex-col items-center gap-3 py-8 border-4 border-dashed border-slate-700 rounded-3xl w-full bg-slate-900/20 px-6">
+                <div className="flex flex-col items-center gap-3 py-8 border-4 border-dashed border-border rounded-3xl w-full bg-muted/20 px-6">
                     {status === 'starting' ? (
-                        <Loader2 className="w-12 h-12 text-slate-500 animate-spin" />
+                        <Loader2 className="w-12 h-12 text-muted-foreground animate-spin" />
                     ) : (
                         <Wifi className="w-12 h-12 text-blue-400 animate-pulse" />
                     )}
-                    <p className="text-slate-400 font-bold text-lg">
+                    <p className="text-muted-foreground font-bold text-lg">
                         {status === 'starting' ? 'Activating NFC...' : 'Hold ID to Back of Phone'}
                     </p>
-                    <p className="text-slate-600 text-sm text-center max-w-xs">
+                    <p className="text-muted-foreground/60 text-sm text-center max-w-xs">
                         Works with NFC-enabled passports and international IDs. US driver&apos;s licenses do not have NFC chips.
                     </p>
                 </div>

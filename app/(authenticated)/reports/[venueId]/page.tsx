@@ -37,19 +37,19 @@ type DateRange = {
 
 // --- COMPONENTS ---
 const MetricCard = ({ title, value, subtext, trend, icon: Icon, colorClass }: any) => (
-    <div className="glass-panel p-6 rounded-2xl relative overflow-hidden group hover:border-slate-600 transition-colors">
+    <div className="glass-panel p-6 rounded-2xl relative overflow-hidden group hover:border-border transition-colors">
         <div className={cn("absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity", colorClass)}>
             <Icon className="w-16 h-16" />
         </div>
         <div className="relative z-10">
             <div className="flex items-center gap-2 mb-2">
-                <div className={cn("p-2 rounded-lg bg-slate-900/50", colorClass)}>
+                <div className={cn("p-2 rounded-lg bg-card", colorClass)}>
                     <Icon className="w-5 h-5" />
                 </div>
-                <h3 className="text-slate-400 font-medium text-sm uppercase tracking-wider">{title}</h3>
+                <h3 className="text-muted-foreground font-medium text-sm uppercase tracking-wider">{title}</h3>
             </div>
-            <div className="text-3xl font-bold text-white mb-1">{value}</div>
-            {subtext && <div className="text-sm text-slate-500">{subtext}</div>}
+            <div className="text-3xl font-bold text-foreground mb-1">{value}</div>
+            {subtext && <div className="text-sm text-muted-foreground">{subtext}</div>}
             {trend && (
                 <div className={cn("flex items-center gap-1 text-sm font-bold mt-2", trend > 0 ? "text-emerald-400" : "text-rose-400")}>
                     {trend > 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
@@ -308,25 +308,25 @@ export default function VenueReportingDashboard() {
         );
     };
 
-    if (!isMounted) return <div className="flex h-screen items-center justify-center text-slate-500">Loading Dashboard...</div>;
+    if (!isMounted) return <div className="flex h-screen items-center justify-center text-muted-foreground">Loading Dashboard...</div>;
 
-    if (!venue || !reportData) return <div className="p-10 text-center text-slate-500">Venue not found</div>;
+    if (!venue || !reportData) return <div className="p-10 text-center text-muted-foreground">Venue not found</div>;
 
     return (
         <div className="space-y-8 animate-[fade-in_0.5s_ease-out] pb-24">
             {/* Header & Filters */}
-            <div className="flex flex-col xl:flex-row justify-between items-start gap-6 border-b border-slate-800 pb-8">
+            <div className="flex flex-col xl:flex-row justify-between items-start gap-6 border-b border-border pb-8">
                 <div>
                     <div className="flex items-center gap-2 mb-2">
-                        <button onClick={() => router.push('/reports')} className="text-slate-400 hover:text-white transition-colors flex items-center gap-1 text-sm font-medium">
+                        <button onClick={() => router.push('/reports')} className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 text-sm font-medium">
                             <ArrowLeft className="w-4 h-4" /> Back to Venues
                         </button>
                     </div>
-                    <h1 className="text-3xl font-bold text-white mb-2">{venue.name} Reports</h1>
-                    <p className="text-slate-400">Detailed analytics for {venue.city}, {venue.state}</p>
+                    <h1 className="text-3xl font-bold text-foreground mb-2">{venue.name} Reports</h1>
+                    <p className="text-muted-foreground">Detailed analytics for {venue.city}, {venue.state}</p>
                 </div>
 
-                <div className="flex flex-wrap gap-4 items-center bg-slate-900/50 p-2 rounded-2xl border border-slate-800">
+                <div className="flex flex-wrap gap-4 items-center bg-card p-2 rounded-2xl border border-border">
                     {/* Date Presets */}
                     <div className="flex gap-2">
                         {quickRanges.map(range => (
@@ -337,7 +337,7 @@ export default function VenueReportingDashboard() {
                                     "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
                                     dateRange.label === range.label
                                         ? "bg-primary text-black shadow-lg shadow-primary/25"
-                                        : "hover:bg-slate-800 text-slate-400"
+                                        : "hover:bg-muted text-muted-foreground"
                                 )}
                             >
                                 {range.label}
@@ -345,10 +345,10 @@ export default function VenueReportingDashboard() {
                         ))}
                     </div>
 
-                    <div className="h-8 w-px bg-slate-700 mx-2 hidden md:block" />
+                    <div className="h-8 w-px bg-muted mx-2 hidden md:block" />
 
                     {/* Custom / Display */}
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 rounded-lg text-xs text-slate-300 font-mono border border-slate-700">
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-lg text-xs text-foreground/80 font-mono border border-border">
                         <CalendarIcon className="w-3 h-3" />
                         {format(dateRange.from, 'MMM d')} - {format(dateRange.to, 'MMM d, yyyy')}
                     </div>
@@ -365,7 +365,7 @@ export default function VenueReportingDashboard() {
                             'px-4 py-2 rounded-lg text-sm font-bold capitalize transition-all',
                             view === v
                                 ? 'bg-violet-600 text-white shadow-lg shadow-violet-500/25'
-                                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                         )}
                     >
                         {v === 'calendar' ? 'Calendar' : 'Analytics'}
@@ -431,35 +431,35 @@ export default function VenueReportingDashboard() {
 
                         {/* Top Locations Card */}
                         <div className="glass-panel p-6 rounded-2xl">
-                            <h3 className="text-sm uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
+                            <h3 className="text-sm uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
                                 <MapPin className="w-4 h-4" /> Top Locations
                             </h3>
                             {reportData.topZips.length > 0 ? (
                                 <div className="space-y-3">
                                     {reportData.topZips.map((z) => (
                                         <div key={z.zip} className="flex justify-between items-center text-sm">
-                                            <span className="text-slate-300 font-mono">{z.zip}</span>
+                                            <span className="text-foreground/80 font-mono">{z.zip}</span>
                                             <div className="flex items-center gap-2">
                                                 <div className="h-1.5 bg-primary rounded-full" style={{ width: `${Math.min(100, (z.count / reportData.totalScans) * 100)}px` }} />
-                                                <span className="text-white font-bold">{z.count}</span>
+                                                <span className="text-foreground font-bold">{z.count}</span>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
                             ) : (
-                                <div className="text-center text-slate-600 text-xs py-4">No location data available</div>
+                                <div className="text-center text-muted-foreground/60 text-xs py-4">No location data available</div>
                             )}
                         </div>
 
                         <div className="mt-8">
                             <button
                                 onClick={handleExport}
-                                className="w-full py-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold flex items-center justify-center gap-3 transition-colors shadow-lg"
+                                className="w-full py-4 rounded-xl bg-muted hover:bg-muted border border-border text-foreground font-bold flex items-center justify-center gap-3 transition-colors shadow-lg"
                             >
                                 <FileSpreadsheet className="w-5 h-5 text-emerald-500" />
                                 Export Excel Report
                             </button>
-                            <p className="text-xs text-center mt-3 text-slate-500">
+                            <p className="text-xs text-center mt-3 text-muted-foreground">
                                 Includes Sheets: Summary, Traffic, Demographics, Logs
                             </p>
                         </div>
@@ -471,11 +471,11 @@ export default function VenueReportingDashboard() {
                         {/* Traffic Chart */}
                         <div className="glass-panel p-6 rounded-2xl">
                             <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
                                     <BarChart3 className="w-5 h-5 text-primary" />
                                     Hourly Traffic Breakdown
                                 </h3>
-                                <div className="flex items-center gap-2 text-xs text-slate-400">
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                     <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-emerald-500" /> Entries</div>
                                     <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-rose-500" /> Exits</div>
                                 </div>
@@ -500,11 +500,11 @@ export default function VenueReportingDashboard() {
                         {/* Demographic Flow Chart */}
                         <div className="glass-panel p-6 rounded-2xl">
                             <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
                                     <Users className="w-5 h-5 text-blue-400" />
                                     Demographic Traffic Flow
                                 </h3>
-                                <div className="flex items-center gap-2 text-xs text-slate-400">
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                     <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-blue-500" /> Male</div>
                                     <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-pink-500" /> Female</div>
                                 </div>
@@ -530,7 +530,7 @@ export default function VenueReportingDashboard() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* Age Chart */}
                             <div className="glass-panel p-6 rounded-2xl">
-                                <h3 className="text-lg font-bold text-white mb-6">Age Distribution</h3>
+                                <h3 className="text-lg font-bold text-foreground mb-6">Age Distribution</h3>
                                 <div className="h-[250px]">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <BarChart data={reportData.ageChartData} layout="vertical">
@@ -546,7 +546,7 @@ export default function VenueReportingDashboard() {
 
                             {/* Gender Chart */}
                             <div className="glass-panel p-6 rounded-2xl flex flex-col items-center">
-                                <h3 className="text-lg font-bold text-white mb-2 self-start w-full">Gender Split</h3>
+                                <h3 className="text-lg font-bold text-foreground mb-2 self-start w-full">Gender Split</h3>
                                 <div className="h-[250px] w-full mt-4">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <PieChart>
@@ -565,7 +565,7 @@ export default function VenueReportingDashboard() {
                                             </Pie>
                                             <Tooltip contentStyle={{ backgroundColor: chartColors.tooltip.background, borderColor: chartColors.tooltip.border, color: '#f8fafc' }} />
                                             <Legend
-                                                formatter={(value) => <span className="text-slate-300">{value}</span>}
+                                                formatter={(value) => <span className="text-foreground/80">{value}</span>}
                                                 verticalAlign="bottom"
                                                 height={36}
                                             />
@@ -578,11 +578,11 @@ export default function VenueReportingDashboard() {
                         {/* Hourly Table Summary */}
                         <div className="glass-panel rounded-2xl overflow-hidden">
                             <div className="p-6 border-b border-white/5 flex justify-between items-center">
-                                <h3 className="text-lg font-bold text-white">Hourly Log</h3>
+                                <h3 className="text-lg font-bold text-foreground">Hourly Log</h3>
                             </div>
                             <div className="max-h-[400px] overflow-y-auto">
                                 <table className="w-full text-sm text-left">
-                                    <thead className="bg-slate-900/80 text-slate-400 sticky top-0 backdrop-blur-md">
+                                    <thead className="bg-card/80 text-muted-foreground sticky top-0 backdrop-blur-md">
                                         <tr>
                                             <th className="px-6 py-3 font-medium">Hour</th>
                                             <th className="px-6 py-3 font-medium text-emerald-400">Entries</th>
@@ -596,17 +596,17 @@ export default function VenueReportingDashboard() {
                                             const cumOcc = reportData.hourlyData.slice(0, idx + 1).reduce((acc, r) => acc + r.net, 0);
                                             return (
                                                 <tr key={idx} className="hover:bg-white/5">
-                                                    <td className="px-6 py-4 font-mono text-slate-300">{row.hourLabel}</td>
+                                                    <td className="px-6 py-4 font-mono text-foreground/80">{row.hourLabel}</td>
                                                     <td className="px-6 py-4 font-bold text-emerald-500">{row.entries}</td>
                                                     <td className="px-6 py-4 font-bold text-rose-500">{row.exits}</td>
-                                                    <td className="px-6 py-4 font-mono text-slate-400">{row.net > 0 ? `+${row.net}` : row.net}</td>
+                                                    <td className="px-6 py-4 font-mono text-muted-foreground">{row.net > 0 ? `+${row.net}` : row.net}</td>
                                                     <td className="px-6 py-4 font-bold text-blue-400">{cumOcc}</td>
                                                 </tr>
                                             );
                                         })}
                                         {reportData.hourlyData.length === 0 && (
                                             <tr>
-                                                <td colSpan={5} className="p-8 text-center text-slate-500">No traffic data for selected period.</td>
+                                                <td colSpan={5} className="p-8 text-center text-muted-foreground">No traffic data for selected period.</td>
                                             </tr>
                                         )}
                                     </tbody>

@@ -16,28 +16,28 @@ export function MonthStatsBar({ monthTotal, daysOpen, ytdTotal, monthLabel, mont
     <div className="glass-panel rounded-2xl p-5 flex flex-wrap items-center gap-6 border border-white/5">
       {/* Stat: Month Total */}
       <div className="text-center min-w-[100px]">
-        <div className="text-3xl font-black text-white">{monthTotal.toLocaleString()}</div>
-        <div className="text-[10px] uppercase tracking-widest text-slate-500 mt-0.5">
+        <div className="text-3xl font-black text-foreground">{monthTotal.toLocaleString()}</div>
+        <div className="text-[10px] uppercase tracking-widest text-muted-foreground mt-0.5">
           {monthLabel} TOTAL
         </div>
       </div>
 
-      <div className="h-10 w-px bg-slate-700 hidden sm:block" />
+      <div className="h-10 w-px bg-muted hidden sm:block" />
 
       {/* Stat: Days Open */}
       <div className="text-center min-w-[100px]">
-        <div className="text-3xl font-black text-white">{daysOpen}</div>
-        <div className="text-[10px] uppercase tracking-widest text-slate-500 mt-0.5">
+        <div className="text-3xl font-black text-foreground">{daysOpen}</div>
+        <div className="text-[10px] uppercase tracking-widest text-muted-foreground mt-0.5">
           DAYS OPEN IN {monthLabel}
         </div>
       </div>
 
-      <div className="h-10 w-px bg-slate-700 hidden sm:block" />
+      <div className="h-10 w-px bg-muted hidden sm:block" />
 
       {/* Stat: YTD Total */}
       <div className="text-center min-w-[100px]">
-        <div className="text-3xl font-black text-white">{ytdTotal.toLocaleString()}</div>
-        <div className="text-[10px] uppercase tracking-widest text-slate-500 mt-0.5">YTD TOTAL</div>
+        <div className="text-3xl font-black text-foreground">{ytdTotal.toLocaleString()}</div>
+        <div className="text-[10px] uppercase tracking-widest text-muted-foreground mt-0.5">YTD TOTAL</div>
       </div>
 
       {/* Mini Bar Chart */}

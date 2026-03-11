@@ -90,15 +90,25 @@ export function parseAAMVA(data: string): ParsedID {
     // ID Number
     const idNumber = getVal('DAQ');
 
-    // Expiration
+    // Expiration — handle both YYYYMMDD and MMDDYYYY formats (same as DOB)
     let expRaw = getVal('DBA');
+    let expNormalized: string | null = null;
     let isExpired = false;
     if (expRaw) {
         expRaw = expRaw.replace(/[^0-9]/g, '');
         if (expRaw.length === 8) {
-            const y = parseInt(expRaw.substring(0, 4));
-            const m = parseInt(expRaw.substring(4, 6)) - 1;
-            const d = parseInt(expRaw.substring(6, 8));
+            const y1 = parseInt(expRaw.substring(0, 4));
+            if (y1 > 1900 && y1 < 2100) {
+                expNormalized = expRaw; // YYYYMMDD
+            } else {
+                const mm = expRaw.substring(0, 2);
+                const dd = expRaw.substring(2, 4);
+                const yyyy = expRaw.substring(4, 8);
+                expNormalized = `${yyyy}${mm}${dd}`;
+            }
+            const y = parseInt(expNormalized.substring(0, 4));
+            const m = parseInt(expNormalized.substring(4, 6)) - 1;
+            const d = parseInt(expNormalized.substring(6, 8));
             const expDate = new Date(y, m, d);
             if (expDate < new Date()) {
                 isExpired = true;
@@ -112,7 +122,7 @@ export function parseAAMVA(data: string): ParsedID {
         dateOfBirth: dob,
         sex,
         postalCode,
-        expirationDate: expRaw,
+        expirationDate: expNormalized,
         age,
         isExpired,
         addressStreet,

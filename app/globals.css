@@ -3,29 +3,30 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  /* Light mode (default) */
-  --background: #ffffff;
-  --foreground: #0f172a;
+  /* Light mode — zinc clean (shadcn/ui inspired) */
+  --background: #fafafa;        /* zinc-50 */
+  --foreground: #09090b;        /* zinc-950 */
 
-  /* Primary - Purple accent (same in both modes) */
+  --card: #ffffff;
+  --card-foreground: #09090b;
+
+  --border: #e4e4e7;            /* zinc-200 */
+  --input: #e4e4e7;
+  --ring: #9333ea;
+
+  --muted: #f4f4f5;             /* zinc-100 */
+  --muted-foreground: #71717a;  /* zinc-500 */
+
+  /* Primary - Purple */
   --primary: #9333ea;
   --primary-foreground: #ffffff;
   --primary-hover: #7e22ce;
 
-  /* Secondary - Emerald for positive (same in both modes) */
+  /* Secondary - Emerald */
   --secondary: #10b981;
   --secondary-foreground: #ffffff;
 
-  /* Surfaces - Light card style */
-  --card: rgba(243, 244, 246, 0.8);
-  --card-foreground: #1e293b;
-
-  /* Borders - Light */
-  --border: #e2e8f0;
-  --input: #e2e8f0;
-  --ring: #9333ea;
-
-  /* Status (same in both modes) */
+  /* Status */
   --success: #10b981;
   --warning: #f59e0b;
   --destructive: #ef4444;
@@ -35,7 +36,6 @@
 }
 
 .dark {
-  /* Dark mode overrides */
   --background: #000000;
   --foreground: #f8fafc;
 
@@ -44,6 +44,9 @@
 
   --border: #1f2937;
   --input: #1f2937;
+
+  --muted: #1f2937;
+  --muted-foreground: #94a3b8;
 }
 
 @theme inline {
@@ -58,6 +61,8 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-destructive: var(--destructive);

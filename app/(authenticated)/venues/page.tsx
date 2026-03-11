@@ -105,7 +105,7 @@ export default function VenuesPage() {
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-3xl mb-1">Venues</h1>
-                        <p className="text-gray-400 text-sm">Manage your venues and track live occupancy.</p>
+                        <p className="text-muted-foreground text-sm">Manage your venues and track live occupancy.</p>
                     </div>
                     {activeBusiness && showAddVenue && (
                         <Link
@@ -123,30 +123,30 @@ export default function VenuesPage() {
             {isLoading ? (
                 <div className="space-y-4 animate-pulse">
                     {[1, 2].map(i => (
-                        <div key={i} className="bg-gray-900/50 border border-gray-800 rounded-xl p-6 space-y-4">
+                        <div key={i} className="bg-card border border-border rounded-xl p-6 space-y-4">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-slate-800 rounded-xl" />
+                                <div className="w-10 h-10 bg-muted rounded-xl" />
                                 <div className="space-y-1.5 flex-1">
-                                    <div className="h-5 bg-gray-800 rounded w-48" />
-                                    <div className="h-3.5 bg-gray-800 rounded w-32" />
+                                    <div className="h-5 bg-muted rounded w-48" />
+                                    <div className="h-3.5 bg-muted rounded w-32" />
                                 </div>
                             </div>
                             <div className="grid grid-cols-4 gap-6">
                                 {[1, 2, 3, 4].map(j => (
                                     <div key={j} className="space-y-1.5">
-                                        <div className="h-3 bg-gray-800 rounded w-16" />
-                                        <div className="h-7 bg-gray-800 rounded w-20" />
+                                        <div className="h-3 bg-muted rounded w-16" />
+                                        <div className="h-7 bg-muted rounded w-20" />
                                     </div>
                                 ))}
                             </div>
-                            <div className="h-1.5 bg-gray-800 rounded-full" />
+                            <div className="h-1.5 bg-muted rounded-full" />
                         </div>
                     ))}
                 </div>
             ) : allVenues.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 text-gray-500">
                     <MapPin className="w-12 h-12 mb-4 opacity-30" />
-                    <p className="text-base font-medium text-gray-400 mb-1">No venues yet</p>
+                    <p className="text-base font-medium text-muted-foreground mb-1">No venues yet</p>
                     <p className="text-sm mb-6">Add your first venue to get started.</p>
                     {activeBusiness && showAddVenue && (
                         <Link
@@ -175,58 +175,58 @@ export default function VenuesPage() {
                         return (
                             <div
                                 key={venue.id}
-                                className="bg-gray-900/50 border border-gray-800 rounded-xl p-6 hover:border-gray-700 transition-colors"
+                                className="bg-card border border-border rounded-xl p-6 hover:border-border transition-colors"
                             >
                                 <div className="flex items-start gap-4">
-                                    <div className="w-12 h-12 rounded-xl bg-purple-900/30 border border-purple-500/20 flex items-center justify-center flex-shrink-0">
+                                    <div className="w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-500/20 flex items-center justify-center flex-shrink-0">
                                         <MapPin className="w-6 h-6 text-purple-400" />
                                     </div>
                                     <div className="flex-1">
                                         <div className="flex items-center justify-between mb-2">
                                             <div>
                                                 <h3 className="text-lg mb-1">{venue.name}</h3>
-                                                <p className="text-sm text-gray-400">{address || 'No address'}</p>
+                                                <p className="text-sm text-muted-foreground">{address || 'No address'}</p>
                                             </div>
                                             <div className="flex items-center gap-3">
                                                 <button
                                                     type="button"
-                                                    className="w-10 h-10 rounded-lg hover:bg-gray-800 flex items-center justify-center transition-colors"
+                                                    className="w-10 h-10 rounded-lg hover:bg-muted flex items-center justify-center transition-colors"
                                                     aria-label="Refresh"
                                                 >
-                                                    <RefreshCw className="w-5 h-5 text-gray-400" />
+                                                    <RefreshCw className="w-5 h-5 text-muted-foreground" />
                                                 </button>
                                                 <Link
                                                     href={`/venues/${venue.id}`}
-                                                    className="w-10 h-10 rounded-lg hover:bg-gray-800 flex items-center justify-center transition-colors"
+                                                    className="w-10 h-10 rounded-lg hover:bg-muted flex items-center justify-center transition-colors"
                                                     aria-label="View venue"
                                                 >
-                                                    <ChevronRight className="w-5 h-5 text-gray-400" />
+                                                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
                                                 </Link>
                                             </div>
                                         </div>
 
                                         <div className="grid grid-cols-4 gap-8 mt-6">
                                             <div>
-                                                <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">Occupancy</div>
+                                                <div className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Occupancy</div>
                                                 <div className="text-2xl mb-1">{stats.currentOccupancy}</div>
-                                                <div className="text-sm text-gray-400">of {capacity || '—'}</div>
+                                                <div className="text-sm text-muted-foreground">of {capacity || '—'}</div>
                                             </div>
                                             <div>
-                                                <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">% Full</div>
+                                                <div className="text-xs text-muted-foreground uppercase tracking-wide mb-2">% Full</div>
                                                 <div className="text-2xl text-emerald-400 mb-1">{pct}%</div>
                                             </div>
                                             <div>
-                                                <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">Total In</div>
+                                                <div className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Total In</div>
                                                 <div className="text-2xl text-emerald-400 mb-1">+{stats.totalIn}</div>
                                             </div>
                                             <div>
-                                                <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">Total Out</div>
+                                                <div className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Total Out</div>
                                                 <div className="text-2xl text-red-400 mb-1">{stats.totalOut}</div>
                                             </div>
                                         </div>
 
                                         <div className="mt-4 mb-3">
-                                            <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+                                            <div className="h-2 bg-muted rounded-full overflow-hidden">
                                                 <div
                                                     className="h-full bg-emerald-500 rounded-full transition-all"
                                                     style={{ width: `${pctCapped}%` }}
@@ -234,7 +234,7 @@ export default function VenuesPage() {
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center justify-between text-sm text-gray-400">
+                                        <div className="flex items-center justify-between text-sm text-muted-foreground">
                                             <div>{stats.areaCount} areas · {stats.deviceCount} devices</div>
                                             <div>Last reset: {lastReset}</div>
                                         </div>
