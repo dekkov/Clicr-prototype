@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/store';
 import { Area, AreaType, Clicr, FlowMode } from '@/lib/types';
 import { Building2, MapPin, Users, Check, Plus, ArrowRight, ArrowLeft, Mail, Scan, Ban, Trash2, Pencil, X } from 'lucide-react';
+import { LogoUploader } from '@/components/ui/logo-uploader';
 import { createBusinessVenueAndAreas, updateBusinessSettings } from '@/app/onboarding/setup-actions';
 import { inviteTeamMember } from '@/app/(authenticated)/settings/team-actions';
 import type { Role } from '@/lib/types';
@@ -330,14 +331,15 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                         </select>
                     </div>
                     <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 block">Logo URL <span className="text-slate-600">(optional)</span></label>
-                        <input
-                            type="url"
-                            value={logoUrl}
-                            onChange={e => setLogoUrl(e.target.value)}
-                            placeholder="https://example.com/logo.png"
-                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 focus:outline-none placeholder:text-slate-600"
-                        />
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 block">Logo <span className="text-slate-600">(optional)</span></label>
+                        <div className="flex justify-center mt-2">
+                            <LogoUploader
+                                currentUrl={logoUrl || null}
+                                businessId="pending"
+                                onUpload={(url) => setLogoUrl(url)}
+                                demoMode={true}
+                            />
+                        </div>
                     </div>
                     <button type="submit" disabled={isLoading}
                         className="w-full py-4 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2">
