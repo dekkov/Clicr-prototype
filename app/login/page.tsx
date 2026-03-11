@@ -2,6 +2,7 @@
 import { login } from './actions'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
+import { PasswordInput } from '@/components/ui/password-input'
 
 type Props = {
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>
@@ -58,13 +59,12 @@ export default async function LoginPage({ searchParams }: Props) {
                         </div>
                         <div>
                             <label htmlFor="password" className="sr-only">Password</label>
-                            <input
+                            <PasswordInput
                                 id="password"
                                 name="password"
-                                type="password"
                                 autoComplete="current-password"
                                 required
-                                className="relative block w-full rounded-b-xl border border-white/10 bg-slate-900/50 px-4 py-3 text-white placeholder-slate-500 focus:z-10 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
+                                className="relative block w-full rounded-b-xl border border-white/10 bg-slate-900/50 px-4 pr-10 py-3 text-white placeholder-slate-500 focus:z-10 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
                                 placeholder="Password"
                             />
                         </div>
