@@ -1,35 +1,49 @@
 @import "tailwindcss";
 
-:root {
-  /* Base - Design system (black/dark) */
-  --background: #000000;
-  --foreground: #f8fafc;
+@custom-variant dark (&:where(.dark, .dark *));
 
-  /* Primary - Purple accent (design: purple-600) */
+:root {
+  /* Light mode (default) */
+  --background: #ffffff;
+  --foreground: #0f172a;
+
+  /* Primary - Purple accent (same in both modes) */
   --primary: #9333ea;
   --primary-foreground: #ffffff;
   --primary-hover: #7e22ce;
 
-  /* Secondary - Emerald for positive */
+  /* Secondary - Emerald for positive (same in both modes) */
   --secondary: #10b981;
   --secondary-foreground: #ffffff;
 
-  /* Surfaces - Design card style */
-  --card: rgba(17, 24, 39, 0.5);
-  --card-foreground: #f1f5f9;
+  /* Surfaces - Light card style */
+  --card: rgba(243, 244, 246, 0.8);
+  --card-foreground: #1e293b;
 
-  /* Borders - Design gray-800 */
-  --border: #1f2937;
-  --input: #1f2937;
+  /* Borders - Light */
+  --border: #e2e8f0;
+  --input: #e2e8f0;
   --ring: #9333ea;
 
-  /* Status */
+  /* Status (same in both modes) */
   --success: #10b981;
   --warning: #f59e0b;
   --destructive: #ef4444;
 
   /* Radii */
   --radius: 0.75rem;
+}
+
+.dark {
+  /* Dark mode overrides */
+  --background: #000000;
+  --foreground: #f8fafc;
+
+  --card: rgba(17, 24, 39, 0.5);
+  --card-foreground: #f1f5f9;
+
+  --border: #1f2937;
+  --input: #1f2937;
 }
 
 @theme inline {
@@ -89,16 +103,16 @@ html {
   overscroll-behavior-y: none;
 }
 
-/* Design system card utilities (bg-gray-900/50 border-gray-800) */
+/* Design system card utilities */
 .glass-panel {
-  background: rgba(17, 24, 39, 0.5);
-  border: 1px solid #1f2937;
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: 0.75rem;
 }
 
 .glass-card {
-  background: rgba(17, 24, 39, 0.5);
-  border: 1px solid #1f2937;
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: 0.75rem;
 }
 
