@@ -238,7 +238,11 @@ export default function ClicrPanel({
     }, [showConfigModal, setPollingPaused]);
 
     // Hardware scanner focus management
+    // When Bluetooth scanner is active, it owns focus via its own focus lock
+    const bluetoothActive = scanInputMode === 'BLUETOOTH' && mode === 'scan';
+
     useEffect(() => {
+        if (bluetoothActive) return; // Let BluetoothScanner own focus
         const handleKeyDown = (e: KeyboardEvent) => {
             if (isModalOpenRef.current) return;
             const target = e.target as HTMLElement;
@@ -253,16 +257,18 @@ export default function ClicrPanel({
             clearTimeout(timer);
             window.removeEventListener('keydown', handleKeyDown);
         };
-    }, []);
+    }, [bluetoothActive]);
 
     useEffect(() => {
+        if (bluetoothActive) return; // Let BluetoothScanner own focus
         if (!showBulkModal && !showConfigModal) {
             const timer = setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 50);
             return () => clearTimeout(timer);
         }
-    }, [showBulkModal, showConfigModal]);
+    }, [showBulkModal, showConfigModal, bluetoothActive]);
 
     useEffect(() => {
+        if (bluetoothActive) return; // Let BluetoothScanner own focus
         const handleBlur = () => {
             if (!showBulkModal && !showConfigModal) {
                 setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 100);
@@ -271,7 +277,7 @@ export default function ClicrPanel({
         const inputEl = inputRef.current;
         inputEl?.addEventListener('blur', handleBlur);
         return () => inputEl?.removeEventListener('blur', handleBlur);
-    }, [showBulkModal, showConfigModal]);
+    }, [showBulkModal, showConfigModal, bluetoothActive]);
 
     // Hardware scan debounce
     useEffect(() => {
@@ -574,7 +580,7 @@ export default function ClicrPanel({
     return (
         <div
             className={cn("flex flex-col min-h-screen bg-background text-foreground", className)}
-            onClick={() => { if (!isModalOpenRef.current) inputRef.current?.focus({ preventScroll: true }); }}
+            onClick={() => { if (!isModalOpenRef.current && !bluetoothActive) inputRef.current?.focus({ preventScroll: true }); }}
         >
             {/* Hidden hardware scanner input */}
             <textarea
