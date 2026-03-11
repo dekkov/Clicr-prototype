@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     ArrowLeft, Wifi, WifiOff, ScanLine, XCircle, Zap,
-    RefreshCw, Settings2, Bug, RotateCcw, Scan,
+    Settings2, Bug, RotateCcw, Scan,
     Camera, Bluetooth
 } from 'lucide-react';
 import { useApp } from '@/lib/store';
@@ -121,7 +121,7 @@ export default function ClicrPanel({
     const {
         clicrs, areas, events, venues, business,
         recordEvent, recordScan, recordTurnaround,
-        resetCounts, endShift, isLoading, patrons, patronBans, updateClicr, debug, currentUser,
+        endShift, isLoading, patrons, patronBans, updateClicr, debug, currentUser,
         turnarounds, activeShiftId, activeShiftAreaId,
         setPollingPaused, areaTraffic, refreshTrafficStats, activeBusiness
     } = useApp();
@@ -368,20 +368,6 @@ export default function ClicrPanel({
         });
     };
 
-    const handleReset = async (silent = false) => {
-        if (!silent && !window.confirm('Reset all counts to zero? This cannot be undone.')) return;
-        if (!venueId) return;
-        try {
-            await resetCounts(venueId);
-            setBulkValue(0);
-            setLastScan(null);
-            setScannerInput('');
-            if (clicr.area_id) await refreshTrafficStats?.(venueId, clicr.area_id);
-        } catch (e) {
-            console.error("Reset failed", e);
-            if (!silent) alert("Failed to reset. Please try again.");
-        }
-    };
 
     // --- SCAN LOGIC ---
     const processScan = async (parsed: ReturnType<typeof parseAAMVA>, rawData?: string) => {
@@ -837,14 +823,6 @@ export default function ClicrPanel({
                             >
                                 <RotateCcw className={cn("w-4 h-4 transition-transform", turnaroundFlash && "animate-spin")} />
                                 Turnaround
-                            </button>
-                            <div className="w-px h-4 bg-slate-800" />
-                            <button
-                                onClick={() => handleReset()}
-                                className="flex items-center gap-2 px-4 py-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors text-sm font-medium"
-                            >
-                                <RefreshCw className="w-4 h-4" />
-                                Reset
                             </button>
                         </div>
 

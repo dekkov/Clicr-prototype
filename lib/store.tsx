@@ -51,7 +51,7 @@ export type AppState = {
 type AppContextType = AppState & {
     recordEvent: (event: Omit<CountEvent, 'id' | 'timestamp' | 'user_id' | 'business_id'>) => void;
     recordScan: (scan: Omit<IDScanEvent, 'id' | 'timestamp'>) => void;
-    resetCounts: (venueId?: string) => void;
+    resetCounts: () => Promise<void>;
     startShift: (venueId: string, areaId?: string) => Promise<string | null>;
     endShift: (shiftId: string) => Promise<void>;
     addUser: (user: User) => Promise<void>;
@@ -86,7 +86,7 @@ type AppContextType = AppState & {
 
     // Traffic & Turnarounds
     recordTurnaround: (venueId: string, areaId: string, deviceId: string, count: number) => Promise<void>;
-    refreshTrafficStats: (venueId: string, areaId: string) => Promise<void>;
+    refreshTrafficStats: (venueId: string, areaId?: string) => Promise<void>;
 
     // Device Rename
     renameDevice?: (deviceId: string, name: string) => Promise<void>;
@@ -497,7 +497,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             // then refresh traffic totals so TOTAL IN/OUT reflect the new event.
             setTimeout(() => {
                 isWritingRef.current = Math.max(0, isWritingRef.current - 1);
-                if (data.area_id) refreshTrafficStats(data.venue_id, data.area_id);
+                refreshTrafficStats(data.venue_id, data.area_id || undefined);
             }, 500);
         }
     };
@@ -536,13 +536,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
-    const resetCounts = async (venueId?: string) => {
+    const resetCounts = async () => {
         // LOCK polling to prevent race conditions
         isResettingRef.current = true;
 
         // Optimistic update — zero all counters and start a fresh traffic session
         const optimisticState = {
             ...state,
+            venues: state.venues.map(v => ({ ...v, current_occupancy: 0 })),
             clicrs: state.clicrs.map(c => ({ ...c, current_count: 0 })),
             areas: state.areas.map(a => ({ ...a, current_occupancy: 0 })),
             events: [],
@@ -554,12 +555,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setState(optimisticState);
 
         try {
-            // authFetch posts to /api/sync; the server resolves business_id from the session cookie
-            const res = await authFetch({ action: 'RESET_COUNTS', venue_id: venueId });
+            // Call /api/rpc/reset directly to enforce OWNER/ADMIN RBAC check.
+            // Auth is resolved from the session cookie (same as authFetch).
+            const res = await fetch('/api/rpc/reset', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ business_id: state.business?.id }),
+            });
 
             if (res.ok) {
-                const updatedDB = await res.json();
-                setState(prev => ({ ...prev, ...updatedDB }));
+                // /api/rpc/reset returns { success, areasReset, resetAt } — not full state.
+                // Reconciliation happens via the forced refreshState() in the finally block.
+            } else {
+                const err = await res.json().catch(() => ({}));
+                console.error("Failed to reset counts (server error)", res.status, err);
             }
         } catch (error) {
             console.error("Failed to reset counts", error);
@@ -975,9 +984,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
-    const refreshTrafficStats = async (venueId: string, areaId: string) => {
+    const refreshTrafficStats = async (venueId: string, areaId?: string) => {
         if (!state.business?.id) return;
-        const scopeKey = `area:${state.business.id}:${venueId}:${areaId}`;
+        const scopeKey = areaId
+            ? `area:${state.business.id}:${venueId}:${areaId}`
+            : `venue:${state.business.id}:${venueId}`;
         try {
             const res = await fetch('/api/rpc/traffic', {
                 method: 'POST',

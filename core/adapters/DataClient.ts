@@ -147,6 +147,7 @@ export interface Business {
     id: string;
     name: string;
     timezone: string;
+    last_reset_at?: string;
     settings: {
         refresh_interval_sec: number;
         capacity_thresholds: [number, number, number];
@@ -165,6 +166,7 @@ export interface Venue {
     default_capacity_total?: number | null;
     capacity_enforcement_mode: 'WARN_ONLY' | 'HARD_STOP' | 'MANAGER_OVERRIDE';
     last_reset_at?: string;
+    current_occupancy?: number;
     created_at: string;
     updated_at: string;
 }
@@ -274,8 +276,8 @@ export interface DataClient {
     /** Get aggregated traffic totals (since reset or within window). */
     getTrafficTotals(scope: Scope, window: TimeWindow): Promise<{ totalIn: number; totalOut: number; net: number }>;
 
-    /** Reset counts to zero. Sets last_reset_at. Returns metadata about the reset. */
-    resetCounts(scope: Scope): Promise<ResetResult>;
+    /** Reset all counts for the entire business. Cascades to all venues, areas, and devices. */
+    resetCounts(businessId: string): Promise<ResetResult>;
 
     // ── ID SCANNING ─────────────────────────────────────────────────────
     logScan(businessId: string, scan: ScanPayload): Promise<ScanRecord>;

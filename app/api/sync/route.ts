@@ -396,13 +396,53 @@ export async function POST(request: Request) {
                 };
                 if (hasAreaId) {
                     rpcParams.p_area_id = event.area_id;
+                    const { error: rpcError } = await supabaseAdmin.rpc('apply_occupancy_delta', rpcParams);
+                    if (rpcError) {
+                        console.error('[sync] RECORD_EVENT RPC error:', rpcError.message);
+                        return NextResponse.json({ error: rpcError.message || 'Failed to record event', details: rpcError }, { status: 500 });
+                    }
                 } else {
-                    rpcParams.p_venue_id = (event as any).venue_id;
-                }
-                const { error: rpcError } = await supabaseAdmin.rpc('apply_occupancy_delta', rpcParams);
-                if (rpcError) {
-                    console.error('[sync] RECORD_EVENT RPC error:', rpcError.message);
-                    return NextResponse.json({ error: rpcError.message || 'Failed to record event', details: rpcError }, { status: 500 });
+                    // Venue-level counter: no area RPC available, insert event directly
+                    const eventVenueId = (event as any).venue_id;
+                    const eventBizId = event.business_id || await getBusinessId();
+                    const { error: insertError } = await supabaseAdmin
+                        .from('occupancy_events')
+                        .insert({
+                            business_id: eventBizId,
+                            venue_id: eventVenueId,
+                            area_id: null,
+                            delta: event.delta,
+                            flow_type: event.delta > 0 ? 'IN' : 'OUT',
+                            event_type: rpcParams.p_source === 'scan' ? 'SCAN' : 'TAP',
+                            source: rpcParams.p_source,
+                            device_id: rpcParams.p_device_id || null,
+                            gender: rpcParams.p_gender || null,
+                            idempotency_key: rpcParams.p_idempotency_key || null,
+                            user_id: userId,
+                        });
+
+                    if (insertError) {
+                        console.error('[sync] RECORD_EVENT insert error:', insertError.message);
+                        return NextResponse.json({ error: insertError.message || 'Failed to record event' }, { status: 500 });
+                    }
+
+                    // Update venue current_occupancy directly
+                    if (eventVenueId) {
+                        // Note: This read-modify-write is non-atomic. Under concurrent taps from
+                        // multiple devices on the same venue counter, taps may be silently lost.
+                        // Fix: add a venue-level apply_occupancy_delta RPC (future migration).
+                        const { data: venueRow } = await supabaseAdmin
+                            .from('venues')
+                            .select('current_occupancy')
+                            .eq('id', eventVenueId)
+                            .single();
+
+                        const newOcc = Math.max(0, (venueRow?.current_occupancy || 0) + event.delta);
+                        await supabaseAdmin
+                            .from('venues')
+                            .update({ current_occupancy: newOcc })
+                            .eq('id', eventVenueId);
+                    }
                 }
                 break;
             }
@@ -429,56 +469,6 @@ export async function POST(request: Request) {
                         identity_token_hash: (scan as any).identity_token_hash || null
                     });
                 } catch (e) { console.error("[sync] Scan persistence failed:", e instanceof Error ? e.message : "Unknown error"); }
-                break;
-            }
-
-            case 'RESET_COUNTS': {
-                const resetBizId = await getBusinessId();
-                if (resetBizId) {
-                    let areasToReset: string[] = [];
-                    if (body.venue_id) {
-                        const { data: venueAreas } = await supabaseAdmin
-                            .from('areas')
-                            .select('id')
-                            .eq('venue_id', body.venue_id)
-                            .eq('business_id', resetBizId);
-                        areasToReset = (venueAreas || []).map((a: any) => a.id);
-                    } else {
-                        const { data: bizAreas } = await supabaseAdmin
-                            .from('areas')
-                            .select('id')
-                            .eq('business_id', resetBizId);
-                        areasToReset = (bizAreas || []).map((a: any) => a.id);
-                    }
-
-                    for (const areaId of areasToReset) {
-                        const { data: area, error: areaReadErr } = await supabaseAdmin
-                            .from('areas')
-                            .select('current_occupancy, venue_id')
-                            .eq('id', areaId)
-                            .single();
-
-                        if (areaReadErr) continue;
-
-                        const currentVal = area?.current_occupancy ?? 0;
-                        if (currentVal !== 0) {
-                            await supabaseAdmin.from('occupancy_events').insert({
-                                business_id: resetBizId,
-                                venue_id: area?.venue_id || null,
-                                area_id: areaId,
-                                delta: -currentVal,
-                                flow_type: 'OUT',
-                                event_type: 'RESET',
-                                source: 'reset',
-                                user_id: userId || null,
-                            });
-                        }
-
-                        await supabaseAdmin.from('areas')
-                            .update({ current_occupancy: 0, last_reset_at: new Date().toISOString() })
-                            .eq('id', areaId);
-                    }
-                }
                 break;
             }
 

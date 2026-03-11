@@ -339,16 +339,6 @@ export default function AreaDetailPage() {
             <div className="mt-8 p-4 border border-slate-800 rounded-lg bg-black/20 text-[10px] font-mono text-slate-500">
                 <div className="flex items-center justify-between mb-2">
                     <p className="font-bold text-slate-400">DEBUG: SYNC STATUS</p>
-                    <button
-                        onClick={() => {
-                            if (confirm('Verify: Reset occupancy to 0? This will be logged.')) {
-                                useAppHook.resetCounts(area.venue_id, area.id);
-                            }
-                        }}
-                        className="px-2 py-1 bg-red-900/30 text-red-500 border border-red-900/50 rounded hover:bg-red-900/50"
-                    >
-                        FORCE RESET
-                    </button>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                     <div>

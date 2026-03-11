@@ -180,14 +180,8 @@ export class SupabaseAdapter implements DataClient {
         throw new Error('SupabaseAdapter.getTrafficTotals: Not yet implemented');
     }
 
-    async resetCounts(scope: Scope): Promise<ResetResult> {
-        // TODO: Call RPC reset_counts with:
-        //   p_scope ('BUSINESS' | 'VENUE' | 'AREA'), p_business_id, p_venue_id, p_area_id
-        // The RPC:
-        //   1. Sets occupancy_snapshots.current_occupancy = 0 for all matching rows
-        //   2. Updates last_reset_at on venue/area
-        //   3. Inserts an audit_log entry
-        //   4. Returns { areas_reset, reset_at }
+    async resetCounts(businessId: string): Promise<ResetResult> {
+        // TODO: Call /api/rpc/reset with { business_id: businessId }
         throw new Error('SupabaseAdapter.resetCounts: Not yet implemented');
     }
 

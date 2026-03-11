@@ -46,7 +46,7 @@ const AREA_TYPE_LABELS: Record<string, string> = {
 
 export default function AreasPage() {
     const router = useRouter();
-    const { areas, clicrs, venues, areaTraffic, activeBusiness, addArea, addClicr, resetCounts, startShift, endShift, updateArea, deleteArea, isLoading, currentUser, activeShiftId, activeShiftAreaId } = useApp();
+    const { areas, clicrs, venues, areaTraffic, activeBusiness, addArea, addClicr, startShift, endShift, updateArea, deleteArea, isLoading, currentUser, activeShiftId, activeShiftAreaId } = useApp();
     const userRole = currentUser?.role as Role | undefined;
     const canDelete = hasMinRole(userRole, 'ADMIN');
     const canEdit = canEditVenuesAndAreas(userRole);
@@ -55,7 +55,7 @@ export default function AreasPage() {
     const [search, setSearch] = useState('');
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isAddingArea, setIsAddingArea] = useState(false);
-    const [startingShiftAreaId, setStartingShiftAreaId] = useState<string | null>(null);
+    const [startingShiftAreaId] = useState<string | null>(null);
     const [configAreaId, setConfigAreaId] = useState<string | null>(null);
     const [configName, setConfigName] = useState('');
     const [configCapacity, setConfigCapacity] = useState(0);
@@ -150,10 +150,7 @@ export default function AreasPage() {
     };
 
     const handleStartShift = async (area: Area) => {
-        setStartingShiftAreaId(area.id);
         await startShift(area.venue_id, area.id);
-        await resetCounts(area.venue_id);
-        setStartingShiftAreaId(null);
     };
 
     const openConfigModal = (area: Area) => {
