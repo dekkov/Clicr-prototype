@@ -411,7 +411,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                             const next = theme === "system" ? "light" : theme === "light" ? "dark" : "system";
                             setTheme(next);
                         }}
-                        className="w-10 h-10 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-800 flex items-center justify-center transition-colors"
+                        className="w-10 h-10 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800 flex items-center justify-center transition-colors"
                         title={`Theme: ${theme}`}
                     >
                         {theme === "system" ? (
