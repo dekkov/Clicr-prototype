@@ -808,7 +808,7 @@ export default function DashboardPage() {
                         <button
                             disabled={isResetting}
                             onClick={async () => {
-                                if (activeBusiness && window.confirm('Are you sure you want to reset all occupancy counts to 0?')) {
+                                if (activeBusiness && window.confirm('Reset all data for this business? This will zero all venue, area, and counter occupancy across your entire account. This cannot be undone.')) {
                                     setIsResetting(true);
                                     await resetCounts();
                                     setIsResetting(false);
