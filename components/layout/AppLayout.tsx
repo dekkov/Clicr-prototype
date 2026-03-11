@@ -184,11 +184,19 @@ function BusinessSelector() {
                     canToggle ? "hover:bg-purple-900/40 cursor-pointer" : "cursor-default"
                 )}
             >
-                <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center shrink-0">
-                    <span className="text-sm font-semibold text-white">
-                        {activeBusiness ? (activeBusiness.name.charAt(0) || '?').toUpperCase() : '?'}
-                    </span>
-                </div>
+                {activeBusiness?.logo_url ? (
+                    <img
+                        src={activeBusiness.logo_url}
+                        alt={activeBusiness.name}
+                        className="w-8 h-8 rounded-lg object-cover shrink-0"
+                    />
+                ) : (
+                    <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center shrink-0">
+                        <span className="text-sm font-semibold text-white">
+                            {activeBusiness ? (activeBusiness.name.charAt(0) || '?').toUpperCase() : '?'}
+                        </span>
+                    </div>
+                )}
                 <div className="flex-1 min-w-0 text-left">
                     <div className="text-sm text-white truncate">
                         {activeBusiness ? activeBusiness.name : 'Select Business'}
@@ -222,12 +230,20 @@ function BusinessSelector() {
                                         : "text-gray-300 hover:bg-gray-800/60"
                                 )}
                             >
-                                <div className={cn(
-                                    "w-7 h-7 rounded-md flex items-center justify-center shrink-0 text-xs font-bold",
-                                    isSelected ? "bg-purple-600 text-white" : "bg-gray-700 text-gray-200"
-                                )}>
-                                    {(biz.name.charAt(0) || '?').toUpperCase()}
-                                </div>
+                                {biz.logo_url ? (
+                                    <img
+                                        src={biz.logo_url}
+                                        alt={biz.name}
+                                        className="w-7 h-7 rounded-md object-cover shrink-0"
+                                    />
+                                ) : (
+                                    <div className={cn(
+                                        "w-7 h-7 rounded-md flex items-center justify-center shrink-0 text-xs font-bold",
+                                        isSelected ? "bg-purple-600 text-white" : "bg-gray-700 text-gray-200"
+                                    )}>
+                                        {(biz.name.charAt(0) || '?').toUpperCase()}
+                                    </div>
+                                )}
                                 <span className="flex-1 text-sm truncate">{biz.name}</span>
                                 {isSelected && <Check className="w-3.5 h-3.5 text-purple-400 shrink-0" />}
                             </button>
