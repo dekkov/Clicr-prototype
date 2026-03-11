@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { useTheme } from '@/components/providers/theme-provider';
 import { GettingStartedChecklist } from './_components/GettingStartedChecklist';
 import type { CountEvent, Venue } from '@/lib/types';
 import type { HeatmapData } from '@/app/api/reports/heatmap/route';
@@ -495,6 +496,7 @@ function formatTime(ts: number): string {
 
 export default function DashboardPage() {
     const router = useRouter();
+    const { resolvedTheme } = useTheme();
     const {
         activeBusiness,
         businesses,
@@ -508,6 +510,15 @@ export default function DashboardPage() {
         isLoading,
         resetCounts,
     } = useApp();
+
+    const chartColors = {
+        grid: resolvedTheme === 'dark' ? '#334155' : '#e2e8f0',
+        text: resolvedTheme === 'dark' ? '#94a3b8' : '#64748b',
+        tooltip: {
+            background: resolvedTheme === 'dark' ? '#111827' : '#ffffff',
+            border: resolvedTheme === 'dark' ? '#374151' : '#e2e8f0',
+        },
+    };
 
     const [isResetting, setIsResetting] = useState(false);
 

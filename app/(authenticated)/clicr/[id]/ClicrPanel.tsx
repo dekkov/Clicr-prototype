@@ -566,13 +566,13 @@ export default function ClicrPanel({
 
     // --- LOADING / NOT FOUND ---
     if (isLoading) return (
-        <div className="min-h-screen bg-[#0a0b0f] flex items-center justify-center text-slate-500 animate-pulse">
+        <div className="min-h-screen bg-background flex items-center justify-center text-foreground/50 animate-pulse">
             Connecting...
         </div>
     );
 
     if (!clicr) return (
-        <div className="min-h-screen bg-[#0a0b0f] flex flex-col items-center justify-center text-slate-400 gap-4">
+        <div className="min-h-screen bg-background flex flex-col items-center justify-center text-foreground/60 gap-4">
             <div className="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
             <div className="text-sm">Syncing device state...</div>
         </div>

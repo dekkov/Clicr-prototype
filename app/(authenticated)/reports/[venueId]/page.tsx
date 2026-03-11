@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useApp } from '@/lib/store';
+import { useTheme } from '@/components/providers/theme-provider';
 import {
     Calendar as CalendarIcon,
     BarChart3,
@@ -65,7 +66,17 @@ export default function VenueReportingDashboard() {
     const { venueId } = useParams();
     const router = useRouter();
     const { venues, areas, clicrs } = useApp();
+    const { resolvedTheme } = useTheme();
     const [isMounted, setIsMounted] = useState(false);
+
+    const chartColors = {
+        grid: resolvedTheme === 'dark' ? '#334155' : '#e2e8f0',
+        text: resolvedTheme === 'dark' ? '#94a3b8' : '#64748b',
+        tooltip: {
+            background: resolvedTheme === 'dark' ? '#111827' : '#ffffff',
+            border: resolvedTheme === 'dark' ? '#374151' : '#e2e8f0',
+        },
+    };
 
     // Venue-specific events fetched directly — AppState only has last 100 global events
     const [venueEvents, setVenueEvents] = useState<any[]>([]);
