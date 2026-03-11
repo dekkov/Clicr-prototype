@@ -275,8 +275,8 @@ export interface DataClient {
     /** Get aggregated traffic totals (since reset or within window). */
     getTrafficTotals(scope: Scope, window: TimeWindow): Promise<{ totalIn: number; totalOut: number; net: number }>;
 
-    /** Reset counts to zero. Sets last_reset_at. Returns metadata about the reset. */
-    resetCounts(scope: Scope): Promise<ResetResult>;
+    /** Reset all counts for the entire business. Cascades to all venues, areas, and devices. */
+    resetCounts(businessId: string): Promise<ResetResult>;
 
     // ── ID SCANNING ─────────────────────────────────────────────────────
     logScan(businessId: string, scan: ScanPayload): Promise<ScanRecord>;
