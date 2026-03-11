@@ -14,12 +14,15 @@ import {
     LogOut,
     Ban,
     Moon,
+    Sun,
+    Monitor,
     Bell,
     ChevronDown,
     Check,
     Plus,
     Loader2,
 } from 'lucide-react';
+import { useTheme } from '@/components/providers/theme-provider';
 import { cn } from '@/lib/utils';
 import { useApp } from '@/lib/store';
 import { Business, Role } from '@/lib/types';
@@ -300,6 +303,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         router.push('/login');
     }, [supabase, router]);
 
+    const { theme, setTheme } = useTheme();
     const userInitials = getUserInitials(currentUser?.name ?? '', currentUser?.email ?? '');
     const userRole = currentUser?.role as Role | undefined;
     const visibleNavItems = getVisibleNavItems(userRole, NAV_ITEMS);
@@ -402,8 +406,21 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                         <ScopeSelector />
                     </div>
                     <div className="hidden md:block flex-1" />
-                    <button className="w-10 h-10 rounded-lg hover:bg-gray-800 flex items-center justify-center transition-colors" aria-label="Theme">
-                        <Moon className="w-5 h-5 text-gray-400" />
+                    <button
+                        onClick={() => {
+                            const next = theme === "system" ? "light" : theme === "light" ? "dark" : "system";
+                            setTheme(next);
+                        }}
+                        className="w-10 h-10 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-800 flex items-center justify-center transition-colors"
+                        title={`Theme: ${theme}`}
+                    >
+                        {theme === "system" ? (
+                            <Monitor className="w-5 h-5 text-gray-400" />
+                        ) : theme === "light" ? (
+                            <Sun className="w-5 h-5 text-amber-400" />
+                        ) : (
+                            <Moon className="w-5 h-5 text-gray-400" />
+                        )}
                     </button>
                     <button className="w-10 h-10 rounded-lg hover:bg-gray-800 flex items-center justify-center transition-colors relative" aria-label="Notifications">
                         <Bell className="w-5 h-5 text-gray-400" />
