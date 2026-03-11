@@ -147,6 +147,7 @@ export interface Business {
     id: string;
     name: string;
     timezone: string;
+    last_reset_at?: string;
     settings: {
         refresh_interval_sec: number;
         capacity_thresholds: [number, number, number];
