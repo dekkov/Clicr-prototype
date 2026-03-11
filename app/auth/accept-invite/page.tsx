@@ -54,8 +54,8 @@ export default function AcceptInvitePage() {
     }, [router]);
 
     return (
-        <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6">
-            <div className="w-full max-w-md bg-slate-900/50 border border-white/10 rounded-3xl p-8 shadow-2xl backdrop-blur-xl text-center">
+        <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
+            <div className="w-full max-w-md bg-card border border-border rounded-3xl p-8 shadow-2xl backdrop-blur-xl text-center">
                 <div className="flex justify-center mb-6">
                     <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10">
                         <Logo className="w-10 h-10" />
@@ -64,13 +64,13 @@ export default function AcceptInvitePage() {
                 {error ? (
                     <>
                         <h1 className="text-xl font-bold text-red-400 mb-2">Something went wrong</h1>
-                        <p className="text-slate-400 text-sm">{error}</p>
+                        <p className="text-foreground/60 text-sm">{error}</p>
                     </>
                 ) : (
                     <>
                         <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-4" />
-                        <h1 className="text-xl font-bold text-white mb-2">Accepting invite...</h1>
-                        <p className="text-slate-400 text-sm">Setting up your account. This will just take a moment.</p>
+                        <h1 className="text-xl font-bold text-foreground mb-2">Accepting invite...</h1>
+                        <p className="text-foreground/60 text-sm">Setting up your account. This will just take a moment.</p>
                     </>
                 )}
             </div>

@@ -14,12 +14,15 @@ import {
     LogOut,
     Ban,
     Moon,
+    Sun,
+    Monitor,
     Bell,
     ChevronDown,
     Check,
     Plus,
     Loader2,
 } from 'lucide-react';
+import { useTheme } from '@/components/providers/theme-provider';
 import { cn } from '@/lib/utils';
 import { useApp } from '@/lib/store';
 import { Business, Role } from '@/lib/types';
@@ -184,11 +187,19 @@ function BusinessSelector() {
                     canToggle ? "hover:bg-purple-900/40 cursor-pointer" : "cursor-default"
                 )}
             >
-                <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center shrink-0">
-                    <span className="text-sm font-semibold text-white">
-                        {activeBusiness ? (activeBusiness.name.charAt(0) || '?').toUpperCase() : '?'}
-                    </span>
-                </div>
+                {activeBusiness?.logo_url ? (
+                    <img
+                        src={activeBusiness.logo_url}
+                        alt={activeBusiness.name}
+                        className="w-8 h-8 rounded-lg object-cover shrink-0"
+                    />
+                ) : (
+                    <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center shrink-0">
+                        <span className="text-sm font-semibold text-white">
+                            {activeBusiness ? (activeBusiness.name.charAt(0) || '?').toUpperCase() : '?'}
+                        </span>
+                    </div>
+                )}
                 <div className="flex-1 min-w-0 text-left">
                     <div className="text-sm text-white truncate">
                         {activeBusiness ? activeBusiness.name : 'Select Business'}
@@ -222,12 +233,20 @@ function BusinessSelector() {
                                         : "text-gray-300 hover:bg-gray-800/60"
                                 )}
                             >
-                                <div className={cn(
-                                    "w-7 h-7 rounded-md flex items-center justify-center shrink-0 text-xs font-bold",
-                                    isSelected ? "bg-purple-600 text-white" : "bg-gray-700 text-gray-200"
-                                )}>
-                                    {(biz.name.charAt(0) || '?').toUpperCase()}
-                                </div>
+                                {biz.logo_url ? (
+                                    <img
+                                        src={biz.logo_url}
+                                        alt={biz.name}
+                                        className="w-7 h-7 rounded-md object-cover shrink-0"
+                                    />
+                                ) : (
+                                    <div className={cn(
+                                        "w-7 h-7 rounded-md flex items-center justify-center shrink-0 text-xs font-bold",
+                                        isSelected ? "bg-purple-600 text-white" : "bg-gray-700 text-gray-200"
+                                    )}>
+                                        {(biz.name.charAt(0) || '?').toUpperCase()}
+                                    </div>
+                                )}
                                 <span className="flex-1 text-sm truncate">{biz.name}</span>
                                 {isSelected && <Check className="w-3.5 h-3.5 text-purple-400 shrink-0" />}
                             </button>
@@ -284,6 +303,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         router.push('/login');
     }, [supabase, router]);
 
+    const { theme, setTheme } = useTheme();
     const userInitials = getUserInitials(currentUser?.name ?? '', currentUser?.email ?? '');
     const userRole = currentUser?.role as Role | undefined;
     const visibleNavItems = getVisibleNavItems(userRole, NAV_ITEMS);
@@ -297,7 +317,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
     if (staffRedirect) {
         return (
-            <div className="flex flex-col h-screen bg-black text-white items-center justify-center">
+            <div className="flex flex-col h-screen bg-background text-foreground items-center justify-center">
                 <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
             </div>
         );
@@ -309,7 +329,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
     if (isLoading) {
         return (
-            <div className="flex flex-col h-screen bg-black text-white items-center justify-center">
+            <div className="flex flex-col h-screen bg-background text-foreground items-center justify-center">
                 <div className="flex items-center gap-2 mb-6">
                     <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center">
                         <Sparkles className="w-5 h-5 text-white" />
@@ -323,24 +343,24 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     return (
-        <div className="flex flex-col md:flex-row h-screen bg-black text-white overflow-hidden">
+        <div className="flex flex-col md:flex-row h-screen bg-background text-foreground overflow-hidden">
             {/* Desktop: sidebar + main. Mobile: main only */}
             <div className="flex flex-1 min-h-0 overflow-hidden">
-                {/* Sidebar - Design: w-64, border-gray-800 */}
-                <aside className="w-64 border-r border-gray-800 flex flex-col shrink-0 hidden md:flex">
+                {/* Sidebar */}
+                <aside className="w-64 border-r border-border bg-background flex flex-col shrink-0 hidden md:flex">
                 {/* Logo */}
-                <div className="h-16 border-b border-gray-800 flex items-center px-4 shrink-0">
+                <div className="h-16 border-b border-border flex items-center px-4 shrink-0">
                     <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center">
                             <Sparkles className="w-5 h-5 text-white" />
                         </div>
-                        <span className="font-semibold">clicr</span>
+                        <span className="font-semibold text-foreground">clicr</span>
                         <span className="text-xs text-blue-400 ml-1">v4.0</span>
                     </div>
                 </div>
 
                 {/* Group Selector (Business/Venue) */}
-                <div className="px-4 py-4 border-b border-gray-800 shrink-0">
+                <div className="px-4 py-4 border-b border-border shrink-0">
                     <ScopeSelector />
                 </div>
 
@@ -355,7 +375,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                                 href={item.href}
                                 className={cn(
                                     "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
-                                    isActive ? "bg-purple-900/40 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800/50"
+                                    isActive ? "bg-purple-900/40 text-foreground" : "text-foreground/60 hover:text-foreground hover:bg-gray-200 dark:hover:bg-gray-800/50"
                                 )}
                             >
                                 <Icon className="w-5 h-5 shrink-0" />
@@ -366,10 +386,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 </nav>
 
                 {/* Settings + Sign out */}
-                <div className="px-3 py-4 border-t border-gray-800 space-y-1 shrink-0">
+                <div className="px-3 py-4 border-t border-border space-y-1 shrink-0">
                     <button
                         onClick={handleSignOut}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800/50 transition-colors"
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-foreground/60 hover:text-foreground hover:bg-gray-200 dark:hover:bg-gray-800/50 transition-colors"
                     >
                         <LogOut className="w-5 h-5 shrink-0" />
                         <span>Sign out</span>
@@ -379,15 +399,28 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
                 {/* Main: Top bar + Content */}
                 <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                {/* Top Bar - Design: h-16 */}
-                <header className="h-16 border-b border-gray-800 flex items-center px-4 md:px-6 gap-3 shrink-0">
+                {/* Top Bar */}
+                <header className="h-16 border-b border-border bg-background flex items-center px-4 md:px-6 gap-3 shrink-0">
                     {/* Mobile: Business selector (hidden on desktop — desktop uses sidebar) */}
                     <div className="md:hidden flex-1 min-w-0">
                         <ScopeSelector />
                     </div>
                     <div className="hidden md:block flex-1" />
-                    <button className="w-10 h-10 rounded-lg hover:bg-gray-800 flex items-center justify-center transition-colors" aria-label="Theme">
-                        <Moon className="w-5 h-5 text-gray-400" />
+                    <button
+                        onClick={() => {
+                            const next = theme === "system" ? "light" : theme === "light" ? "dark" : "system";
+                            setTheme(next);
+                        }}
+                        className="w-10 h-10 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800 flex items-center justify-center transition-colors"
+                        title={`Theme: ${theme}`}
+                    >
+                        {theme === "system" ? (
+                            <Monitor className="w-5 h-5 text-gray-400" />
+                        ) : theme === "light" ? (
+                            <Sun className="w-5 h-5 text-amber-400" />
+                        ) : (
+                            <Moon className="w-5 h-5 text-gray-400" />
+                        )}
                     </button>
                     <button className="w-10 h-10 rounded-lg hover:bg-gray-800 flex items-center justify-center transition-colors relative" aria-label="Notifications">
                         <Bell className="w-5 h-5 text-gray-400" />
@@ -408,7 +441,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
 
             {/* Mobile Bottom Nav */}
-            <nav className="md:hidden flex-none bg-gray-900 border-t border-gray-800 pb-[env(safe-area-inset-bottom)] z-50">
+            <nav className="md:hidden flex-none bg-background border-t border-border pb-[env(safe-area-inset-bottom)] z-50">
                 <div className="flex justify-around items-center p-2">
                     {visibleMobileItems.map((item) => {
                         const isActive = pathname === item.href || pathname.startsWith(item.href + '/');

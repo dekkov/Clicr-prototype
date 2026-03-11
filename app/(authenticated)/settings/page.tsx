@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/store';
 import { Building2, Save, Users, ShieldAlert, Shield, ChevronRight, Trash2, X, AlertTriangle, ScanLine } from 'lucide-react';
+import { LogoUploader } from '@/components/ui/logo-uploader';
 import { Role } from '@/lib/types';
 import Link from 'next/link';
 import { canManageSettings } from '@/lib/permissions';
@@ -153,6 +154,18 @@ export default function SettingsPage() {
                         <Building2 className="w-5 h-5 text-purple-400" />
                     </div>
                     <h2 className="text-lg font-bold text-white">Business Information</h2>
+                </div>
+                <div className="mb-6 flex justify-center">
+                    <LogoUploader
+                        currentUrl={business?.logo_url || null}
+                        businessId={business?.id || ""}
+                        onUpload={async (url) => {
+                            if (business) {
+                                await updateBusiness({ logo_url: url });
+                            }
+                        }}
+                        demoMode={process.env.NEXT_PUBLIC_APP_MODE === "demo"}
+                    />
                 </div>
                 <form onSubmit={handleSaveBusiness} className="space-y-4">
                     <div>

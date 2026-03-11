@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useApp } from '@/lib/store';
+import { useTheme } from '@/components/providers/theme-provider';
 import {
     Calendar as CalendarIcon,
     BarChart3,
@@ -65,7 +66,17 @@ export default function VenueReportingDashboard() {
     const { venueId } = useParams();
     const router = useRouter();
     const { venues, areas, clicrs } = useApp();
+    const { resolvedTheme } = useTheme();
     const [isMounted, setIsMounted] = useState(false);
+
+    const chartColors = {
+        grid: resolvedTheme === 'dark' ? '#334155' : '#e2e8f0',
+        text: resolvedTheme === 'dark' ? '#94a3b8' : '#64748b',
+        tooltip: {
+            background: resolvedTheme === 'dark' ? '#111827' : '#ffffff',
+            border: resolvedTheme === 'dark' ? '#374151' : '#e2e8f0',
+        },
+    };
 
     // Venue-specific events fetched directly — AppState only has last 100 global events
     const [venueEvents, setVenueEvents] = useState<any[]>([]);
@@ -472,11 +483,11 @@ export default function VenueReportingDashboard() {
                             <div className="h-[300px]">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={reportData.hourlyData}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} vertical={false} />
-                                        <XAxis dataKey="hourLabel" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                                        <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                                        <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} opacity={0.5} vertical={false} />
+                                        <XAxis dataKey="hourLabel" stroke={chartColors.text} fontSize={12} tickLine={false} axisLine={false} />
+                                        <YAxis stroke={chartColors.text} fontSize={12} tickLine={false} axisLine={false} />
                                         <Tooltip
-                                            contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc' }}
+                                            contentStyle={{ backgroundColor: chartColors.tooltip.background, borderColor: chartColors.tooltip.border, color: '#f8fafc' }}
                                             cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                                         />
                                         <Bar dataKey="entries" fill="#10b981" radius={[4, 4, 0, 0]} barSize={20} />
@@ -501,11 +512,11 @@ export default function VenueReportingDashboard() {
                             <div className="h-[250px]">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={reportData.hourlyData}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} vertical={false} />
-                                        <XAxis dataKey="hourLabel" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                                        <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                                        <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} opacity={0.5} vertical={false} />
+                                        <XAxis dataKey="hourLabel" stroke={chartColors.text} fontSize={12} tickLine={false} axisLine={false} />
+                                        <YAxis stroke={chartColors.text} fontSize={12} tickLine={false} axisLine={false} />
                                         <Tooltip
-                                            contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc' }}
+                                            contentStyle={{ backgroundColor: chartColors.tooltip.background, borderColor: chartColors.tooltip.border, color: '#f8fafc' }}
                                             cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                                         />
                                         <Bar dataKey="maleEntries" name="Male Entries" fill="#3b82f6" stackId="a" radius={[0, 0, 4, 4]} barSize={20} />
@@ -523,10 +534,10 @@ export default function VenueReportingDashboard() {
                                 <div className="h-[250px]">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <BarChart data={reportData.ageChartData} layout="vertical">
-                                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} horizontal={false} />
-                                            <XAxis type="number" stroke="#94a3b8" fontSize={12} axisLine={false} tickLine={false} />
-                                            <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={12} axisLine={false} tickLine={false} width={80} />
-                                            <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc' }} />
+                                            <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} opacity={0.5} horizontal={false} />
+                                            <XAxis type="number" stroke={chartColors.text} fontSize={12} axisLine={false} tickLine={false} />
+                                            <YAxis dataKey="name" type="category" stroke={chartColors.text} fontSize={12} axisLine={false} tickLine={false} width={80} />
+                                            <Tooltip contentStyle={{ backgroundColor: chartColors.tooltip.background, borderColor: chartColors.tooltip.border, color: '#f8fafc' }} />
                                             <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={24} />
                                         </BarChart>
                                     </ResponsiveContainer>
@@ -552,7 +563,7 @@ export default function VenueReportingDashboard() {
                                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                                 ))}
                                             </Pie>
-                                            <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc' }} />
+                                            <Tooltip contentStyle={{ backgroundColor: chartColors.tooltip.background, borderColor: chartColors.tooltip.border, color: '#f8fafc' }} />
                                             <Legend
                                                 formatter={(value) => <span className="text-slate-300">{value}</span>}
                                                 verticalAlign="bottom"

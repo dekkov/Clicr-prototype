@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { Lock, ArrowRight } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
+import { PasswordInput } from '@/components/ui/password-input';
 
 export default function SetPasswordPage() {
     const router = useRouter();
@@ -44,18 +45,18 @@ export default function SetPasswordPage() {
     };
 
     return (
-        <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 relative overflow-hidden">
+        <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 relative overflow-hidden">
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-primary/10 rounded-full blur-3xl opacity-30 -z-10" />
 
-            <div className="w-full max-w-md bg-slate-900/50 border border-white/10 rounded-3xl p-8 shadow-2xl backdrop-blur-xl">
+            <div className="w-full max-w-md bg-card border border-border rounded-3xl p-8 shadow-2xl backdrop-blur-xl">
                 <div className="text-center mb-8">
                     <div className="flex justify-center mb-6">
                         <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10">
                             <Logo className="w-10 h-10" />
                         </div>
                     </div>
-                    <h1 className="text-2xl font-bold tracking-tight mb-2 text-white">Set your password</h1>
-                    <p className="text-slate-400 text-sm">You were invited to join a team. Create a password to complete your account.</p>
+                    <h1 className="text-2xl font-bold tracking-tight mb-2 text-foreground">Set your password</h1>
+                    <p className="text-foreground/60 text-sm">You were invited to join a team. Create a password to complete your account.</p>
                 </div>
 
                 {error && (
@@ -66,32 +67,30 @@ export default function SetPasswordPage() {
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">New Password</label>
+                        <label className="block text-xs font-bold text-foreground/50 uppercase tracking-widest mb-2">New Password</label>
                         <div className="relative">
-                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                            <input
-                                type="password"
+                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/50 z-10" />
+                            <PasswordInput
                                 required
                                 minLength={8}
                                 value={password}
                                 onChange={e => setPassword(e.target.value)}
                                 placeholder="8+ characters"
-                                className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-11 pr-4 text-white placeholder-slate-600 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                                className="w-full bg-input border border-border rounded-xl py-3 pl-11 pr-10 text-foreground placeholder-foreground/40 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
                             />
                         </div>
                     </div>
                     <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Confirm Password</label>
+                        <label className="block text-xs font-bold text-foreground/50 uppercase tracking-widest mb-2">Confirm Password</label>
                         <div className="relative">
-                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                            <input
-                                type="password"
+                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/50 z-10" />
+                            <PasswordInput
                                 required
                                 minLength={8}
                                 value={confirmPassword}
                                 onChange={e => setConfirmPassword(e.target.value)}
                                 placeholder="Repeat password"
-                                className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-11 pr-4 text-white placeholder-slate-600 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                                className="w-full bg-input border border-border rounded-xl py-3 pl-11 pr-10 text-foreground placeholder-foreground/40 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
                             />
                         </div>
                     </div>
