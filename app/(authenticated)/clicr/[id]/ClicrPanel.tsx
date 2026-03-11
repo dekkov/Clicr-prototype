@@ -62,13 +62,13 @@ const ConfigModalBody = React.memo(function ConfigModalBody({
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white font-bold focus:outline-none focus:border-white transition-colors"
+                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground font-bold focus:outline-none focus:border-foreground transition-colors"
                     placeholder="e.g. Main Entrance"
                 />
             </div>
             <div className="space-y-2">
-                <div className="flex justify-between items-center bg-slate-900/50 p-3 rounded-xl border border-white/5">
-                    <span className="text-sm font-bold text-white">Classify Scans</span>
+                <div className="flex justify-between items-center bg-card p-3 rounded-xl border border-border">
+                    <span className="text-sm font-bold text-foreground">Classify Scans</span>
                     <button type="button" onClick={handleClassifyToggle} className={cn("w-12 h-7 rounded-full relative transition-colors", classifyMode ? "bg-emerald-500" : "bg-slate-700")}>
                         <div className="absolute left-1 top-1 w-5 h-5 bg-white rounded-full shadow-md transition-transform" style={{ transform: classifyMode ? "translateX(20px)" : "translateX(0px)" }} />
                     </button>
@@ -79,13 +79,13 @@ const ConfigModalBody = React.memo(function ConfigModalBody({
                 {snap.hasTapToken ? (
                     <div className="space-y-2">
                         <div className="flex gap-2">
-                            <input readOnly value={`${typeof window !== 'undefined' ? window.location.origin : ''}/tap/${snap.tapToken}`} className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-slate-400 text-xs font-mono focus:outline-none truncate" />
-                            <button type="button" onClick={handleCopy} className="px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-colors shrink-0">{copyFeedback ? 'Copied!' : 'Copy'}</button>
+                            <input readOnly value={`${typeof window !== 'undefined' ? window.location.origin : ''}/tap/${snap.tapToken}`} className="flex-1 bg-background border border-border rounded-xl px-3 py-2.5 text-foreground/60 text-xs font-mono focus:outline-none truncate" />
+                            <button type="button" onClick={handleCopy} className="px-3 py-2.5 rounded-xl bg-card hover:bg-card/80 text-foreground text-xs font-bold transition-colors shrink-0">{copyFeedback ? 'Copied!' : 'Copy'}</button>
                         </div>
-                        <button type="button" onClick={snap.onGenerateToken} className="w-full py-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-slate-500 text-slate-400 text-xs font-bold transition-colors">Regenerate Link</button>
+                        <button type="button" onClick={snap.onGenerateToken} className="w-full py-2.5 rounded-xl bg-background border border-border hover:border-foreground/60 text-foreground/60 text-xs font-bold transition-colors">Regenerate Link</button>
                     </div>
                 ) : (
-                    <button type="button" onClick={snap.onGenerateToken} className="w-full py-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-white text-white text-xs font-bold transition-colors">Generate Link</button>
+                    <button type="button" onClick={snap.onGenerateToken} className="w-full py-2.5 rounded-xl bg-background border border-border hover:border-foreground text-foreground text-xs font-bold transition-colors">Generate Link</button>
                 )}
             </div>
             <div className="grid grid-cols-2 gap-3 pt-2">
@@ -587,7 +587,7 @@ export default function ClicrPanel({
 
     return (
         <div
-            className={cn("flex flex-col min-h-screen bg-[#0a0b0f] text-white", className)}
+            className={cn("flex flex-col min-h-screen bg-background text-foreground", className)}
             onClick={() => { if (!isModalOpenRef.current) inputRef.current?.focus({ preventScroll: true }); }}
         >
             {/* Hidden hardware scanner input */}
@@ -606,7 +606,7 @@ export default function ClicrPanel({
                 <div className="w-[90px] flex justify-start">
                     <button
                         onClick={() => router.back()}
-                        className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors p-1 -ml-1"
+                        className="flex items-center gap-1.5 text-foreground/60 hover:text-foreground transition-colors p-1 -ml-1"
                     >
                         <ArrowLeft className="w-5 h-5" />
                         <span className="text-sm font-medium">Back</span>
@@ -617,7 +617,7 @@ export default function ClicrPanel({
                 <div className="flex-1 text-center">
                     <div className="flex items-center justify-center gap-1.5">
                         <ScanLine className="w-4 h-4 text-indigo-400 shrink-0" />
-                        <h1 className="text-base font-bold text-white leading-none truncate">{clicr.name}</h1>
+                        <h1 className="text-base font-bold text-foreground leading-none truncate">{clicr.name}</h1>
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5 truncate">
                         {currentArea?.name}{venue ? ` · ${venue.name}` : ''}
@@ -643,7 +643,7 @@ export default function ClicrPanel({
                                 onCopy: async () => { try { await navigator.clipboard.writeText(`${window.location.origin}/tap/${clicr.button_config!.tap_token}`); } catch { } },
                             };
                         }}
-                        className="p-1.5 text-slate-500 hover:text-slate-300 hover:bg-slate-800 rounded-lg transition-colors"
+                        className="p-1.5 text-foreground/40 hover:text-foreground/70 hover:bg-card rounded-lg transition-colors"
                     >
                         <Settings2 className="w-4 h-4" />
                     </button>
@@ -672,14 +672,14 @@ export default function ClicrPanel({
 
                 {/* Center: Count / Scan tabs — flex-1 + flex center keeps it always in the middle */}
                 <div className="flex-1 flex justify-center">
-                    <div className="flex bg-slate-900/60 border border-slate-800 rounded-full p-1 gap-1">
+                    <div className="flex bg-card border border-border rounded-full p-1 gap-1">
                         <button
                             onClick={() => setMode('count')}
                             className={cn(
                                 "flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold transition-all",
                                 mode === 'count'
                                     ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20"
-                                    : "text-slate-400 hover:text-white"
+                                    : "text-foreground/60 hover:text-foreground"
                             )}
                         >
                             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -693,7 +693,7 @@ export default function ClicrPanel({
                                 "flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold transition-all",
                                 mode === 'scan'
                                     ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20"
-                                    : "text-slate-400 hover:text-white"
+                                    : "text-foreground/60 hover:text-foreground"
                             )}
                         >
                             <Scan className="w-3.5 h-3.5" />
@@ -721,7 +721,7 @@ export default function ClicrPanel({
                     "rounded-2xl border p-5",
                     isVenueCounter
                         ? "bg-amber-950/20 border-amber-500/20"
-                        : "bg-slate-900/60 border-slate-800/60"
+                        : "bg-card border-border/60"
                 )}>
                     <p className={cn(
                         "text-[10px] font-bold uppercase tracking-[0.2em] text-center mb-1",
@@ -733,7 +733,7 @@ export default function ClicrPanel({
                     <div className="text-center">
                         <span className={cn(
                             "text-8xl font-bold leading-none tabular-nums",
-                            isVenueCounter ? "text-amber-300" : "text-white"
+                            isVenueCounter ? "text-amber-300" : "text-foreground"
                         )}>
                             {totalAreaCount}
                         </span>
@@ -746,7 +746,7 @@ export default function ClicrPanel({
                     </p>
 
                     {/* Progress bar */}
-                    <div className="mt-3 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="mt-3 h-1.5 bg-border rounded-full overflow-hidden">
                         {capacity != null && (
                             <div
                                 className={cn(
@@ -838,10 +838,10 @@ export default function ClicrPanel({
                                 <RotateCcw className={cn("w-4 h-4 transition-transform", turnaroundFlash && "animate-spin")} />
                                 Turnaround
                             </button>
-                            <div className="w-px h-4 bg-slate-800" />
+                            <div className="w-px h-4 bg-border" />
                             <button
                                 onClick={() => handleReset()}
-                                className="flex items-center gap-2 px-4 py-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors text-sm font-medium"
+                                className="flex items-center gap-2 px-4 py-2 rounded-xl text-foreground/60 hover:text-foreground hover:bg-card/60 transition-colors text-sm font-medium"
                             >
                                 <RefreshCw className="w-4 h-4" />
                                 Reset
@@ -864,7 +864,7 @@ export default function ClicrPanel({
                 {mode === 'scan' && (
                     <>
                         {/* Scan Input Mode Selector */}
-                        <div className="flex gap-1.5 bg-slate-900/60 border border-slate-800/60 rounded-2xl p-2">
+                        <div className="flex gap-1.5 bg-card border border-border/60 rounded-2xl p-2">
                             {([
                                 { id: 'CAMERA' as ScanMode, label: 'Camera', Icon: Camera },
                                 { id: 'BLUETOOTH' as ScanMode, label: 'Bluetooth', Icon: Bluetooth },
@@ -877,7 +877,7 @@ export default function ClicrPanel({
                                         'flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all',
                                         scanInputMode === id
                                             ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20'
-                                            : 'text-slate-400 hover:text-white'
+                                            : 'text-foreground/60 hover:text-foreground'
                                     )}
                                 >
                                     <Icon className="w-3.5 h-3.5" />
@@ -887,7 +887,7 @@ export default function ClicrPanel({
                         </div>
 
                         {/* Scanner Components */}
-                        <div className="bg-slate-900/60 border border-slate-800/60 rounded-2xl p-4 min-h-[180px] flex flex-col items-center justify-center">
+                        <div className="bg-card border border-border/60 rounded-2xl p-4 min-h-[180px] flex flex-col items-center justify-center">
                             <CameraScanner
                                 active={scanInputMode === 'CAMERA' && mode === 'scan' && !lastScan}
                                 onScan={handleCameraScan}
@@ -903,7 +903,7 @@ export default function ClicrPanel({
                         </div>
 
                         {/* Manual paste input */}
-                        <div className="bg-slate-900/60 border border-slate-800/60 rounded-2xl p-4 space-y-3">
+                        <div className="bg-card border border-border/60 rounded-2xl p-4 space-y-3">
                             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                                 Paste / Enter Scan Data
                             </p>
@@ -914,7 +914,7 @@ export default function ClicrPanel({
                                     onChange={(e) => setManualScanInput(e.target.value)}
                                     onKeyDown={(e) => { if (e.key === 'Enter') handleManualScanProcess(); }}
                                     placeholder="Paste PDF-417 or ID token..."
-                                    className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 transition-colors placeholder-slate-600"
+                                    className="flex-1 bg-background border border-border rounded-xl px-3 py-2.5 text-foreground text-sm focus:outline-none focus:border-indigo-500 transition-colors placeholder-foreground/30"
                                     onClick={(e) => e.stopPropagation()}
                                 />
                                 <button
@@ -927,9 +927,9 @@ export default function ClicrPanel({
                         </div>
 
                         {/* Add to Count on Accept toggle */}
-                        <div className="bg-slate-900/60 border border-slate-800/60 rounded-2xl px-4 py-3.5 flex items-center justify-between">
+                        <div className="bg-card border border-border/60 rounded-2xl px-4 py-3.5 flex items-center justify-between">
                             <div>
-                                <p className="text-white font-semibold text-sm">Add to Count on Accept</p>
+                                <p className="text-foreground font-semibold text-sm">Add to Count on Accept</p>
                                 <p className="text-slate-500 text-xs mt-0.5">Automatically adjust occupancy when ID accepted</p>
                             </div>
                             <button
@@ -992,9 +992,9 @@ export default function ClicrPanel({
             {/* Config modal */}
             {showConfigModal && (
                 <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-6">
-                    <div className="bg-[#0f1218] border border-slate-800 p-6 rounded-3xl w-full max-w-sm shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
+                    <div className="bg-card border border-border p-6 rounded-3xl w-full max-w-sm shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
                         <div>
-                            <h3 className="text-xl font-bold text-white">Clicr Settings</h3>
+                            <h3 className="text-xl font-bold text-foreground">Clicr Settings</h3>
                             <p className="text-slate-500 text-sm">Customize your counter interface.</p>
                         </div>
                         <ConfigModalBody configRef={configModalRef} />
@@ -1009,21 +1009,21 @@ export default function ClicrPanel({
                         initial={{ x: '100%' }}
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
-                        className="fixed inset-y-0 right-0 w-80 bg-slate-950 border-l border-slate-800 p-6 z-[200] overflow-y-auto shadow-2xl"
+                        className="fixed inset-y-0 right-0 w-80 bg-background border-l border-border p-6 z-[200] overflow-y-auto shadow-2xl"
                     >
                         <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-white font-bold flex items-center gap-2">
+                            <h3 className="text-foreground font-bold flex items-center gap-2">
                                 <Bug className="w-5 h-5 text-indigo-400" />
                                 Sync Debugger
                             </h3>
-                            <button onClick={() => setShowDebug(false)} className="text-slate-500 hover:text-white">
+                            <button onClick={() => setShowDebug(false)} className="text-foreground/60 hover:text-foreground">
                                 <XCircle className="w-5 h-5" />
                             </button>
                         </div>
                         <div className="space-y-6">
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-slate-500 uppercase">Context</label>
-                                <div className="text-xs text-slate-300 font-mono bg-slate-900 p-2 rounded border border-slate-800 break-all">
+                                <div className="text-xs text-foreground/80 font-mono bg-card p-2 rounded border border-border break-all">
                                     UID: {currentUser?.id}<br />
                                     BIZ: {venue?.business_id}<br />
                                     VEN: {venueId}<br />
@@ -1041,14 +1041,14 @@ export default function ClicrPanel({
                                 <label className="text-xs font-bold text-slate-500 uppercase">Realtime Status</label>
                                 <div className="flex items-center gap-2">
                                     <div className={cn("w-2 h-2 rounded-full", isRealtimeConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500")} />
-                                    <span className="text-sm text-white font-mono">{debugAny?.realtimeStatus || 'UNKNOWN'}</span>
+                                    <span className="text-sm text-foreground font-mono">{debugAny?.realtimeStatus || 'UNKNOWN'}</span>
                                 </div>
                             </div>
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-slate-500 uppercase">Last 5 Writes</label>
                                 <div className="space-y-2">
                                     {debugAny?.lastWrites?.map((w: any, i: number) => (
-                                        <div key={i} className="bg-slate-900 p-2 rounded text-[10px] font-mono border border-slate-800">
+                                        <div key={i} className="bg-card p-2 rounded text-[10px] font-mono border border-border">
                                             <div className={cn("font-bold mb-1", w.type === 'RPC_SUCCESS' ? "text-emerald-400" : "text-red-400")}>{w.type}</div>
                                             <div className="text-slate-400 truncate">{JSON.stringify(w.payload)}</div>
                                         </div>
@@ -1060,7 +1060,7 @@ export default function ClicrPanel({
                                 <label className="text-xs font-bold text-slate-500 uppercase">Last 5 Events</label>
                                 <div className="space-y-2">
                                     {debugAny?.lastEvents?.map((e: any, i: number) => (
-                                        <div key={i} className="bg-slate-900 p-2 rounded text-[10px] font-mono border border-slate-800">
+                                        <div key={i} className="bg-card p-2 rounded text-[10px] font-mono border border-border">
                                             <div className="text-indigo-400 font-bold mb-1">{e.eventType}</div>
                                             <div className="text-slate-400 break-all">{JSON.stringify(e.new || e.old)}</div>
                                         </div>
