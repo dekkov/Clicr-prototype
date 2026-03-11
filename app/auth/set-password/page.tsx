@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { Lock, ArrowRight } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
+import { PasswordInput } from '@/components/ui/password-input';
 
 export default function SetPasswordPage() {
     const router = useRouter();
@@ -68,30 +69,28 @@ export default function SetPasswordPage() {
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">New Password</label>
                         <div className="relative">
-                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                            <input
-                                type="password"
+                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 z-10" />
+                            <PasswordInput
                                 required
                                 minLength={8}
                                 value={password}
                                 onChange={e => setPassword(e.target.value)}
                                 placeholder="8+ characters"
-                                className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-11 pr-4 text-white placeholder-slate-600 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                                className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-11 pr-10 text-white placeholder-slate-600 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
                             />
                         </div>
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Confirm Password</label>
                         <div className="relative">
-                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                            <input
-                                type="password"
+                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 z-10" />
+                            <PasswordInput
                                 required
                                 minLength={8}
                                 value={confirmPassword}
                                 onChange={e => setConfirmPassword(e.target.value)}
                                 placeholder="Repeat password"
-                                className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-11 pr-4 text-white placeholder-slate-600 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                                className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-11 pr-10 text-white placeholder-slate-600 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
                             />
                         </div>
                     </div>
