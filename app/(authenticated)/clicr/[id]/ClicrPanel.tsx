@@ -206,6 +206,12 @@ export default function ClicrPanel({
     const globalIn = areaStats?.total_in ?? 0;
     const globalOut = areaStats?.total_out ?? 0;
 
+    const turnaroundCount = isVenueCounter
+        ? (turnarounds || [])
+            .filter(t => t.venue_id === venueId)
+            .reduce((s, t) => s + (t.count ?? 1), 0)
+        : 0;
+
     useEffect(() => {
         if (!venueId || !venue?.business_id) return;
         if (isVenueCounter) {
@@ -718,7 +724,7 @@ export default function ClicrPanel({
 
                 {/* ── OCCUPANCY CARD (always visible) ──────────────── */}
                 <div className={cn(
-                    "rounded-2xl border p-5",
+                    "relative rounded-2xl border p-5",
                     isVenueCounter
                         ? "bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-500/20"
                         : "bg-card border-border/60"
@@ -772,6 +778,35 @@ export default function ClicrPanel({
                             <span className="text-red-400 font-bold text-lg">-{globalOut}</span>
                         </div>
                     </div>
+
+                    {/* Turnaround panel — right side, venue counter only */}
+                    {isVenueCounter && (
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col items-center gap-1.5">
+                            {/* Count */}
+                            <div className="flex flex-col items-center">
+                                <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-purple-500 dark:text-purple-400">Turns</span>
+                                <span className="text-3xl font-bold tabular-nums text-purple-600 dark:text-purple-300 leading-none">{turnaroundCount}</span>
+                            </div>
+                            {/* Button */}
+                            <button
+                                onClick={() => {
+                                    if (navigator.vibrate) navigator.vibrate([30, 40, 30]);
+                                    setTurnaroundFlash(true);
+                                    setTimeout(() => setTurnaroundFlash(false), 600);
+                                    if (venueId) recordTurnaround?.(venueId, '', clicr.id, 1);
+                                }}
+                                className={cn(
+                                    "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all active:scale-[0.92] touch-manipulation border",
+                                    turnaroundFlash
+                                        ? "bg-purple-500/30 text-purple-600 dark:text-purple-200 border-purple-400/50 scale-[1.05]"
+                                        : "bg-purple-100 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-500/30 hover:bg-purple-200 dark:hover:bg-purple-500/20"
+                                )}
+                            >
+                                <RotateCcw className={cn("w-3.5 h-3.5", turnaroundFlash && "animate-spin")} />
+                                Turn
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* ── COUNT MODE ───────────────────────────────────── */}
@@ -817,29 +852,6 @@ export default function ClicrPanel({
                                 </button>
                             )}
                         </div>
-
-                        {/* Turnaround — venue-dedicated clicrs only */}
-                        {isVenueCounter && (
-                            <div className="flex items-center justify-center gap-6 pt-1">
-                                <button
-                                    onClick={() => {
-                                        if (navigator.vibrate) navigator.vibrate([30, 40, 30]);
-                                        setTurnaroundFlash(true);
-                                        setTimeout(() => setTurnaroundFlash(false), 600);
-                                        if (venueId) recordTurnaround?.(venueId, '', clicr.id, 1);
-                                    }}
-                                    className={cn(
-                                        "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all active:scale-[0.92] touch-manipulation",
-                                        turnaroundFlash
-                                            ? "bg-purple-500/30 text-purple-200 scale-[1.05]"
-                                            : "text-muted-foreground hover:text-purple-300 hover:bg-purple-500/10"
-                                    )}
-                                >
-                                    <RotateCcw className={cn("w-4 h-4 transition-transform", turnaroundFlash && "animate-spin")} />
-                                    Turnaround
-                                </button>
-                            </div>
-                        )}
 
                         {/* End Shift */}
                         {activeShiftId && activeShiftAreaId === clicr?.area_id && (

@@ -1115,6 +1115,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             created_by: state.currentUser.id
         };
 
+        isWritingRef.current += 1; // Acquire lock slot — prevents polls overwriting optimistic state
         // Optimistic update
         setState(prev => ({ ...prev, turnarounds: [newTurnaround, ...prev.turnarounds] }));
 
@@ -1123,6 +1124,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             if (!res.ok) console.error("Failed to record turnaround (server error)", res.status);
         } catch (error) {
             console.error("Failed to record turnaround", error);
+        } finally {
+            setTimeout(() => {
+                isWritingRef.current = Math.max(0, isWritingRef.current - 1);
+            }, 500);
         }
     };
 
