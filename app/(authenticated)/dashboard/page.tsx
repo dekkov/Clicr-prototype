@@ -4,7 +4,7 @@ import React, { useMemo, useEffect, useState, useRef } from 'react';
 import { useApp } from '@/lib/store';
 import {
     Users, TrendingUp, ScanLine, ShieldBan,
-    Calendar, RefreshCw, Download, MapPin
+    Calendar, RefreshCw, Download, MapPin, RotateCcw, Timer
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -12,6 +12,9 @@ import { useTheme } from '@/components/providers/theme-provider';
 import { GettingStartedChecklist } from './_components/GettingStartedChecklist';
 import type { CountEvent, Venue } from '@/lib/types';
 import type { HeatmapData } from '@/app/api/reports/heatmap/route';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { useReset } from '@/lib/reset-context';
+import { getAutoDateLabel } from '@/lib/business-day';
 import {
     BarChart, Bar, AreaChart, Area,
     XAxis, YAxis, CartesianGrid, Tooltip,
@@ -508,7 +511,7 @@ export default function DashboardPage() {
         bans,
         turnarounds,
         isLoading,
-        resetCounts,
+        updateBusiness,
     } = useApp();
 
     const chartColors = {
@@ -518,7 +521,15 @@ export default function DashboardPage() {
         tooltipBorder: resolvedTheme === 'dark' ? '#374151' : '#e2e8f0',
     };
 
-    const [isResetting, setIsResetting] = useState(false);
+    const { triggerNightReset, triggerOperationalReset } = useReset();
+
+    const resetTime = activeBusiness?.settings?.reset_time || '05:00';
+    const resetTz = activeBusiness?.settings?.reset_timezone || activeBusiness?.timezone || 'UTC';
+
+    const [showAdvanceConfirm, setShowAdvanceConfirm] = useState(false);
+    const [showOpResetConfirm, setShowOpResetConfirm] = useState(false);
+    const [showSchedulePopover, setShowSchedulePopover] = useState(false);
+    const [advanceDate, setAdvanceDate] = useState(() => getAutoDateLabel(new Date(), resetTime, resetTz));
 
     const [heatmapData, setHeatmapData] = useState<HeatmapData>({});
     const [heatmapLoading, setHeatmapLoading] = useState(true);
@@ -809,29 +820,39 @@ export default function DashboardPage() {
                         <h1 className="text-3xl mb-1">Live Insights</h1>
                         <p className="text-foreground/60 text-sm">Real-time data from all connected devices.</p>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <button className="px-4 py-2 rounded-lg bg-card border border-border hover:bg-muted transition-colors flex items-center gap-2 text-sm text-foreground">
-                            <Calendar className="w-4 h-4" />
-                            <span>Tonight</span>
-                        </button>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {/* Advance to Next Day */}
                         <button
-                            disabled={isResetting}
-                            onClick={async () => {
-                                if (activeBusiness && window.confirm('Reset all data for this business? This will zero all venue, area, and counter occupancy across your entire account. This cannot be undone.')) {
-                                    setIsResetting(true);
-                                    await resetCounts();
-                                    setIsResetting(false);
-                                }
+                            onClick={() => {
+                                setAdvanceDate(getAutoDateLabel(new Date(), resetTime, resetTz));
+                                setShowAdvanceConfirm(true);
                             }}
-                            className={cn(
-                                "px-4 py-2 rounded-lg bg-card border border-border hover:bg-muted transition-colors flex items-center gap-2 text-sm text-foreground",
-                                isResetting && "opacity-50 cursor-not-allowed"
-                            )}
+                            className="px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-white transition-colors flex items-center gap-2 text-sm font-medium"
                         >
-                            <RefreshCw className={cn("w-4 h-4", isResetting && "animate-spin")} />
-                            <span>Reset Data</span>
+                            <RotateCcw className="w-4 h-4" />
+                            Advance to Next Day
                         </button>
-                        <button className="px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-white transition-colors flex items-center gap-2 text-sm">
+
+                        {/* Operational Reset */}
+                        <button
+                            onClick={() => setShowOpResetConfirm(true)}
+                            className="px-4 py-2 rounded-lg bg-card border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 text-sm"
+                        >
+                            <RefreshCw className="w-4 h-4" />
+                            Operational Reset
+                        </button>
+
+                        {/* Auto-Reset Schedule */}
+                        <button
+                            onClick={() => setShowSchedulePopover(prev => !prev)}
+                            className="px-4 py-2 rounded-lg bg-card border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 text-sm"
+                        >
+                            <Timer className="w-4 h-4" />
+                            Auto-Reset
+                        </button>
+
+                        {/* Export */}
+                        <button className="px-4 py-2 rounded-lg bg-card border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 text-sm">
                             <Download className="w-4 h-4" />
                             <span>Export</span>
                         </button>
@@ -843,7 +864,7 @@ export default function DashboardPage() {
             <GettingStartedChecklist />
 
             {/* KPI Cards - Design */}
-            <div className={cn("grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6 transition-opacity duration-300", isResetting && "opacity-40 pointer-events-none")}>
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
                 <KpiCard
                     label="Live Occupancy"
                     value={liveOccupancy}
@@ -878,7 +899,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Age Distribution + Live Event Log - Design */}
-            <div className={cn("grid grid-cols-1 lg:grid-cols-3 gap-6 transition-opacity duration-300", isResetting && "opacity-40 pointer-events-none")}>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Age Distribution */}
                 <div className="lg:col-span-2 bg-card border border-border rounded-xl p-6">
                     <div className="flex items-center gap-3 mb-6">
@@ -971,6 +992,95 @@ export default function DashboardPage() {
 
             {/* Live Venues */}
             <LiveVenues data={liveVenuesData} onViewAll={() => router.push('/areas')} />
+
+            {/* Auto-Reset Schedule Popover */}
+            {showSchedulePopover && (
+                <div className="bg-card border border-border rounded-xl p-4 shadow-lg">
+                    <h4 className="text-sm font-bold text-foreground mb-3">Auto-Reset Schedule</h4>
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Enabled</span>
+                            <button
+                                onClick={() => {
+                                    const newRule = activeBusiness?.settings?.reset_rule === 'SCHEDULED' ? 'MANUAL' : 'SCHEDULED';
+                                    updateBusiness({ settings: { ...activeBusiness!.settings, reset_rule: newRule } });
+                                }}
+                                className={cn(
+                                    "relative w-11 h-6 rounded-full transition-colors",
+                                    activeBusiness?.settings?.reset_rule === 'SCHEDULED' ? "bg-primary" : "bg-muted"
+                                )}
+                            >
+                                <span className={cn(
+                                    "absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform",
+                                    activeBusiness?.settings?.reset_rule === 'SCHEDULED' && "translate-x-5"
+                                )} />
+                            </button>
+                        </div>
+                        {activeBusiness?.settings?.reset_rule === 'SCHEDULED' && (
+                            <>
+                                <div>
+                                    <label className="text-xs text-muted-foreground mb-1 block">Time</label>
+                                    <input
+                                        type="time"
+                                        value={activeBusiness.settings.reset_time || '05:00'}
+                                        onChange={(e) => updateBusiness({ settings: { ...activeBusiness.settings, reset_time: e.target.value } })}
+                                        className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-foreground text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-muted-foreground mb-1 block">Timezone</label>
+                                    <select
+                                        value={activeBusiness.settings.reset_timezone || activeBusiness.timezone || 'UTC'}
+                                        onChange={(e) => updateBusiness({ settings: { ...activeBusiness.settings, reset_timezone: e.target.value } })}
+                                        className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-foreground text-sm"
+                                    >
+                                        {['America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'America/Phoenix', 'Pacific/Honolulu', 'America/Anchorage', 'Europe/London', 'Europe/Paris', 'Asia/Tokyo', 'Australia/Sydney', 'UTC'].map(tz => (
+                                            <option key={tz} value={tz}>{tz.replace(/_/g, ' ')}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Advance to Next Day Modal */}
+            <ConfirmModal
+                open={showAdvanceConfirm}
+                title="Advance to Next Day"
+                message="Save today's metrics and zero all counts."
+                confirmLabel="Save & Reset"
+                onConfirm={async () => {
+                    setShowAdvanceConfirm(false);
+                    await triggerNightReset(advanceDate);
+                }}
+                onCancel={() => setShowAdvanceConfirm(false)}
+            >
+                <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">Saving log for:</label>
+                    <input
+                        type="date"
+                        value={advanceDate}
+                        onChange={(e) => setAdvanceDate(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-foreground text-sm"
+                    />
+                </div>
+            </ConfirmModal>
+
+            {/* Operational Reset Modal */}
+            <ConfirmModal
+                open={showOpResetConfirm}
+                title="Operational Reset"
+                message="This will zero all counts without saving any data. This cannot be undone."
+                confirmLabel="Reset Without Saving"
+                destructive
+                onConfirm={async () => {
+                    setShowOpResetConfirm(false);
+                    await triggerOperationalReset();
+                }}
+                onCancel={() => setShowOpResetConfirm(false)}
+            />
         </div>
     );
 }
