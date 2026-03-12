@@ -38,6 +38,7 @@ import type {
     BanRecord,
     ScanRecord,
 } from './DataClient';
+import type { NightLog } from '@/lib/types';
 
 // ─── Internal State ────────────────────────────────────────────────────
 
@@ -336,7 +337,7 @@ export class LocalAdapter implements DataClient {
         return { totalIn, totalOut, net: totalIn - totalOut };
     }
 
-    async resetCounts(businessId: string): Promise<ResetResult> {
+    async resetCounts(businessId: string, resetType: 'NIGHT_AUTO' | 'NIGHT_MANUAL' | 'OPERATIONAL' = 'OPERATIONAL'): Promise<ResetResult> {
         const resetAt = nowISO();
         let count = 0;
 
@@ -357,7 +358,12 @@ export class LocalAdapter implements DataClient {
         this.state.business = { ...this.state.business, last_reset_at: resetAt };
 
         this.saveState();
-        return { areasReset: count, resetAt };
+        return { areasReset: count, resetAt, success: true };
+    }
+
+    async getNightLogs(businessId: string, date: string): Promise<NightLog[]> {
+        // TODO: Full implementation in Task 5 — for now return empty array
+        return [];
     }
 
     // ── SCANNING ────────────────────────────────────────────────────────

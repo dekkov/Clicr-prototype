@@ -40,6 +40,7 @@ import type {
     DemographicBreakdown,
     EventLogEntry,
 } from './DataClient';
+import type { NightLog } from '@/lib/types';
 
 // import { createClient } from '@supabase/supabase-js';
 // const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
@@ -180,9 +181,14 @@ export class SupabaseAdapter implements DataClient {
         throw new Error('SupabaseAdapter.getTrafficTotals: Not yet implemented');
     }
 
-    async resetCounts(businessId: string): Promise<ResetResult> {
-        // TODO: Call /api/rpc/reset with { business_id: businessId }
+    async resetCounts(businessId: string, resetType: 'NIGHT_AUTO' | 'NIGHT_MANUAL' | 'OPERATIONAL' = 'OPERATIONAL'): Promise<ResetResult> {
+        // TODO: Call /api/rpc/reset with { business_id: businessId, reset_type: resetType }
         throw new Error('SupabaseAdapter.resetCounts: Not yet implemented');
+    }
+
+    async getNightLogs(businessId: string, date: string): Promise<NightLog[]> {
+        // TODO: Query night_logs table filtered by business_id and date
+        throw new Error('SupabaseAdapter.getNightLogs: Not yet implemented');
     }
 
     // ── SCANNING ────────────────────────────────────────────────────────
