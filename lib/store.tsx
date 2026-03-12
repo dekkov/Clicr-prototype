@@ -87,7 +87,7 @@ type AppContextType = AppState & {
 
     // Traffic & Turnarounds
     recordTurnaround: (venueId: string, areaId: string, deviceId: string, count: number) => Promise<void>;
-    refreshTrafficStats: (venueId: string, areaId?: string) => Promise<void>;
+    refreshTrafficStats: (venueId: string, areaId?: string, deviceId?: string) => Promise<void>;
 
     // Device Rename
     renameDevice?: (deviceId: string, name: string) => Promise<void>;
@@ -453,15 +453,32 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 : `venue:${bizId}:${data.venue_id}`;
             const prevTraffic = prev.areaTraffic[trafficKey] ?? { total_in: 0, total_out: 0, net_delta: 0, event_count: 0 };
             const absDelta = Math.abs(data.delta);
-            const updatedTraffic = {
+            const trafficDelta = {
+                total_in: (data.flow_type === 'IN' ? absDelta : 0),
+                total_out: (data.flow_type === 'OUT' ? absDelta : 0),
+                net_delta: data.delta,
+                event_count: 1,
+            };
+            const updatedTraffic: Record<string, { total_in: number; total_out: number; net_delta: number; event_count: number }> = {
                 ...prev.areaTraffic,
                 [trafficKey]: {
-                    total_in: prevTraffic.total_in + (data.flow_type === 'IN' ? absDelta : 0),
-                    total_out: prevTraffic.total_out + (data.flow_type === 'OUT' ? absDelta : 0),
-                    net_delta: prevTraffic.net_delta + data.delta,
-                    event_count: prevTraffic.event_count + 1,
+                    total_in: prevTraffic.total_in + trafficDelta.total_in,
+                    total_out: prevTraffic.total_out + trafficDelta.total_out,
+                    net_delta: prevTraffic.net_delta + trafficDelta.net_delta,
+                    event_count: prevTraffic.event_count + trafficDelta.event_count,
                 }
             };
+            // Also track per-device traffic for venue counters
+            if (data.clicr_id && !data.area_id) {
+                const deviceKey = `device:${bizId}:${data.clicr_id}`;
+                const prevDevice = prev.areaTraffic[deviceKey] ?? { total_in: 0, total_out: 0, net_delta: 0, event_count: 0 };
+                updatedTraffic[deviceKey] = {
+                    total_in: prevDevice.total_in + trafficDelta.total_in,
+                    total_out: prevDevice.total_out + trafficDelta.total_out,
+                    net_delta: prevDevice.net_delta + trafficDelta.net_delta,
+                    event_count: prevDevice.event_count + trafficDelta.event_count,
+                };
+            }
 
             if (data.area_id) {
                 // AREA-LEVEL: optimistically update area occupancy
@@ -517,7 +534,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             // then refresh traffic totals so TOTAL IN/OUT reflect the new event.
             setTimeout(() => {
                 isWritingRef.current = Math.max(0, isWritingRef.current - 1);
-                refreshTrafficStats(data.venue_id, data.area_id || undefined);
+                refreshTrafficStats(data.venue_id, data.area_id || undefined, data.clicr_id || undefined);
             }, 500);
         }
     };
@@ -1091,13 +1108,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
-    const refreshTrafficStats = async (venueId: string, areaId?: string) => {
+    const refreshTrafficStats = async (venueId: string, areaId?: string, deviceId?: string) => {
         if (!state.business?.id) return;
         // Skip if other writes are still in-flight — optimistic values are more current
         if (isWritingRef.current > 0) return;
-        const scopeKey = areaId
-            ? `area:${state.business.id}:${venueId}:${areaId}`
-            : `venue:${state.business.id}:${venueId}`;
+
+        // For venue counters with a deviceId, refresh per-device stats
+        const isDeviceScope = !areaId && deviceId;
+        const scopeKey = isDeviceScope
+            ? `device:${state.business.id}:${deviceId}`
+            : areaId
+                ? `area:${state.business.id}:${venueId}:${areaId}`
+                : `venue:${state.business.id}:${venueId}`;
         try {
             const res = await fetch('/api/rpc/traffic', {
                 method: 'POST',
@@ -1106,6 +1128,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                     business_id: state.business.id,
                     venue_id: venueId,
                     area_id: areaId,
+                    device_id: isDeviceScope ? deviceId : undefined,
                     start_ts: new Date(state.trafficSessionStart).toISOString()
                 })
             });

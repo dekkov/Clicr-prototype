@@ -9,7 +9,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { business_id, venue_id, area_id, start_ts, end_ts } = await request.json();
+        const { business_id, venue_id, area_id, device_id, start_ts, end_ts } = await request.json();
 
         if (!business_id) {
             return NextResponse.json({ error: 'Business ID required' }, { status: 400 });
@@ -63,6 +63,11 @@ export async function POST(request: Request) {
                 .gte('created_at', start)
                 .lte('created_at', end);
 
+            // Per-device filtering — each venue counter clicr tracks its own in/out
+            if (device_id) {
+                q = q.eq('device_id', device_id);
+            }
+
             const { data: rows, error: qErr } = await q;
             if (qErr) throw new Error(qErr.message);
 
@@ -74,7 +79,7 @@ export async function POST(request: Request) {
                 net_delta: totalIn - totalOut,
                 event_count: (rows ?? []).length,
                 period: { start, end },
-                source: 'venue_direct'
+                source: device_id ? 'venue_device' : 'venue_direct'
             });
         }
 

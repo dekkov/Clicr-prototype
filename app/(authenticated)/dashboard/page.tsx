@@ -500,6 +500,18 @@ function buildOccupancyOverTime(events: CountEvent[]) {
     });
 }
 
+/** Compute true peak by replaying events chronologically */
+function computePeakOccupancy(events: CountEvent[]): number {
+    const sorted = [...events].sort((a, b) => a.timestamp - b.timestamp);
+    let running = 0;
+    let peak = 0;
+    for (const e of sorted) {
+        running = Math.max(0, running + e.delta);
+        if (running > peak) peak = running;
+    }
+    return peak;
+}
+
 // --- Helpers ---
 
 function getTodayStart(): number {
@@ -727,8 +739,8 @@ export default function DashboardPage() {
     const hourlyData = useMemo(() => buildHourlyData(todayEvents), [todayEvents]);
     const occupancyData = useMemo(() => buildOccupancyOverTime(todayEvents), [todayEvents]);
     const peakOccupancyValue = useMemo(
-        () => Math.max(0, ...occupancyData.map(d => d.occupancy)),
-        [occupancyData]
+        () => Math.max(computePeakOccupancy(todayEvents), liveOccupancy),
+        [todayEvents, liveOccupancy]
     );
 
     const areaMap = useMemo(() => {

@@ -206,7 +206,7 @@ export default function ClicrPanel({
 
     const scopeKey = venue?.business_id && venueId
         ? isVenueCounter
-            ? `venue:${venue.business_id}:${venueId}`
+            ? `device:${venue.business_id}:${clicr?.id}`
             : clicr?.area_id
                 ? `area:${venue.business_id}:${venueId}:${clicr.area_id}`
                 : null
@@ -224,11 +224,11 @@ export default function ClicrPanel({
     useEffect(() => {
         if (!venueId || !venue?.business_id) return;
         if (isVenueCounter) {
-            refreshTrafficStats?.(venueId);
+            refreshTrafficStats?.(venueId, undefined, clicr?.id);
         } else if (clicr?.area_id) {
             refreshTrafficStats?.(venueId, clicr.area_id);
         }
-    }, [isVenueCounter, venueId, venue?.business_id, clicr?.area_id, events]);
+    }, [isVenueCounter, venueId, venue?.business_id, clicr?.area_id, clicr?.id, events]);
 
     // Capacity
     const capacity = isVenueCounter
