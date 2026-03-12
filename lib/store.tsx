@@ -446,11 +446,29 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 return c;
             });
 
+            // Optimistically update areaTraffic totals
+            const bizId = prev.business?.id ?? '';
+            const trafficKey = data.area_id
+                ? `area:${bizId}:${data.venue_id}:${data.area_id}`
+                : `venue:${bizId}:${data.venue_id}`;
+            const prevTraffic = prev.areaTraffic[trafficKey] ?? { total_in: 0, total_out: 0, net_delta: 0, event_count: 0 };
+            const absDelta = Math.abs(data.delta);
+            const updatedTraffic = {
+                ...prev.areaTraffic,
+                [trafficKey]: {
+                    total_in: prevTraffic.total_in + (data.flow_type === 'IN' ? absDelta : 0),
+                    total_out: prevTraffic.total_out + (data.flow_type === 'OUT' ? absDelta : 0),
+                    net_delta: prevTraffic.net_delta + data.delta,
+                    event_count: prevTraffic.event_count + 1,
+                }
+            };
+
             if (data.area_id) {
                 // AREA-LEVEL: optimistically update area occupancy
                 return {
                     ...prev,
                     clicrs: updatedClicrs,
+                    areaTraffic: updatedTraffic,
                     areas: prev.areas.map(a => {
                         if (a.id === data.area_id) {
                             const current = a.current_occupancy ?? prev.clicrs.filter(c => c.area_id === a.id).reduce((sum, c) => sum + c.current_count, 0);
@@ -465,6 +483,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 return {
                     ...prev,
                     clicrs: updatedClicrs,
+                    areaTraffic: updatedTraffic,
                     venues: prev.venues.map(v => {
                         if (v.id === data.venue_id) {
                             return { ...v, current_occupancy: Math.max(0, (v.current_occupancy ?? 0) + data.delta) };
@@ -835,6 +854,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const deleteClicr = async (clicrId: string): Promise<{ success: boolean, error?: string }> => {
         // Optimistic - remove from list
         const originalClicr = state.clicrs.find(c => c.id === clicrId);
+        isWritingRef.current += 1;
         setState(prev => ({
             ...prev,
             clicrs: prev.clicrs.filter(c => c.id !== clicrId)
@@ -842,6 +862,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
         try {
             const res = await authFetch({ action: 'DELETE_CLICR', payload: { id: clicrId } });
+            isWritingRef.current = Math.max(0, isWritingRef.current - 1);
             if (res.ok) {
                 const updatedDB = await res.json();
                 setState(prev => ({ ...prev, ...updatedDB }));
@@ -854,6 +875,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 return { success: false, error: errData.error || res.statusText };
             }
         } catch (e: any) {
+            isWritingRef.current = Math.max(0, isWritingRef.current - 1);
             console.error("Delete Clicr Network Error", e);
             if (originalClicr) setState(prev => ({ ...prev, clicrs: [...prev.clicrs, originalClicr] }));
             return { success: false, error: e.message };
@@ -862,10 +884,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     const addClicr = async (clicr: Clicr): Promise<{ success: boolean, error?: string }> => {
         const tempId = clicr.id;
+        isWritingRef.current += 1;
         setState(prev => ({ ...prev, clicrs: [...prev.clicrs, clicr] }));
 
         try {
             const res = await authFetch({ action: 'ADD_CLICR', payload: clicr });
+            isWritingRef.current = Math.max(0, isWritingRef.current - 1);
             if (res.ok) {
                 return { success: true };
             } else {
@@ -875,6 +899,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 return { success: false, error: errData.error || res.statusText };
             }
         } catch (error: any) {
+            isWritingRef.current = Math.max(0, isWritingRef.current - 1);
             console.error("Failed to add clicr network error", error);
             // Revert
             setState(prev => ({ ...prev, clicrs: prev.clicrs.filter(c => c.id !== tempId) }));
@@ -884,17 +909,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     const updateClicr = async (clicr: Clicr) => {
         // Optimistic update — applies name/config change immediately
+        isWritingRef.current += 1;
         setState(prev => ({ ...prev, clicrs: prev.clicrs.map(c => c.id === clicr.id ? clicr : c) }));
         try {
             const res = await authFetch({ action: 'UPDATE_CLICR', payload: clicr });
+            isWritingRef.current = Math.max(0, isWritingRef.current - 1);
             if (!res.ok) {
                 console.error("UPDATE_CLICR failed (server error)", res.status);
-                // Intentionally NOT reverting — optimistic state is user's intent.
-                // The 2-second polling interval will reconcile if needed.
             }
-            // Intentionally NOT spreading updatedDB — the optimistic update is correct
-            // and the 2-second polling interval will confirm server truth.
-        } catch (error) { console.error("Failed to update clicr", error); }
+        } catch (error) {
+            isWritingRef.current = Math.max(0, isWritingRef.current - 1);
+            console.error("Failed to update clicr", error);
+        }
     };
 
     const addDevice = async (device: Device) => {
@@ -1067,6 +1093,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     const refreshTrafficStats = async (venueId: string, areaId?: string) => {
         if (!state.business?.id) return;
+        // Skip if other writes are still in-flight — optimistic values are more current
+        if (isWritingRef.current > 0) return;
         const scopeKey = areaId
             ? `area:${state.business.id}:${venueId}:${areaId}`
             : `venue:${state.business.id}:${venueId}`;
@@ -1082,19 +1110,29 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 })
             });
             if (res.ok) {
+                // Re-check: new writes may have started during our fetch
+                if (isWritingRef.current > 0) return;
                 const data = await res.json();
-                setState(prev => ({
-                    ...prev,
-                    areaTraffic: {
-                        ...prev.areaTraffic,
-                        [scopeKey]: {
-                            total_in: data.total_in,
-                            total_out: data.total_out,
-                            net_delta: data.net_delta,
-                            event_count: data.event_count
-                        }
+                setState(prev => {
+                    const current = prev.areaTraffic[scopeKey];
+                    // Never regress — traffic within a session can only go up.
+                    // Optimistic values may be ahead of the server; don't overwrite with stale data.
+                    if (current && (data.total_in < current.total_in || data.total_out < current.total_out)) {
+                        return prev;
                     }
-                }));
+                    return {
+                        ...prev,
+                        areaTraffic: {
+                            ...prev.areaTraffic,
+                            [scopeKey]: {
+                                total_in: data.total_in,
+                                total_out: data.total_out,
+                                net_delta: data.net_delta,
+                                event_count: data.event_count
+                            }
+                        }
+                    };
+                });
             }
         } catch (error) {
             console.error("Failed to refresh traffic stats", error);

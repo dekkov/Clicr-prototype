@@ -233,7 +233,7 @@ export default function ClicrPanel({
     // Capacity
     const capacity = isVenueCounter
         ? (currentVenue?.total_capacity ?? currentVenue?.default_capacity_total ?? null)
-        : (currentArea?.capacity_max ?? null);
+        : (currentArea?.capacity_max ?? currentArea?.default_capacity ?? currentArea?.capacity_limit ?? null);
     const capacityPercent = capacity && capacity > 0
         ? Math.min(100, Math.round((totalAreaCount / capacity) * 100))
         : null;
@@ -813,7 +813,7 @@ export default function ClicrPanel({
                                 <button
                                     key={`in-${label.id}`}
                                     onClick={() => handleIn(label.id)}
-                                    className="relative overflow-hidden bg-gradient-to-br from-emerald-500 to-emerald-700 hover:from-emerald-400 hover:to-emerald-600 active:scale-[0.97] transition-all rounded-2xl border-2 border-emerald-400/40 shadow-lg shadow-emerald-500/20 py-8 flex flex-col items-center justify-center touch-manipulation"
+                                    className="relative overflow-hidden bg-gradient-to-br from-green-500 to-green-700 hover:from-green-400 hover:to-green-600 active:scale-[0.97] transition-all rounded-2xl border-2 border-green-400/40 shadow-lg shadow-green-500/20 py-8 flex flex-col items-center justify-center touch-manipulation"
                                 >
                                     <span className="text-4xl font-bold text-foreground leading-none drop-shadow">+</span>
                                     <span className="text-foreground font-bold tracking-[0.2em] text-sm mt-1 uppercase">{label.label}</span>
@@ -824,10 +824,10 @@ export default function ClicrPanel({
                                 <button
                                     key={`out-${label.id}`}
                                     onClick={() => handleOut(label.id)}
-                                    className="relative overflow-hidden bg-gradient-to-br from-slate-700 to-slate-900 hover:from-slate-600 hover:to-slate-800 active:scale-[0.97] transition-all rounded-2xl border-2 border-slate-600/40 shadow-lg shadow-slate-900/20 py-5 flex items-center justify-center touch-manipulation"
+                                    className="relative overflow-hidden bg-gradient-to-br from-red-500 to-red-700 hover:from-red-400 hover:to-red-600 active:scale-[0.97] transition-all rounded-2xl border-2 border-red-400/40 shadow-lg shadow-red-500/20 py-8 flex flex-col items-center justify-center touch-manipulation"
                                 >
-                                    <span className="text-3xl font-bold text-foreground/80 leading-none">−</span>
-                                    <span className="text-foreground/60 font-bold tracking-[0.2em] text-xs ml-2 uppercase">{label.label}</span>
+                                    <span className="text-4xl font-bold text-foreground leading-none drop-shadow">−</span>
+                                    <span className="text-foreground font-bold tracking-[0.2em] text-sm mt-1 uppercase">{label.label}</span>
                                 </button>
                             ))}
                         </div>

@@ -275,22 +275,22 @@ export default function AreaDetailPage() {
                                     <p className="text-[10px] text-muted-foreground mt-1">Unique identifier for hardware or keyboard mapping.</p>
                                 </div>
 
-                                <div>
-                                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1">Counter Labels</label>
-                                    <div className="flex flex-wrap gap-2 mb-2">
-                                        {newClicrLabels.map((lbl, i) => (
-                                            <span key={i} className="flex items-center gap-1 px-2 py-1 bg-muted rounded-full text-xs text-foreground">
-                                                {lbl}
-                                                {newClicrLabels.length > 1 && (
-                                                    <button type="button" onClick={() => setNewClicrLabels(prev => prev.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-red-400 ml-0.5">&times;</button>
-                                                )}
-                                            </span>
-                                        ))}
-                                    </div>
-                                    <button type="button" onClick={() => {
-                                        const name = prompt('Label name:');
-                                        if (name?.trim()) setNewClicrLabels(prev => [...prev, name.trim()]);
-                                    }} className="text-xs text-primary hover:text-primary/80">+ Add label</button>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">Counter Labels</label>
+                                    {newClicrLabels.map((lbl, i) => (
+                                        <div key={i} className="flex items-center gap-2">
+                                            <input value={lbl} onChange={e => setNewClicrLabels(prev => prev.map((l, j) => j === i ? e.target.value : l))}
+                                                className="flex-1 bg-background border border-border rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary" placeholder="Label name" />
+                                            {newClicrLabels.length > 1 && (
+                                                <button type="button" onClick={() => setNewClicrLabels(prev => prev.filter((_, j) => j !== i))}
+                                                    className="text-red-400 hover:text-red-300">
+                                                    <X className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                    <button type="button" onClick={() => setNewClicrLabels(prev => [...prev, ''])}
+                                        className="text-xs text-primary hover:text-primary/80">+ Add label</button>
                                 </div>
                             </div>
 

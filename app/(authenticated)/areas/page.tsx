@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/store';
 import { Area, AreaType, CountingMode, ShiftMode, Role } from '@/lib/types';
-import { Search, RefreshCw, ArrowUp, ArrowDown, Plus, ChevronDown, Play, Square, Settings2, Layers, LayoutGrid } from 'lucide-react';
+import { Search, RefreshCw, ArrowUp, ArrowDown, Plus, ChevronDown, Play, Square, Settings2, Layers, LayoutGrid, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { canEditVenuesAndAreas, canStartShift, canAddClicr, hasMinRole } from '@/lib/permissions';
@@ -288,8 +288,8 @@ export default function AreasPage() {
                     No areas found.
                 </div>
             ) : (
-                venueGroups.map(({ venue, areas: venueAreas }) => (
-                    <section key={venue.id} className="space-y-8">
+                venueGroups.map(({ venue, areas: venueAreas }, vi) => (
+                    <section key={venue.id} className={`space-y-8 ${vi > 0 ? 'mt-12' : ''}`}>
                         <div className="mb-4">
                             <span className="text-xs font-bold uppercase tracking-widest text-sky-400 bg-sky-500/10 border border-sky-200 dark:border-sky-500/20 px-3 py-1.5 rounded-full">Venue — {venue.name}</span>
                         </div>
@@ -363,13 +363,24 @@ export default function AreasPage() {
                                                         </div>
 
                                                         <div className="mb-4">
-                                                            <div className="text-4xl mb-2">{liveOcc}</div>
+                                                            <div className="flex items-center gap-3 mb-2">
+                                                                <div className={cn("text-4xl", pct >= 100 ? "text-red-400" : pct >= 85 ? "text-amber-400" : "text-foreground")}>{liveOcc}</div>
+                                                                {capacity > 0 && pct >= 100 && (
+                                                                    <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider bg-red-500/20 text-red-400 animate-pulse">At Capacity</span>
+                                                                )}
+                                                                {capacity > 0 && pct >= 85 && pct < 100 && (
+                                                                    <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider bg-amber-500/20 text-amber-400">Near Capacity</span>
+                                                                )}
+                                                            </div>
                                                             <div className="text-sm text-muted-foreground mb-4">
                                                                 of {capacity || '—'} · {pct}% full
                                                             </div>
                                                             <div className="h-2 bg-muted rounded-full overflow-hidden">
                                                                 <div
-                                                                    className="h-full bg-emerald-500 rounded-full transition-all"
+                                                                    className={cn(
+                                                                        "h-full rounded-full transition-all",
+                                                                        pct >= 100 ? "bg-red-500" : pct >= 85 ? "bg-amber-500" : "bg-emerald-500"
+                                                                    )}
                                                                     style={{ width: `${Math.min(pct, 100)}%` }}
                                                                 />
                                                             </div>
@@ -674,20 +685,20 @@ export default function AreasPage() {
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-muted-foreground">Counter Labels</label>
-                                    <div className="flex flex-wrap gap-2 mb-2">
-                                        {newClicrLabels.map((lbl, i) => (
-                                            <span key={i} className="flex items-center gap-1 px-2 py-1 bg-muted rounded-full text-xs text-foreground">
-                                                {lbl}
-                                                {newClicrLabels.length > 1 && (
-                                                    <button type="button" onClick={() => setNewClicrLabels(prev => prev.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-red-400 ml-0.5">&times;</button>
-                                                )}
-                                            </span>
-                                        ))}
-                                    </div>
-                                    <button type="button" onClick={() => {
-                                        const name = prompt('Label name:');
-                                        if (name?.trim()) setNewClicrLabels(prev => [...prev, name.trim()]);
-                                    }} className="text-xs text-primary hover:text-primary/80">+ Add label</button>
+                                    {newClicrLabels.map((lbl, i) => (
+                                        <div key={i} className="flex items-center gap-2">
+                                            <input value={lbl} onChange={e => setNewClicrLabels(prev => prev.map((l, j) => j === i ? e.target.value : l))}
+                                                className="flex-1 bg-background border border-border rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50" placeholder="Label name" />
+                                            {newClicrLabels.length > 1 && (
+                                                <button type="button" onClick={() => setNewClicrLabels(prev => prev.filter((_, j) => j !== i))}
+                                                    className="text-red-400 hover:text-red-300">
+                                                    <X className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                    <button type="button" onClick={() => setNewClicrLabels(prev => [...prev, ''])}
+                                        className="text-xs text-primary hover:text-primary/80">+ Add label</button>
                                 </div>
                                 <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
                                     <button

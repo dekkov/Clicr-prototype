@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useApp } from '@/lib/store';
-import { LayoutGrid, Sparkles, ScanLine, ChevronRight, Plus, Wifi } from 'lucide-react';
+import { LayoutGrid, Sparkles, ScanLine, ChevronRight, Plus, Wifi, X } from 'lucide-react';
 import { BoardSelectPanel } from '@/components/board/BoardSelectPanel';
 import { listBoardViews } from '@/app/actions/board';
 import { canAddClicr } from '@/lib/permissions';
@@ -154,22 +154,22 @@ export default function ClicrListPage() {
                                     placeholder="e.g. Front Door"
                                     className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground text-sm" />
                             </div>
-                            <div>
-                                <label className="text-xs font-medium text-muted-foreground mb-1 block">Counter Labels</label>
-                                <div className="flex flex-wrap gap-2 mb-2">
-                                    {newClicrLabels.map((lbl, i) => (
-                                        <span key={i} className="flex items-center gap-1 px-2 py-1 bg-muted rounded-full text-xs text-foreground">
-                                            {lbl}
-                                            {newClicrLabels.length > 1 && (
-                                                <button type="button" onClick={() => setNewClicrLabels(prev => prev.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-red-400 ml-0.5">&times;</button>
-                                            )}
-                                        </span>
-                                    ))}
-                                </div>
-                                <button type="button" onClick={() => {
-                                    const name = prompt('Label name:');
-                                    if (name?.trim()) setNewClicrLabels(prev => [...prev, name.trim()]);
-                                }} className="text-xs text-primary hover:text-primary/80">+ Add label</button>
+                            <div className="space-y-2">
+                                <label className="text-xs font-medium text-muted-foreground block">Counter Labels</label>
+                                {newClicrLabels.map((lbl, i) => (
+                                    <div key={i} className="flex items-center gap-2">
+                                        <input value={lbl} onChange={e => setNewClicrLabels(prev => prev.map((l, j) => j === i ? e.target.value : l))}
+                                            className="flex-1 bg-background border border-border rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary" placeholder="Label name" />
+                                        {newClicrLabels.length > 1 && (
+                                            <button type="button" onClick={() => setNewClicrLabels(prev => prev.filter((_, j) => j !== i))}
+                                                className="text-red-400 hover:text-red-300">
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
+                                <button type="button" onClick={() => setNewClicrLabels(prev => [...prev, ''])}
+                                    className="text-xs text-primary hover:text-primary/80">+ Add label</button>
                             </div>
                         </div>
                         <div className="flex gap-3 pt-2">

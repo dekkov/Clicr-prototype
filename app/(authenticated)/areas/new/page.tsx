@@ -56,7 +56,7 @@ export default function NewAreaPage() {
 
     const handleSaveClicr = (id: string) => {
         const trimmed = editingClicrName.trim();
-        if (trimmed) setCreatedClicrs(prev => prev.map(c => c.id === id ? { ...c, name: trimmed } : c));
+        if (trimmed) setCreatedClicrs(prev => prev.map(c => c.id === id ? { ...c, name: trimmed, counter_labels: c.counter_labels } : c));
         setEditingClicrId(null);
     };
 
@@ -341,11 +341,31 @@ export default function NewAreaPage() {
                                             </div>
                                         </div>
                                     ) : (
-                                        <div className="flex flex-col gap-2 w-full">
-                                            <input autoFocus type="text" value={editingClicrName}
-                                                onChange={e => setEditingClicrName(e.target.value)}
-                                                onKeyDown={e => { if (e.key === 'Escape') setEditingClicrId(null); }}
-                                                className="flex-1 bg-card border border-primary/50 rounded-lg px-3 py-1.5 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
+                                        <div className="flex flex-col gap-3 w-full">
+                                            <div>
+                                                <label className="text-xs font-medium text-muted-foreground mb-1 block">Counter Name</label>
+                                                <input autoFocus type="text" value={editingClicrName}
+                                                    onChange={e => setEditingClicrName(e.target.value)}
+                                                    onKeyDown={e => { if (e.key === 'Escape') setEditingClicrId(null); }}
+                                                    className="w-full bg-card border border-primary/50 rounded-lg px-3 py-1.5 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-medium text-muted-foreground block">Counter Labels</label>
+                                                {c.counter_labels.map(l => (
+                                                    <div key={l.id} className="flex items-center gap-2">
+                                                        <input value={l.label} onChange={e => setCreatedClicrs(prev => prev.map(cl => cl.id === c.id ? { ...cl, counter_labels: cl.counter_labels.map(lb => lb.id === l.id ? { ...lb, label: e.target.value } : lb) } : cl))}
+                                                            className="flex-1 bg-card border border-border rounded-lg px-2 py-1 text-sm" />
+                                                        {c.counter_labels.length > 1 && (
+                                                            <button type="button" onClick={() => setCreatedClicrs(prev => prev.map(cl => cl.id === c.id ? { ...cl, counter_labels: cl.counter_labels.filter(lb => lb.id !== l.id).map((lb, idx) => ({ ...lb, position: idx })) } : cl))}
+                                                                className="text-red-400 hover:text-red-300">
+                                                                <X className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                                <button type="button" onClick={() => setCreatedClicrs(prev => prev.map(cl => cl.id === c.id ? { ...cl, counter_labels: [...cl.counter_labels, { id: crypto.randomUUID(), device_id: c.id, label: '', position: cl.counter_labels.length }] } : cl))}
+                                                    className="text-xs text-primary hover:text-primary/80">+ Add label</button>
+                                            </div>
                                             <div className="flex gap-2">
                                                 <button type="button" onClick={() => handleSaveClicr(c.id)}
                                                     className="flex-1 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 text-sm font-medium transition-colors flex items-center justify-center gap-1">
@@ -364,25 +384,33 @@ export default function NewAreaPage() {
                     )}
 
                     <div className="bg-background/50 p-4 rounded-xl border border-dashed border-border space-y-3">
-                        <div className="flex gap-2">
+                        <div>
+                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Counter Name</label>
                             <input
                                 type="text"
-                                placeholder="Clicr Name (e.g. Front Door)"
+                                placeholder="e.g. Front Door"
                                 value={clicrInput}
                                 onChange={e => setClicrInput(e.target.value)}
                                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddClicr(); } }}
-                                className="flex-1 bg-card border border-border rounded-lg px-3 py-2 text-foreground text-sm focus:ring-1 focus:ring-primary focus:outline-none"
+                                className="w-full bg-card border border-border rounded-lg px-3 py-2 text-foreground text-sm focus:ring-1 focus:ring-primary focus:outline-none"
                             />
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    const name = prompt('Add label:');
-                                    if (name?.trim()) setClicrLabels(prev => [...prev, name.trim()]);
-                                }}
-                                className="px-3 py-2 bg-card border border-border rounded-lg text-xs text-primary hover:bg-muted transition-colors whitespace-nowrap"
-                            >
-                                + Label
-                            </button>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-xs font-medium text-muted-foreground block">Counter Labels</label>
+                            {clicrLabels.map((lbl, i) => (
+                                <div key={i} className="flex items-center gap-2">
+                                    <input value={lbl} onChange={e => setClicrLabels(prev => prev.map((l, j) => j === i ? e.target.value : l))}
+                                        className="flex-1 bg-card border border-border rounded-lg px-2 py-1 text-sm" placeholder="Label name" />
+                                    {clicrLabels.length > 1 && (
+                                        <button type="button" onClick={() => setClicrLabels(prev => prev.filter((_, j) => j !== i))}
+                                            className="text-red-400 hover:text-red-300">
+                                            <X className="w-3.5 h-3.5" />
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                            <button type="button" onClick={() => setClicrLabels(prev => [...prev, ''])}
+                                className="text-xs text-primary hover:text-primary/80">+ Add label</button>
                         </div>
                         <button
                             type="button"

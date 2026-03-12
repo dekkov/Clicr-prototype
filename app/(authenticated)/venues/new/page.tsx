@@ -3,15 +3,22 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/store';
-import { Venue, Area, AreaType, Clicr } from '@/lib/types';
-import { ArrowLeft, Check, Plus, MapPin, Building2, Users, Pencil, Trash2, X } from 'lucide-react';
+import { Venue, Area, AreaType, Clicr, CounterLabel } from '@/lib/types';
+import { ArrowLeft, Check, Plus, MapPin, Building2, Users, Pencil, Trash2, X, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+type VenueCounter = {
+    id: string;
+    name: string;
+    labels: { id: string; label: string; position: number }[];
+    isPrimary: boolean;
+};
 
 type Step = 'VENUE' | 'AREAS' | 'CLICRS';
 
 export default function NewVenuePage() {
     const router = useRouter();
-    const { addVenue, addArea, addClicr, activeBusiness } = useApp();
+    const { addVenue, addArea, addClicr, updateClicr, activeBusiness } = useApp();
     const [step, setStep] = useState<Step>('VENUE');
     const [isLoading, setIsLoading] = useState(false);
 
@@ -30,6 +37,7 @@ export default function NewVenuePage() {
 
     // Clicr Form (Map areaId -> List of Clicr Names)
     const [clicrInputs, setClicrInputs] = useState<Record<string, string>>({});
+    const [clicrLabelInputs, setClicrLabelInputs] = useState<Record<string, string[]>>({});
     const [createdClicrs, setCreatedClicrs] = useState<Clicr[]>([]);
 
     // Inline-edit state for areas
@@ -37,6 +45,12 @@ export default function NewVenuePage() {
     const [editingAreaName, setEditingAreaName] = useState('');
     const [editingAreaCapacity, setEditingAreaCapacity] = useState('');
     const [editingAreaType, setEditingAreaType] = useState<AreaType>('MAIN');
+
+    // Venue counters
+    const [venueCounters, setVenueCounters] = useState<VenueCounter[]>([
+        { id: crypto.randomUUID(), name: 'Venue Counter', labels: [{ id: crypto.randomUUID(), label: 'General', position: 0 }], isPrimary: true },
+    ]);
+    const [editingVCId, setEditingVCId] = useState<string | null>(null);
 
     // Inline-edit state for clicrs
     const [editingClicrId, setEditingClicrId] = useState<string | null>(null);
@@ -59,6 +73,7 @@ export default function NewVenuePage() {
         if (trimmed) setCreatedClicrs(prev => prev.map(c => c.id === id ? {
             ...c,
             name: trimmed,
+            counter_labels: c.counter_labels,
         } : c));
         setEditingClicrId(null);
     };
@@ -102,16 +117,18 @@ export default function NewVenuePage() {
         const name = clicrInputs[areaId];
         if (!name) return;
         const deviceId = crypto.randomUUID();
+        const labels = clicrLabelInputs[areaId]?.length ? clicrLabelInputs[areaId] : ['General'];
         const clicr: Clicr = {
             id: deviceId,
             area_id: areaId,
             name,
-            counter_labels: [{ id: crypto.randomUUID(), device_id: deviceId, label: 'General', position: 0 }],
+            counter_labels: labels.map((lbl, i) => ({ id: crypto.randomUUID(), device_id: deviceId, label: lbl, position: i })),
             active: true,
             current_count: 0,
         };
         setCreatedClicrs(prev => [...prev, clicr]);
         setClicrInputs(prev => ({ ...prev, [areaId]: '' }));
+        setClicrLabelInputs(prev => ({ ...prev, [areaId]: ['General'] }));
     };
 
     // --- FINISH: BATCH COMMIT ALL ---
@@ -135,7 +152,23 @@ export default function NewVenuePage() {
                 active: true,
             };
             await addVenue(venue);
-            // addVenue auto-creates venue counter clicr
+            // addVenue auto-creates a default venue counter clicr — update it with user's config
+
+            // Add user-defined venue counters (skip the first — it replaces the auto-created one)
+            for (let i = 1; i < venueCounters.length; i++) {
+                const vc = venueCounters[i];
+                const deviceId = crypto.randomUUID();
+                await addClicr({
+                    id: deviceId,
+                    area_id: null,
+                    venue_id: venueId,
+                    is_venue_counter: true,
+                    name: vc.name || 'Venue Counter',
+                    counter_labels: vc.labels.map((l, idx) => ({ id: l.id, device_id: deviceId, label: l.label, position: idx })),
+                    active: true,
+                    current_count: 0,
+                });
+            }
 
             for (const area of createdAreas) {
                 await addArea(area);
@@ -356,8 +389,94 @@ export default function NewVenuePage() {
                 <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
                     <Users className="text-primary" /> Step 3: Add Clicrs
                 </h2>
-                <p className="text-muted-foreground text-sm">How many counters do you need for each area? Name them for your staff (e.g. "Front Door", "Stairs").</p>
+                <p className="text-muted-foreground text-sm">Name your counters. The venue counter tracks overall venue occupancy.</p>
 
+                {/* VENUE COUNTERS */}
+                <div className="space-y-3">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-amber-500">
+                        {venueData.name || 'Venue'} Counters
+                    </h3>
+                    {venueCounters.map(vc => (
+                        <div key={vc.id} className="bg-amber-50 dark:bg-amber-950/10 p-4 rounded-xl border border-amber-200 dark:border-amber-500/20">
+                            {editingVCId === vc.id ? (
+                                <div className="flex flex-col gap-3 w-full">
+                                    <div>
+                                        <label className="text-xs font-medium text-muted-foreground mb-1 block">Counter Name</label>
+                                        <input autoFocus type="text" value={vc.name}
+                                            onChange={e => setVenueCounters(prev => prev.map(v => v.id === vc.id ? { ...v, name: e.target.value } : v))}
+                                            onKeyDown={e => { if (e.key === 'Escape') setEditingVCId(null); }}
+                                            className="w-full bg-card border border-amber-200 dark:border-amber-500/30 rounded-lg px-3 py-1.5 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                            placeholder="e.g. Front Door" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-medium text-muted-foreground block">Counter Labels</label>
+                                        {vc.labels.map(l => (
+                                            <div key={l.id} className="flex items-center gap-2">
+                                                <input value={l.label} onChange={e => setVenueCounters(prev => prev.map(v => v.id === vc.id ? { ...v, labels: v.labels.map(lb => lb.id === l.id ? { ...lb, label: e.target.value } : lb) } : v))}
+                                                    className="flex-1 bg-card border border-border rounded-lg px-2 py-1 text-sm" />
+                                                {vc.labels.length > 1 && (
+                                                    <button type="button" onClick={() => setVenueCounters(prev => prev.map(v => v.id === vc.id ? { ...v, labels: v.labels.filter(lb => lb.id !== l.id).map((lb, i) => ({ ...lb, position: i })) } : v))}
+                                                        className="text-red-400 hover:text-red-300">
+                                                        <X className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
+                                        <button type="button" onClick={() => setVenueCounters(prev => prev.map(v => v.id === vc.id ? { ...v, labels: [...v.labels, { id: crypto.randomUUID(), label: '', position: v.labels.length }] } : v))}
+                                            className="text-xs text-amber-500 hover:text-amber-400">+ Add label</button>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button type="button" onClick={() => setEditingVCId(null)}
+                                            className="flex-1 py-1 rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 text-sm font-medium transition-colors flex items-center justify-center gap-1">
+                                            <Check className="w-3.5 h-3.5" /> Done
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="flex items-center justify-between text-sm">
+                                        <div className="flex items-center gap-2 text-amber-600 dark:text-amber-300">
+                                            <Sparkles className="w-4 h-4" />
+                                            {vc.name || 'Venue Counter'}
+                                            <span className="text-xs text-amber-600/60 dark:text-amber-300/60">
+                                                {vc.labels.length} label{vc.labels.length !== 1 ? 's' : ''}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <button type="button" onClick={() => setEditingVCId(vc.id)}
+                                                className="p-1.5 rounded-lg text-amber-600 hover:text-amber-400 hover:bg-amber-500/10 transition-colors" title="Edit">
+                                                <Pencil className="w-3 h-3" />
+                                            </button>
+                                            {!vc.isPrimary && (
+                                                <button type="button" onClick={() => setVenueCounters(prev => prev.filter(v => v.id !== vc.id))}
+                                                    className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors" title="Remove">
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1 mt-2">
+                                        {vc.labels.map(l => (
+                                            <span key={l.id} className="text-xs bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded-full text-amber-700 dark:text-amber-300">
+                                                {l.label || 'Unnamed'}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    ))}
+                    <button type="button" onClick={() => setVenueCounters(prev => [...prev, {
+                        id: crypto.randomUUID(),
+                        name: '',
+                        labels: [{ id: crypto.randomUUID(), label: 'General', position: 0 }],
+                        isPrimary: false,
+                    }])} className="flex items-center gap-2 text-sm text-amber-500 hover:text-amber-400 transition-colors">
+                        <Plus className="w-4 h-4" /> Add venue counter
+                    </button>
+                </div>
+
+                {/* AREA CLICRS */}
                 <div className="space-y-6">
                     {createdAreas.map(area => {
                         const areaClicrs = createdClicrs.filter(c => c.area_id === area.id);
@@ -392,11 +511,31 @@ export default function NewVenuePage() {
                                                         </div>
                                                     </div>
                                                 ) : (
-                                                    <div className="flex flex-col gap-2 w-full">
-                                                        <input autoFocus type="text" value={editingClicrName}
-                                                            onChange={e => setEditingClicrName(e.target.value)}
-                                                            onKeyDown={e => { if (e.key === 'Escape') setEditingClicrId(null); }}
-                                                            className="flex-1 bg-card border border-primary/50 rounded-lg px-3 py-1.5 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
+                                                    <div className="flex flex-col gap-3 w-full">
+                                                        <div>
+                                                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Counter Name</label>
+                                                            <input autoFocus type="text" value={editingClicrName}
+                                                                onChange={e => setEditingClicrName(e.target.value)}
+                                                                onKeyDown={e => { if (e.key === 'Escape') setEditingClicrId(null); }}
+                                                                className="w-full bg-card border border-primary/50 rounded-lg px-3 py-1.5 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <label className="text-xs font-medium text-muted-foreground block">Counter Labels</label>
+                                                            {clicr.counter_labels.map(l => (
+                                                                <div key={l.id} className="flex items-center gap-2">
+                                                                    <input value={l.label} onChange={e => setCreatedClicrs(prev => prev.map(cl => cl.id === clicr.id ? { ...cl, counter_labels: cl.counter_labels.map(lb => lb.id === l.id ? { ...lb, label: e.target.value } : lb) } : cl))}
+                                                                        className="flex-1 bg-card border border-border rounded-lg px-2 py-1 text-sm" />
+                                                                    {clicr.counter_labels.length > 1 && (
+                                                                        <button type="button" onClick={() => setCreatedClicrs(prev => prev.map(cl => cl.id === clicr.id ? { ...cl, counter_labels: cl.counter_labels.filter(lb => lb.id !== l.id).map((lb, i) => ({ ...lb, position: i })) } : cl))}
+                                                                            className="text-red-400 hover:text-red-300">
+                                                                            <X className="w-3.5 h-3.5" />
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                            <button type="button" onClick={() => setCreatedClicrs(prev => prev.map(cl => cl.id === clicr.id ? { ...cl, counter_labels: [...cl.counter_labels, { id: crypto.randomUUID(), device_id: clicr.id, label: '', position: cl.counter_labels.length }] } : cl))}
+                                                                className="text-xs text-primary hover:text-primary/80">+ Add label</button>
+                                                        </div>
                                                         <div className="flex gap-2">
                                                             <button type="button" onClick={() => handleSaveClicr(clicr.id)}
                                                                 className="flex-1 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 text-sm font-medium transition-colors flex items-center justify-center gap-1">

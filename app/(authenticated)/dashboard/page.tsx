@@ -476,15 +476,22 @@ function buildHourlyData(events: CountEvent[]) {
 
 function buildOccupancyOverTime(events: CountEvent[]) {
     const buckets: Record<number, number> = {};
-    EVENING_HOURS.forEach(h => { buckets[h] = 0; });
 
     events.forEach(e => {
         const hour = new Date(e.timestamp).getHours();
-        if (buckets[hour] !== undefined) buckets[hour] += e.delta;
+        if (!buckets[hour]) buckets[hour] = 0;
+        buckets[hour] += e.delta;
+    });
+
+    // Sort hours in evening-first order (18→23, then 0→17) — same as hourly chart
+    const hours = Object.keys(buckets).map(Number).sort((a, b) => {
+        const aAdj = a < 18 ? a + 24 : a;
+        const bAdj = b < 18 ? b + 24 : b;
+        return aAdj - bAdj;
     });
 
     let running = 0;
-    return EVENING_HOURS.map(h => {
+    return hours.map(h => {
         running = Math.max(0, running + buckets[h]);
         return {
             hour: h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`,
@@ -607,7 +614,7 @@ export default function DashboardPage() {
 
     const todayEvents = useMemo(
         () => isToday
-            ? events.filter((e) => e.timestamp >= dateFrom && e.timestamp <= dateTo && !e.area_id)
+            ? events.filter((e) => e.timestamp >= dateFrom && e.timestamp <= dateTo)
             : [],
         [events, isToday, dateFrom, dateTo]
     );
