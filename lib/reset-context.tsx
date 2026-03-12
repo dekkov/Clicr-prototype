@@ -7,6 +7,7 @@ import type { NightLog } from '@/lib/types';
 
 interface ResetContextValue {
     overlayState: ResetOverlayState;
+    resetMessage: string;
     error?: string;
     daySummary: NightLog | null;
     showSummary: boolean;
@@ -21,11 +22,13 @@ const ResetContext = createContext<ResetContextValue | undefined>(undefined);
 export function ResetProvider({ children }: { children: ReactNode }) {
     const { resetCounts } = useApp();
     const [overlayState, setOverlayState] = useState<ResetOverlayState>('idle');
+    const [resetMessage, setResetMessage] = useState('');
     const [error, setError] = useState<string>();
     const [daySummary, setDaySummary] = useState<NightLog | null>(null);
     const [showSummary, setShowSummary] = useState(false);
 
     const triggerNightReset = useCallback(async (date?: string) => {
+        setResetMessage('Saving summary and zeroing all counts.');
         setOverlayState('resetting');
         const resetType = date ? 'NIGHT_MANUAL' : 'NIGHT_AUTO';
         const result = await resetCounts(resetType);
@@ -45,6 +48,7 @@ export function ResetProvider({ children }: { children: ReactNode }) {
     }, [resetCounts]);
 
     const triggerOperationalReset = useCallback(async () => {
+        setResetMessage('Zeroing all counts.');
         setOverlayState('resetting');
         const result = await resetCounts('OPERATIONAL');
         if (result.success) {
@@ -67,7 +71,7 @@ export function ResetProvider({ children }: { children: ReactNode }) {
 
     return (
         <ResetContext.Provider value={{
-            overlayState, error, daySummary, showSummary,
+            overlayState, resetMessage, error, daySummary, showSummary,
             triggerNightReset, triggerOperationalReset,
             dismissOverlay, dismissSummary,
         }}>

@@ -175,7 +175,7 @@ const INTENSITY_CLASSES = [
 ];
 const EVENING_HOURS = [18, 19, 20, 21, 22, 23, 0, 1, 2, 3];
 
-const PeakTimesHeatmap = ({ data, loading }: { data: HeatmapData; loading: boolean }) => {
+const PeakTimesHeatmap = ({ data }: { data: HeatmapData }) => {
     const maxVal = useMemo(() => {
         let m = 1;
         Object.values(data).forEach(hours =>
@@ -199,10 +199,8 @@ const PeakTimesHeatmap = ({ data, loading }: { data: HeatmapData; loading: boole
                 <Calendar className="w-4 h-4 text-muted-foreground" />
                 <span className="text-lg">Peak Times Heatmap</span>
             </div>
-            <p className="text-xs text-gray-500 mb-4">Entry density by day × hour (all time)</p>
-            {loading ? (
-                <div className="h-40 animate-pulse bg-muted rounded-lg" />
-            ) : Object.keys(data).length === 0 ? (
+            <p className="text-xs text-gray-500 mb-4">Entry density by day × hour (since last reset)</p>
+            {Object.keys(data).length === 0 ? (
                 <p className="text-sm text-gray-600 italic text-center py-8">No historical data yet. Data appears after events are recorded.</p>
             ) : (
                 <div className="overflow-x-auto">
@@ -434,6 +432,19 @@ const LiveVenues = ({ data, onViewAll }: {
 
 // --- Chart Helpers ---
 
+function buildHeatmap(events: CountEvent[]): HeatmapData {
+    const heatmap: HeatmapData = {};
+    for (const e of events) {
+        if (e.delta <= 0) continue;
+        const d = new Date(e.timestamp);
+        const day = d.getDay();
+        const hour = d.getHours();
+        if (!heatmap[day]) heatmap[day] = {};
+        heatmap[day][hour] = (heatmap[day][hour] ?? 0) + 1;
+    }
+    return heatmap;
+}
+
 function buildHourlyData(events: CountEvent[]) {
     const buckets: Record<number, { entries: number; exits: number }> = {};
     // Seed evening hours so they always appear even with no data
@@ -522,7 +533,7 @@ export default function DashboardPage() {
         tooltipBorder: resolvedTheme === 'dark' ? '#374151' : '#e2e8f0',
     };
 
-    const { triggerNightReset, triggerOperationalReset } = useReset();
+    const { triggerNightReset, triggerOperationalReset, overlayState } = useReset();
 
     const resetTime = activeBusiness?.settings?.reset_time || '05:00';
     const resetTz = activeBusiness?.settings?.reset_timezone || activeBusiness?.timezone || 'UTC';
@@ -540,16 +551,7 @@ export default function DashboardPage() {
 
     const isToday = selectedDate === null;
 
-    const [heatmapData, setHeatmapData] = useState<HeatmapData>({});
-    const [heatmapLoading, setHeatmapLoading] = useState(true);
-
-    useEffect(() => {
-        fetch('/api/reports/heatmap')
-            .then(r => r.json())
-            .then(d => setHeatmapData(d.heatmap ?? {}))
-            .catch(() => setHeatmapData({}))
-            .finally(() => setHeatmapLoading(false));
-    }, []);
+    const heatmapData = useMemo(() => buildHeatmap(events), [events]);
 
     // Analyst sees only Reports — redirect from Dashboard
     useEffect(() => {
@@ -1056,7 +1058,7 @@ export default function DashboardPage() {
             </div>}
 
             {/* Peak Times Heatmap */}
-            {isToday && <PeakTimesHeatmap data={heatmapData} loading={heatmapLoading} />}
+            {isToday && <PeakTimesHeatmap data={heatmapData} />}
 
             {/* Location Distribution + Venue Contribution */}
             {isToday && <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1153,7 +1155,7 @@ export default function DashboardPage() {
                         type="date"
                         value={advanceDate}
                         onChange={(e) => setAdvanceDate(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-foreground text-sm"
+                        className="w-full px-3 py-2 rounded-lg bg-white border border-border text-black text-sm"
                     />
                 </div>
             </ConfirmModal>

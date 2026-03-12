@@ -116,4 +116,21 @@ describe('Business-level reset', () => {
         expect(result.areasReset).toBe(0);
         expect(result.resetAt).toBeTruthy();
     });
+
+    it('resetCounts returns ResetResult with success flag', async () => {
+        const adapter = new LocalAdapter();
+        const result = await adapter.resetCounts('test-business', 'NIGHT_AUTO');
+        expect(result.success).toBe(true);
+        expect(typeof result.areasReset).toBe('number');
+        expect(typeof result.resetAt).toBe('string');
+    });
+
+    it('resetCounts accepts reset_type parameter', async () => {
+        const adapter = new LocalAdapter();
+        const nightResult = await adapter.resetCounts('test-business', 'NIGHT_MANUAL');
+        expect(nightResult.success).toBe(true);
+
+        const opResult = await adapter.resetCounts('test-business', 'OPERATIONAL');
+        expect(opResult.success).toBe(true);
+    });
 });

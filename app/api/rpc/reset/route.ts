@@ -129,18 +129,34 @@ export async function POST(request: Request) {
                 };
             }
 
+            // Venue-direct accumulators for events that have no area_id
+            type VenueDirect = { total_in: number; total_out: number; scans_total: number; scans_accepted: number; scans_denied: number; turnarounds: number; occupancySeq: number[] };
+            const venueDirect: Record<string, VenueDirect> = {};
+            for (const v of (venues ?? [])) {
+                venueDirect[v.id] = { total_in: 0, total_out: 0, scans_total: 0, scans_accepted: 0, scans_denied: 0, turnarounds: 0, occupancySeq: [] };
+            }
+
             // Occupancy events → total_in, total_out + replay for peak
             const areaOccupancySequence: Record<string, number[]> = {};
             for (const ev of (occEvents ?? [])) {
                 const aId = ev.area_id;
-                if (!aId || !areaStats[aId]) continue;
-                if (ev.flow_type === 'IN') {
-                    areaStats[aId].total_in += ev.delta;
-                } else {
-                    areaStats[aId].total_out += Math.abs(ev.delta);
+                if (aId && areaStats[aId]) {
+                    if (ev.flow_type === 'IN') {
+                        areaStats[aId].total_in += ev.delta;
+                    } else {
+                        areaStats[aId].total_out += Math.abs(ev.delta);
+                    }
+                    if (!areaOccupancySequence[aId]) areaOccupancySequence[aId] = [];
+                    areaOccupancySequence[aId].push(ev.delta);
+                } else if (!aId && ev.venue_id && venueDirect[ev.venue_id]) {
+                    // Venue-level event (no area_id) — aggregate directly
+                    if (ev.flow_type === 'IN') {
+                        venueDirect[ev.venue_id].total_in += ev.delta;
+                    } else {
+                        venueDirect[ev.venue_id].total_out += Math.abs(ev.delta);
+                    }
+                    venueDirect[ev.venue_id].occupancySeq.push(ev.delta);
                 }
-                if (!areaOccupancySequence[aId]) areaOccupancySequence[aId] = [];
-                areaOccupancySequence[aId].push(ev.delta);
             }
 
             // Replay to compute peak per area
@@ -158,17 +174,25 @@ export async function POST(request: Request) {
             // ID scan events
             for (const ev of (scanEvents ?? [])) {
                 const aId = ev.area_id;
-                if (!aId || !areaStats[aId]) continue;
-                areaStats[aId].scans_total += 1;
-                if (ev.scan_result === 'ACCEPTED') areaStats[aId].scans_accepted += 1;
-                if (ev.scan_result === 'DENIED') areaStats[aId].scans_denied += 1;
+                if (aId && areaStats[aId]) {
+                    areaStats[aId].scans_total += 1;
+                    if (ev.scan_result === 'ACCEPTED') areaStats[aId].scans_accepted += 1;
+                    if (ev.scan_result === 'DENIED') areaStats[aId].scans_denied += 1;
+                } else if (!aId && ev.venue_id && venueDirect[ev.venue_id]) {
+                    venueDirect[ev.venue_id].scans_total += 1;
+                    if (ev.scan_result === 'ACCEPTED') venueDirect[ev.venue_id].scans_accepted += 1;
+                    if (ev.scan_result === 'DENIED') venueDirect[ev.venue_id].scans_denied += 1;
+                }
             }
 
             // Turnaround events
             for (const ev of (turnaroundEvents ?? [])) {
                 const aId = ev.area_id;
-                if (!aId || !areaStats[aId]) continue;
-                areaStats[aId].turnarounds += ev.count ?? 1;
+                if (aId && areaStats[aId]) {
+                    areaStats[aId].turnarounds += ev.count ?? 1;
+                } else if (!aId && ev.venue_id && venueDirect[ev.venue_id]) {
+                    venueDirect[ev.venue_id].turnarounds += ev.count ?? 1;
+                }
             }
 
             // ── Build per-venue totals ────────────────────────────────────────────
@@ -204,8 +228,27 @@ export async function POST(request: Request) {
                 vs.scans_total += stats.scans_total;
                 vs.scans_accepted += stats.scans_accepted;
                 vs.scans_denied += stats.scans_denied;
-                // Venue peak is sum of area peaks (approximate)
                 vs.peak_occupancy += stats.peak_occupancy;
+            }
+
+            // Add venue-direct events (no area_id) to venue totals
+            for (const [vId, direct] of Object.entries(venueDirect)) {
+                const vs = venueStats[vId];
+                if (!vs) continue;
+                vs.total_in += direct.total_in;
+                vs.total_out += direct.total_out;
+                vs.turnarounds += direct.turnarounds;
+                vs.scans_total += direct.scans_total;
+                vs.scans_accepted += direct.scans_accepted;
+                vs.scans_denied += direct.scans_denied;
+                // Peak from venue-direct events
+                let running = 0, peak = 0;
+                for (const d of direct.occupancySeq) {
+                    running += d;
+                    if (running < 0) running = 0;
+                    if (running > peak) peak = running;
+                }
+                vs.peak_occupancy += peak;
             }
 
             // ── Build night_logs rows ─────────────────────────────────────────────
@@ -246,25 +289,7 @@ export async function POST(request: Request) {
                 });
             }
 
-            // Area-level rows
-            for (const [areaId, stats] of Object.entries(areaStats)) {
-                nightLogRows.push({
-                    business_id,
-                    venue_id: stats.venue_id,
-                    area_id: areaId,
-                    business_date,
-                    period_start,
-                    reset_at: resetAt,
-                    total_in: stats.total_in,
-                    total_out: stats.total_out,
-                    turnarounds: stats.turnarounds,
-                    scans_total: stats.scans_total,
-                    scans_accepted: stats.scans_accepted,
-                    scans_denied: stats.scans_denied,
-                    peak_occupancy: stats.peak_occupancy,
-                    reset_type,
-                });
-            }
+
 
             if (nightLogRows.length > 0) {
                 const { error: insertError } = await supabaseAdmin

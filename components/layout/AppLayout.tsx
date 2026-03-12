@@ -308,7 +308,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
     const supabase = useMemo(() => createClient(), []);
 
     const {
-        overlayState, error, daySummary, showSummary,
+        overlayState, resetMessage, error, daySummary, showSummary,
         triggerNightReset, dismissOverlay, dismissSummary,
     } = useReset();
 
@@ -487,7 +487,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
                 </div>
             </nav>
         </div>
-        <ResetOverlay state={overlayState} errorMessage={error} onDismiss={dismissOverlay} />
+        <ResetOverlay state={overlayState} resettingMessage={resetMessage} errorMessage={error} onDismiss={dismissOverlay} />
         <DaySummaryCard open={showSummary} log={daySummary} onDismiss={dismissSummary} />
         </>
     );

@@ -21,11 +21,23 @@ export async function GET() {
         return NextResponse.json({ error: 'No business found' }, { status: 403 });
     }
 
-    const { data: events, error } = await supabaseAdmin
+    const { data: business } = await supabaseAdmin
+        .from('businesses')
+        .select('last_reset_at')
+        .eq('id', membership.business_id)
+        .single();
+
+    let query = supabaseAdmin
         .from('occupancy_events')
         .select('created_at')
         .eq('business_id', membership.business_id)
         .gt('delta', 0);
+
+    if (business?.last_reset_at) {
+        query = query.gte('created_at', business.last_reset_at);
+    }
+
+    const { data: events, error } = await query;
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

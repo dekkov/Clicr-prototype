@@ -7,11 +7,12 @@ export type ResetOverlayState = 'idle' | 'resetting' | 'success' | 'error';
 
 interface ResetOverlayProps {
     state: ResetOverlayState;
+    resettingMessage?: string;
     errorMessage?: string;
     onDismiss: () => void;
 }
 
-export function ResetOverlay({ state, errorMessage, onDismiss }: ResetOverlayProps) {
+export function ResetOverlay({ state, resettingMessage, errorMessage, onDismiss }: ResetOverlayProps) {
     useEffect(() => {
         if (state !== 'success') return;
         const t = setTimeout(onDismiss, 1500);
@@ -27,7 +28,7 @@ export function ResetOverlay({ state, errorMessage, onDismiss }: ResetOverlayPro
                     <>
                         <Loader2 className="w-12 h-12 text-primary animate-spin" />
                         <p className="text-lg font-bold text-foreground">Resetting data...</p>
-                        <p className="text-sm text-muted-foreground">Saving summary and zeroing all counts.</p>
+                        <p className="text-sm text-muted-foreground">{resettingMessage ?? 'Saving summary and zeroing all counts.'}</p>
                     </>
                 )}
                 {state === 'success' && (
