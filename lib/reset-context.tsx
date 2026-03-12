@@ -31,9 +31,13 @@ export function ResetProvider({ children }: { children: ReactNode }) {
         const result = await resetCounts(resetType);
         if (result.success) {
             setOverlayState('success');
-            // Day Summary will be shown after overlay auto-dismisses
-            // For now, we set showSummary after a delay matching the overlay auto-dismiss
-            // The daySummary data would come from the API response in a future enhancement
+            if (result.nightLog) {
+                setDaySummary(result.nightLog);
+                // Show summary after overlay auto-dismisses (~1500ms) plus a small buffer
+                setTimeout(() => {
+                    setShowSummary(true);
+                }, 1700);
+            }
         } else {
             setError(result.error);
             setOverlayState('error');

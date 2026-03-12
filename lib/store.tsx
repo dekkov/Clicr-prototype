@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { Business, Venue, Area, Clicr, CountEvent, User, IDScanEvent, BanRecord, BannedPerson, PatronBan, BanEnforcementEvent, BanAuditLog, Device, CapacityOverride, VenueAuditLog, TurnaroundEvent } from './types';
+import type { NightLog } from '@/lib/types';
 import { createClient } from '@/utils/supabase/client';
 
 const INITIAL_USER: User = {
@@ -51,7 +52,7 @@ export type AppState = {
 type AppContextType = AppState & {
     recordEvent: (event: Omit<CountEvent, 'id' | 'timestamp' | 'user_id' | 'business_id'>) => void;
     recordScan: (scan: Omit<IDScanEvent, 'id' | 'timestamp'>) => void;
-    resetCounts: (resetType?: 'NIGHT_AUTO' | 'NIGHT_MANUAL' | 'OPERATIONAL') => Promise<{ success: boolean; error?: string }>;
+    resetCounts: (resetType?: 'NIGHT_AUTO' | 'NIGHT_MANUAL' | 'OPERATIONAL') => Promise<{ success: boolean; error?: string; nightLog?: NightLog }>;
     startShift: (venueId: string, areaId?: string) => Promise<string | null>;
     endShift: (shiftId: string) => Promise<void>;
     addUser: (user: User) => Promise<void>;
@@ -538,9 +539,51 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     const resetCounts = async (
         resetType: 'NIGHT_AUTO' | 'NIGHT_MANUAL' | 'OPERATIONAL' = 'OPERATIONAL'
-    ): Promise<{ success: boolean; error?: string }> => {
+    ): Promise<{ success: boolean; error?: string; nightLog?: NightLog }> => {
         if (!state.business) return { success: false, error: 'No business selected' };
         isResettingRef.current = true;
+
+        // Capture pre-reset metrics before zeroing state (used for Day Summary card)
+        let nightLog: NightLog | undefined;
+        if (resetType === 'NIGHT_AUTO' || resetType === 'NIGHT_MANUAL') {
+            const businessId = state.business.id;
+            const firstVenue = state.venues[0];
+            const venueId = firstVenue?.id ?? '';
+
+            const totalIn = state.events
+                .filter(e => e.flow_type === 'IN')
+                .reduce((s, e) => s + e.delta, 0);
+            const totalOut = state.events
+                .filter(e => e.flow_type === 'OUT')
+                .reduce((s, e) => s + Math.abs(e.delta), 0);
+            const turnaroundsCount = state.turnarounds.reduce((s, t) => s + (t.count ?? 1), 0);
+            const scansTotal = state.scanEvents.length;
+            const scansAccepted = state.scanEvents.filter(s => s.scan_result === 'ACCEPTED').length;
+            const scansDenied = state.scanEvents.filter(s => s.scan_result === 'DENIED').length;
+            const peakOccupancy = Math.max(
+                0,
+                ...state.venues.map(v => v.current_occupancy ?? 0),
+            );
+
+            nightLog = {
+                id: crypto.randomUUID(),
+                business_id: businessId,
+                venue_id: venueId,
+                area_id: null,
+                business_date: new Date().toISOString().slice(0, 10),
+                period_start: state.business.last_reset_at ?? state.business.settings?.reset_time ?? new Date().toISOString(),
+                reset_at: new Date().toISOString(),
+                total_in: totalIn,
+                total_out: totalOut,
+                turnarounds: turnaroundsCount,
+                scans_total: scansTotal,
+                scans_accepted: scansAccepted,
+                scans_denied: scansDenied,
+                peak_occupancy: peakOccupancy,
+                reset_type: resetType,
+                created_at: new Date().toISOString(),
+            };
+        }
 
         // Optimistic update
         const optimisticState = {
@@ -575,8 +618,39 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 return { success: false, error: errText };
             }
 
+            // Attempt to enrich nightLog with server-side venue aggregates if available
+            if (nightLog && (resetType === 'NIGHT_AUTO' || resetType === 'NIGHT_MANUAL')) {
+                try {
+                    const data = await res.json();
+                    if (data.nightLog) {
+                        const venueKeys = Object.keys(data.nightLog.venues ?? {});
+                        if (venueKeys.length > 0) {
+                            const venueId = venueKeys[0];
+                            const v = data.nightLog.venues[venueId];
+                            nightLog = {
+                                ...nightLog,
+                                venue_id: venueId,
+                                business_date: data.nightLog.business_date ?? nightLog.business_date,
+                                period_start: data.nightLog.period_start ?? nightLog.period_start,
+                                reset_at: data.nightLog.reset_at ?? nightLog.reset_at,
+                                reset_type: data.nightLog.reset_type ?? nightLog.reset_type,
+                                total_in: v.total_in ?? nightLog.total_in,
+                                total_out: v.total_out ?? nightLog.total_out,
+                                turnarounds: v.turnarounds ?? nightLog.turnarounds,
+                                scans_total: v.scans_total ?? nightLog.scans_total,
+                                scans_accepted: v.scans_accepted ?? nightLog.scans_accepted,
+                                scans_denied: v.scans_denied ?? nightLog.scans_denied,
+                                peak_occupancy: v.peak_occupancy ?? nightLog.peak_occupancy,
+                            };
+                        }
+                    }
+                } catch {
+                    // Response parsing failed — keep pre-reset optimistic nightLog
+                }
+            }
+
             await refreshState();
-            return { success: true };
+            return { success: true, nightLog };
         } catch (error) {
             await refreshState();
             return { success: false, error: 'Network error — please try again' };
