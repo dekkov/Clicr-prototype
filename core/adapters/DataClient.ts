@@ -12,6 +12,8 @@
  * 5. Auth methods are stubbed in LocalAdapter; fully implemented in SupabaseAdapter.
  */
 
+import type { NightLog } from '@/lib/types';
+
 // ─── SHARED TYPES ──────────────────────────────────────────────────────
 // Re-export from models for convenience. Adapter implementations should import from here.
 
@@ -46,6 +48,8 @@ export type DeltaResult = {
 export type ResetResult = {
     areasReset: number;
     resetAt: string; // ISO timestamp
+    success: boolean;
+    error?: string;
 };
 
 export type ScanPayload = {
@@ -152,6 +156,8 @@ export interface Business {
         refresh_interval_sec: number;
         capacity_thresholds: [number, number, number];
         reset_rule: 'MANUAL' | 'SCHEDULED';
+        reset_time?: string;
+        reset_timezone?: string;
     };
 }
 
@@ -277,7 +283,10 @@ export interface DataClient {
     getTrafficTotals(scope: Scope, window: TimeWindow): Promise<{ totalIn: number; totalOut: number; net: number }>;
 
     /** Reset all counts for the entire business. Cascades to all venues, areas, and devices. */
-    resetCounts(businessId: string): Promise<ResetResult>;
+    resetCounts(businessId: string, resetType: 'NIGHT_AUTO' | 'NIGHT_MANUAL' | 'OPERATIONAL'): Promise<ResetResult>;
+
+    /** Get night log entries for a business on a given business date (YYYY-MM-DD). */
+    getNightLogs(businessId: string, date: string): Promise<NightLog[]>;
 
     // ── ID SCANNING ─────────────────────────────────────────────────────
     logScan(businessId: string, scan: ScanPayload): Promise<ScanRecord>;

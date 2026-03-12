@@ -56,6 +56,8 @@ export type Business = {
         refresh_interval_sec: number;
         capacity_thresholds: [number, number, number]; // e.g. [80, 90, 100]
         reset_rule: 'MANUAL' | 'SCHEDULED';
+        reset_time?: string;      // "HH:MM" 24h, default "05:00"
+        reset_timezone?: string;  // IANA timezone, default from business.timezone
         scan_method?: 'CAMERA' | 'BLUETOOTH';
         scan_enabled_default?: boolean;
         ban_permissions?: { manager: boolean; staff: boolean };
@@ -364,5 +366,24 @@ export type BoardView = {
     device_ids: string[];
     labels: Record<string, string>;
     created_by: string;
+    created_at: string;
+};
+
+export type NightLog = {
+    id: string;
+    business_id: string;
+    venue_id: string;
+    area_id: string | null;
+    business_date: string; // "YYYY-MM-DD"
+    period_start: string;  // ISO timestamp
+    reset_at: string;      // ISO timestamp
+    total_in: number;
+    total_out: number;
+    turnarounds: number;
+    scans_total: number;
+    scans_accepted: number;
+    scans_denied: number;
+    peak_occupancy: number;
+    reset_type: 'NIGHT_AUTO' | 'NIGHT_MANUAL';
     created_at: string;
 };
