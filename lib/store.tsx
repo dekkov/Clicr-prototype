@@ -51,7 +51,7 @@ export type AppState = {
 type AppContextType = AppState & {
     recordEvent: (event: Omit<CountEvent, 'id' | 'timestamp' | 'user_id' | 'business_id'>) => void;
     recordScan: (scan: Omit<IDScanEvent, 'id' | 'timestamp'>) => void;
-    resetCounts: () => Promise<void>;
+    resetCounts: (resetType?: 'NIGHT_AUTO' | 'NIGHT_MANUAL' | 'OPERATIONAL') => Promise<{ success: boolean; error?: string }>;
     startShift: (venueId: string, areaId?: string) => Promise<string | null>;
     endShift: (shiftId: string) => Promise<void>;
     addUser: (user: User) => Promise<void>;
@@ -536,11 +536,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
-    const resetCounts = async () => {
-        // LOCK polling to prevent race conditions
+    const resetCounts = async (
+        resetType: 'NIGHT_AUTO' | 'NIGHT_MANUAL' | 'OPERATIONAL' = 'OPERATIONAL'
+    ): Promise<{ success: boolean; error?: string }> => {
+        if (!state.business) return { success: false, error: 'No business selected' };
         isResettingRef.current = true;
 
-        // Optimistic update — zero all counters and start a fresh traffic session
+        // Optimistic update
         const optimisticState = {
             ...state,
             venues: state.venues.map(v => ({ ...v, current_occupancy: 0 })),
@@ -555,28 +557,31 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setState(optimisticState);
 
         try {
-            // Call /api/rpc/reset directly to enforce OWNER/ADMIN RBAC check.
-            // Auth is resolved from the session cookie (same as authFetch).
+            // Call /api/rpc/reset directly (not authFetch) to enforce OWNER/ADMIN RBAC
             const res = await fetch('/api/rpc/reset', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ business_id: state.business?.id }),
+                body: JSON.stringify({
+                    business_id: state.business.id,
+                    reset_type: resetType,
+                }),
             });
 
-            if (res.ok) {
-                // /api/rpc/reset returns { success, areasReset, resetAt } — not full state.
-                // Reconciliation happens via the forced refreshState() in the finally block.
-            } else {
-                const err = await res.json().catch(() => ({}));
-                console.error("Failed to reset counts (server error)", res.status, err);
+            if (!res.ok) {
+                await refreshState();
+                const errText = res.status === 403
+                    ? 'Only owners and admins can reset'
+                    : `Reset failed (${res.status})`;
+                return { success: false, error: errText };
             }
+
+            await refreshState();
+            return { success: true };
         } catch (error) {
-            console.error("Failed to reset counts", error);
+            await refreshState();
+            return { success: false, error: 'Network error — please try again' };
         } finally {
-            // UNLOCK polling
             isResettingRef.current = false;
-            // Force immediate fresh poll
-            refreshState();
         }
     };
 
