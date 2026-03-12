@@ -214,6 +214,7 @@ async function buildSyncResponse(
                 id: b.id,
                 name: b.name,
                 timezone: b.timezone || 'UTC',
+                logo_url: b.logo_url || undefined,
                 settings: b.settings || { refresh_interval_sec: 5, capacity_thresholds: [80, 90, 100], reset_rule: 'MANUAL' },
                 last_reset_at: b.last_reset_at || undefined,
             }));

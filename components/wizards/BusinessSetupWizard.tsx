@@ -31,6 +31,7 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
     const [step, setStep] = useState<Step>('BUSINESS');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const finishingRef = React.useRef(false);
 
     // Business step
     const [businessName, setBusinessName] = useState('');
@@ -170,6 +171,9 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
     };
 
     const finish = async (opts?: { saveBanConfig?: boolean; saveScanConfig?: boolean }) => {
+        if (finishingRef.current) return;
+        finishingRef.current = true;
+
         const shouldSaveScan = opts?.saveScanConfig ?? scanConfigured;
         const shouldSaveBan = opts?.saveBanConfig ?? banConfigured;
 
@@ -281,6 +285,7 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
             console.error('[wizard] finish error:', e);
             setError(e.message || 'Setup failed. Please try again.');
             setIsLoading(false);
+            finishingRef.current = false;
         }
     };
 
