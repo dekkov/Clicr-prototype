@@ -1125,13 +1125,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const updateBusiness = async (updates: Partial<Business>) => {
-        // Optimistic
-        if (state.business) {
-            setState(prev => ({
-                ...prev,
-                business: { ...prev.business!, ...updates }
-            }));
-        }
+        // Optimistic — update both business and activeBusiness so bound inputs stay in sync
+        setState(prev => ({
+            ...prev,
+            business: prev.business ? { ...prev.business, ...updates } : prev.business,
+            activeBusiness: prev.activeBusiness ? { ...prev.activeBusiness, ...updates } : prev.activeBusiness,
+        }));
 
         try {
             const payload = state.activeBusiness?.id

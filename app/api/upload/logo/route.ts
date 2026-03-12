@@ -48,13 +48,26 @@ export async function POST(request: Request) {
         const ext = file.type.split("/")[1] === "jpeg" ? "jpg" : file.type.split("/")[1];
         const path = `${businessId}/logo.${ext}`;
 
+        // Ensure bucket exists (creates on first upload if missing)
+        const { error: bucketError } = await supabaseAdmin.storage.createBucket(BUCKET, {
+            public: true,
+            allowedMimeTypes: ALLOWED_TYPES,
+            fileSizeLimit: MAX_SIZE,
+        });
+        // Ignore "already exists" error
+        if (bucketError && !bucketError.message.includes("already exists")) {
+            console.error("[upload] Failed to ensure bucket:", bucketError.message);
+            return NextResponse.json({ error: "Storage not configured" }, { status: 500 });
+        }
+
         const buffer = Buffer.from(await file.arrayBuffer());
         const { error: uploadError } = await supabaseAdmin.storage
             .from(BUCKET)
             .upload(path, buffer, { contentType: file.type, upsert: true });
 
         if (uploadError) {
-            return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+            console.error("[upload] Storage upload error:", uploadError.message);
+            return NextResponse.json({ error: uploadError.message }, { status: 500 });
         }
 
         const { data: urlData } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(path);

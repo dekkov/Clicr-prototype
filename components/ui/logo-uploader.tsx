@@ -89,30 +89,32 @@ export function LogoUploader({ currentUrl, businessId, onUpload, demoMode }: Log
 
     return (
         <div className="flex flex-col items-center gap-3">
-            <div
-                onClick={() => inputRef.current?.click()}
-                onDrop={handleDrop}
-                onDragOver={(e) => e.preventDefault()}
-                className="relative w-24 h-24 rounded-full border-2 border-dashed border-border hover:border-primary/50 flex items-center justify-center cursor-pointer overflow-hidden transition-colors bg-card"
-            >
-                {uploading ? (
-                    <Loader2 className="w-6 h-6 text-primary animate-spin" />
-                ) : preview ? (
-                    <>
+            <div className="relative w-24 h-24">
+                <div
+                    onClick={() => inputRef.current?.click()}
+                    onDrop={handleDrop}
+                    onDragOver={(e) => e.preventDefault()}
+                    className="w-full h-full rounded-full border-2 border-dashed border-border hover:border-primary/50 flex items-center justify-center cursor-pointer overflow-hidden transition-colors bg-card"
+                >
+                    {uploading ? (
+                        <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                    ) : preview ? (
                         <img src={preview} alt="Logo" className="w-full h-full object-cover" />
-                        <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); handleRemove(); }}
-                            className="absolute top-0 right-0 p-1 bg-background/60 rounded-full"
-                        >
-                            <X className="w-3 h-3 text-white" />
-                        </button>
-                    </>
-                ) : (
-                    <div className="flex flex-col items-center gap-1">
-                        <Building2 className="w-8 h-8 text-muted-foreground/60" />
-                        <Upload className="w-3 h-3 text-muted-foreground/60" />
-                    </div>
+                    ) : (
+                        <div className="flex flex-col items-center gap-1">
+                            <Building2 className="w-8 h-8 text-muted-foreground/60" />
+                            <Upload className="w-3 h-3 text-muted-foreground/60" />
+                        </div>
+                    )}
+                </div>
+                {preview && !uploading && (
+                    <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleRemove(); }}
+                        className="absolute top-0 right-0 p-1 bg-background/60 rounded-full"
+                    >
+                        <X className="w-3 h-3 text-white" />
+                    </button>
                 )}
             </div>
 

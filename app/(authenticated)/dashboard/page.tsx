@@ -920,6 +920,7 @@ export default function DashboardPage() {
                         year={calYear}
                         month={calMonth}
                         dailyEntries={{}}
+                        selectAllPast
                         selectedDate={selectedDate}
                         onSelectDate={(dateStr) => {
                             setSelectedDate(dateStr);

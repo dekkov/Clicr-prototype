@@ -252,6 +252,7 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                 id: batchBusinessId,
                 name: businessName,
                 timezone,
+                ...(logoUrl ? { logo_url: logoUrl } : {}),
                 settings: {
                     refresh_interval_sec: 2,
                     capacity_thresholds: [80, 90, 100],

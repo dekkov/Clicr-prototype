@@ -64,7 +64,7 @@ export default async function LoginPage({ searchParams }: Props) {
                                 name="password"
                                 autoComplete="current-password"
                                 required
-                                className="relative block w-full rounded-b-xl border border-border bg-input px-4 pr-10 py-3 text-foreground placeholder-foreground/40 focus:z-10 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
+                                className="relative block w-full rounded-b-xl border border-border bg-input px-4 pr-10 py-3 text-foreground placeholder-foreground/40 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
                                 placeholder="Password"
                             />
                         </div>

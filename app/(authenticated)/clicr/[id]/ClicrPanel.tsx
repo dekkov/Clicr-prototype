@@ -810,27 +810,28 @@ export default function ClicrPanel({
                             )}
                         </div>
 
-                        {/* Turnaround + Reset */}
-                        <div className="flex items-center justify-center gap-6 pt-1">
-                            <button
-                                onClick={() => {
-                                    if (navigator.vibrate) navigator.vibrate([30, 40, 30]);
-                                    setTurnaroundFlash(true);
-                                    setTimeout(() => setTurnaroundFlash(false), 600);
-                                    if (clicr.area_id) recordTurnaround?.(venueId || '', clicr.area_id, clicr.id, 1);
-                                    else if (venueId) recordTurnaround?.(venueId, '', clicr.id, 1);
-                                }}
-                                className={cn(
-                                    "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all active:scale-[0.92] touch-manipulation",
-                                    turnaroundFlash
-                                        ? "bg-purple-500/30 text-purple-200 scale-[1.05]"
-                                        : "text-muted-foreground hover:text-purple-300 hover:bg-purple-500/10"
-                                )}
-                            >
-                                <RotateCcw className={cn("w-4 h-4 transition-transform", turnaroundFlash && "animate-spin")} />
-                                Turnaround
-                            </button>
-                        </div>
+                        {/* Turnaround — venue-dedicated clicrs only */}
+                        {isVenueCounter && (
+                            <div className="flex items-center justify-center gap-6 pt-1">
+                                <button
+                                    onClick={() => {
+                                        if (navigator.vibrate) navigator.vibrate([30, 40, 30]);
+                                        setTurnaroundFlash(true);
+                                        setTimeout(() => setTurnaroundFlash(false), 600);
+                                        if (venueId) recordTurnaround?.(venueId, '', clicr.id, 1);
+                                    }}
+                                    className={cn(
+                                        "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all active:scale-[0.92] touch-manipulation",
+                                        turnaroundFlash
+                                            ? "bg-purple-500/30 text-purple-200 scale-[1.05]"
+                                            : "text-muted-foreground hover:text-purple-300 hover:bg-purple-500/10"
+                                    )}
+                                >
+                                    <RotateCcw className={cn("w-4 h-4 transition-transform", turnaroundFlash && "animate-spin")} />
+                                    Turnaround
+                                </button>
+                            </div>
+                        )}
 
                         {/* End Shift */}
                         {activeShiftId && activeShiftAreaId === clicr?.area_id && (

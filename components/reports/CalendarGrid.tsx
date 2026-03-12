@@ -15,6 +15,7 @@ type Props = {
   onSelectDate: (dateStr: string) => void;
   onPrevMonth: () => void;
   onNextMonth: () => void;
+  selectAllPast?: boolean; // when true, all past dates are selectable regardless of data
 };
 
 const DOW = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
@@ -27,6 +28,7 @@ export function CalendarGrid({
   onSelectDate,
   onPrevMonth,
   onNextMonth,
+  selectAllPast = false,
 }: Props) {
   const grid = buildCalendarGrid(year, month);
   const monthLabel = format(new Date(year, month, 1), 'MMMM yyyy').toUpperCase();
@@ -79,18 +81,20 @@ export function CalendarGrid({
           const hasData = throughput > 0;
           const isSelected = selectedDate === dateStr;
           const isToday = dateStr === today;
+          const isFuture = dateStr > today;
           const isLastInRow = (idx + 1) % 7 === 0;
+          const isSelectable = hasData || (selectAllPast && !isFuture && !isToday);
 
           return (
             <button
               key={dateStr}
-              onClick={() => hasData && onSelectDate(dateStr)}
-              disabled={!hasData}
+              onClick={() => isSelectable && onSelectDate(dateStr)}
+              disabled={!isSelectable}
               className={cn(
                 'min-h-[80px] p-3 flex flex-col items-start border-r border-b border-white/5 transition-all text-left group',
                 isLastInRow && 'border-r-0',
-                hasData && 'hover:bg-white/5 cursor-pointer',
-                !hasData && 'cursor-default opacity-50',
+                isSelectable && 'hover:bg-white/5 cursor-pointer',
+                !isSelectable && 'cursor-default opacity-50',
                 isSelected && 'bg-violet-100 dark:bg-violet-900/40 border-violet-200 dark:border-violet-500/50 hover:bg-violet-900/50'
               )}
               aria-label={`${dateStr}: ${hasData ? throughput + ' entries' : 'no data'}`}
