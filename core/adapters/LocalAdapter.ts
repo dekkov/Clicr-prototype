@@ -39,6 +39,7 @@ import type {
     ScanRecord,
 } from './DataClient';
 import type { NightLog } from '@/lib/types';
+import { getAutoDateLabel } from '@/lib/business-day';
 
 // ─── Internal State ────────────────────────────────────────────────────
 
@@ -341,6 +342,68 @@ export class LocalAdapter implements DataClient {
         const resetAt = nowISO();
         let count = 0;
 
+        // For night resets: snapshot current state into NightLog before zeroing
+        if (resetType !== 'OPERATIONAL') {
+            const logKey = `clicr_night_logs_${businessId}`;
+            const existing: NightLog[] = typeof window !== 'undefined'
+                ? JSON.parse(localStorage.getItem(logKey) || '[]')
+                : [];
+
+            const resetTime = this.state.business?.settings?.reset_time || '05:00';
+            const resetTz = this.state.business?.settings?.reset_timezone || this.state.business?.timezone || 'UTC';
+            const businessDate = getAutoDateLabel(new Date(), resetTime, resetTz);
+
+            const newLogs: NightLog[] = this.state.venues
+                .filter(v => v.business_id === businessId)
+                .map(v => {
+                    const venueEvents = this.state.events.filter(e => e.venueId === v.id);
+                    const venueScans = this.state.scans.filter(s => s.venueId === v.id);
+
+                    const total_in = venueEvents.filter(e => e.flowType === 'IN').reduce((sum, e) => sum + Math.abs(e.delta), 0);
+                    const total_out = venueEvents.filter(e => e.flowType === 'OUT').reduce((sum, e) => sum + Math.abs(e.delta), 0);
+                    const scans_total = venueScans.length;
+                    const scans_accepted = venueScans.filter(s => s.scanResult === 'ACCEPTED').length;
+                    const scans_denied = venueScans.filter(s => s.scanResult === 'DENIED').length;
+
+                    // Peak occupancy: running sum of deltas ordered by createdAt
+                    const sorted = [...venueEvents].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+                    let running = 0, peak = 0;
+                    for (const e of sorted) {
+                        running += e.delta;
+                        if (running > peak) peak = running;
+                    }
+
+                    // period_start: last reset time, or earliest event, or business created_at fallback
+                    const periodStart = this.state.business?.last_reset_at
+                        || (venueEvents.length > 0
+                            ? venueEvents.reduce((min, e) => e.createdAt < min ? e.createdAt : min, venueEvents[0].createdAt)
+                            : resetAt);
+
+                    return {
+                        id: crypto.randomUUID(),
+                        business_id: businessId,
+                        venue_id: v.id,
+                        area_id: null,
+                        business_date: businessDate,
+                        period_start: periodStart,
+                        reset_at: resetAt,
+                        total_in,
+                        total_out,
+                        turnarounds: 0,
+                        scans_total,
+                        scans_accepted,
+                        scans_denied,
+                        peak_occupancy: peak,
+                        reset_type: resetType as 'NIGHT_AUTO' | 'NIGHT_MANUAL',
+                        created_at: resetAt,
+                    };
+                });
+
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(logKey, JSON.stringify([...existing, ...newLogs]));
+            }
+        }
+
         // Zero all area occupancy snapshots
         for (const area of this.state.areas) {
             this.state.snapshots.set(area.id, 0);
@@ -362,8 +425,12 @@ export class LocalAdapter implements DataClient {
     }
 
     async getNightLogs(businessId: string, date: string): Promise<NightLog[]> {
-        // TODO: Full implementation in Task 5 — for now return empty array
-        return [];
+        if (typeof window === 'undefined') return [];
+        const key = `clicr_night_logs_${businessId}`;
+        const stored = localStorage.getItem(key);
+        if (!stored) return [];
+        const all: NightLog[] = JSON.parse(stored);
+        return all.filter(l => l.business_date === date);
     }
 
     // ── SCANNING ────────────────────────────────────────────────────────
