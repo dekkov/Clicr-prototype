@@ -2,10 +2,16 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export async function resolvePostAuthRoute(userId: string): Promise<string> {
     try {
-        const { data: memberships } = await supabaseAdmin
+        const { data: memberships, error } = await supabaseAdmin
             .from('business_members')
             .select('business_id, role')
             .eq('user_id', userId);
+
+        if (error) {
+            console.error('[resolvePostAuthRoute] Query error:', error);
+            // Don't redirect to onboarding on DB errors — default to dashboard
+            return '/dashboard';
+        }
 
         if (!memberships || memberships.length === 0) {
             return '/onboarding/setup';
