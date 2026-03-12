@@ -27,6 +27,10 @@ import { useApp } from '@/lib/store';
 import { Business, Role } from '@/lib/types';
 import { getScopeSelectorType, getVisibleNavItems, canAccessRoute, hasMinRole } from '@/lib/permissions';
 import type { NavItemDef } from '@/lib/permissions';
+import { ResetProvider, useReset } from '@/lib/reset-context';
+import { useAutoReset } from '@/lib/useAutoReset';
+import { ResetOverlay } from '@/components/ui/ResetOverlay';
+import { DaySummaryCard } from '@/components/ui/DaySummaryCard';
 
 const NAV_ITEMS: NavItemDef[] = [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -290,10 +294,31 @@ function ScopeSelector() {
 }
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
+    return (
+        <ResetProvider>
+            <AppLayoutInner>{children}</AppLayoutInner>
+        </ResetProvider>
+    );
+}
+
+function AppLayoutInner({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const router = useRouter();
-    const { currentUser, isLoading } = useApp();
+    const { currentUser, isLoading, activeBusiness } = useApp();
     const supabase = useMemo(() => createClient(), []);
+
+    const {
+        overlayState, error, daySummary, showSummary,
+        triggerNightReset, dismissOverlay, dismissSummary,
+    } = useReset();
+
+    useAutoReset({
+        resetRule: activeBusiness?.settings?.reset_rule || 'MANUAL',
+        resetTime: activeBusiness?.settings?.reset_time || '05:00',
+        timezone: activeBusiness?.settings?.reset_timezone || activeBusiness?.timezone || 'UTC',
+        lastResetAt: activeBusiness?.last_reset_at,
+        onReset: () => triggerNightReset(),
+    });
 
     const handleSignOut = useCallback(async () => {
         await supabase.auth.signOut();
@@ -342,6 +367,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     return (
+        <>
         <div className="flex flex-col md:flex-row h-screen bg-background text-foreground overflow-hidden">
             {/* Desktop: sidebar + main. Mobile: main only */}
             <div className="flex flex-1 min-h-0 overflow-hidden">
@@ -461,5 +487,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 </div>
             </nav>
         </div>
+        <ResetOverlay state={overlayState} errorMessage={error} onDismiss={dismissOverlay} />
+        <DaySummaryCard open={showSummary} log={daySummary} onDismiss={dismissSummary} />
+        </>
     );
 }
