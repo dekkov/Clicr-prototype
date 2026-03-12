@@ -198,7 +198,8 @@ async function buildSyncResponse(
                 id: b.id,
                 name: b.name,
                 timezone: b.timezone || 'UTC',
-                settings: b.settings || { refresh_interval_sec: 5, capacity_thresholds: [80, 90, 100], reset_rule: 'MANUAL' }
+                settings: b.settings || { refresh_interval_sec: 5, capacity_thresholds: [80, 90, 100], reset_rule: 'MANUAL' },
+                last_reset_at: b.last_reset_at || undefined,
             }));
         }
 
@@ -640,6 +641,30 @@ export async function POST(request: Request) {
                     await supabaseAdmin.from('businesses').update(updateFields).eq('id', businessId);
                 }
                 break;
+            }
+
+            case 'POLL': {
+                const businessId = await getBusinessId();
+                if (!businessId) {
+                    return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+                }
+                const { data: bizData } = await supabaseAdmin
+                    .from('businesses')
+                    .select('id, name, timezone, settings, last_reset_at')
+                    .eq('id', businessId)
+                    .single();
+                if (!bizData) {
+                    return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+                }
+                return NextResponse.json({
+                    business: {
+                        id: bizData.id,
+                        name: bizData.name,
+                        timezone: bizData.timezone,
+                        settings: bizData.settings,
+                        last_reset_at: bizData.last_reset_at,
+                    }
+                });
             }
 
             default:
