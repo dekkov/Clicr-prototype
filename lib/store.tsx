@@ -764,7 +764,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 venue_id: venue.id,
                 is_venue_counter: true,
                 name: 'Venue Counter',
-                flow_mode: 'BIDIRECTIONAL',
+                counter_labels: [{ id: crypto.randomUUID(), device_id: '', label: 'General', position: 0 }],
                 active: true,
                 current_count: 0,
             };

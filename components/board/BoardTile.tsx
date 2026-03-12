@@ -9,7 +9,7 @@ type BoardTileProps = {
     area: Area | undefined;
     venue?: Venue;
     label?: string;
-    onTap: (clicrId: string, delta: number, gender: 'M' | 'F') => void;
+    onTap: (clicrId: string, delta: number, counterLabelId: string) => void;
 };
 
 export function BoardTile({ clicr, area, venue, label, onTap }: BoardTileProps) {
@@ -46,9 +46,11 @@ export function BoardTile({ clicr, area, venue, label, onTap }: BoardTileProps) 
         : pct >= 80 ? 'shadow-amber-300/10'
         : 'shadow-emerald-400/10';
 
-    const handleTap = (delta: number, gender: 'M' | 'F') => {
+    const activeLabels = (clicr.counter_labels ?? []).filter(l => !l.deleted_at).sort((a, b) => a.position - b.position);
+
+    const handleTap = (delta: number, counterLabelId: string) => {
         if (navigator.vibrate) navigator.vibrate(50);
-        onTap(clicr.id, delta, gender);
+        onTap(clicr.id, delta, counterLabelId);
     };
 
     return (
@@ -92,32 +94,26 @@ export function BoardTile({ clicr, area, venue, label, onTap }: BoardTileProps) 
                 )}
             </div>
 
-            {/* Tap buttons */}
-            <div className="grid grid-cols-2 gap-2 w-full max-w-[220px]">
-                <button
-                    onClick={() => handleTap(1, 'M')}
-                    className="py-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-sm font-bold border border-emerald-200 dark:border-emerald-500/20 active:scale-[0.96] transition-all"
-                >
-                    + M
-                </button>
-                <button
-                    onClick={() => handleTap(1, 'F')}
-                    className="py-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-sm font-bold border border-emerald-200 dark:border-emerald-500/20 active:scale-[0.96] transition-all"
-                >
-                    + F
-                </button>
-                <button
-                    onClick={() => handleTap(-1, 'M')}
-                    className="py-3 rounded-xl bg-white/[0.03] hover:bg-red-500/10 text-muted-foreground hover:text-red-400 text-sm font-bold border border-white/[0.06] hover:border-red-500/20 active:scale-[0.96] transition-all"
-                >
-                    &minus; M
-                </button>
-                <button
-                    onClick={() => handleTap(-1, 'F')}
-                    className="py-3 rounded-xl bg-white/[0.03] hover:bg-red-500/10 text-muted-foreground hover:text-red-400 text-sm font-bold border border-white/[0.06] hover:border-red-500/20 active:scale-[0.96] transition-all"
-                >
-                    &minus; F
-                </button>
+            {/* Dynamic label tap buttons */}
+            <div className="grid gap-2 w-full max-w-[280px]" style={{ gridTemplateColumns: `repeat(${activeLabels.length || 1}, 1fr)` }}>
+                {activeLabels.map(l => (
+                    <button
+                        key={`in-${l.id}`}
+                        onClick={() => handleTap(1, l.id)}
+                        className="py-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-sm font-bold border border-emerald-200 dark:border-emerald-500/20 active:scale-[0.96] transition-all"
+                    >
+                        + {l.label}
+                    </button>
+                ))}
+                {activeLabels.map(l => (
+                    <button
+                        key={`out-${l.id}`}
+                        onClick={() => handleTap(-1, l.id)}
+                        className="py-3 rounded-xl bg-white/[0.03] hover:bg-red-500/10 text-muted-foreground hover:text-red-400 text-sm font-bold border border-white/[0.06] hover:border-red-500/20 active:scale-[0.96] transition-all"
+                    >
+                        &minus; {l.label}
+                    </button>
+                ))}
             </div>
         </div>
     );

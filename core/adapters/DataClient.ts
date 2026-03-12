@@ -34,9 +34,9 @@ export type DeltaPayload = {
     venueId: string;
     areaId: string | null;
     deviceId?: string;
-    delta: number; // +N or -N
+    delta: number;
     source: 'manual' | 'scan' | 'bulk' | 'reset' | 'auto_scan';
-    gender?: 'M' | 'F';
+    counterLabelId?: string;
     idempotencyKey?: string;
 };
 
@@ -121,7 +121,8 @@ export type EventLogEntry = {
     type: 'TAP' | 'SCAN' | 'BULK' | 'RESET' | 'BAN' | 'TURNAROUND';
     delta?: number;
     flowType?: 'IN' | 'OUT';
-    gender?: string;
+    counterLabelId?: string;
+    counterLabelName?: string;
     source?: string;
     userId?: string;
     deviceId?: string;
@@ -198,8 +199,9 @@ export interface Device {
     venue_id?: string | null;
     area_id?: string | null;
     name: string;
-    direction_mode?: 'in_only' | 'out_only' | 'bidirectional';
     active: boolean;
+    counter_labels: Array<{ id: string; device_id: string; label: string; position: number; color?: string | null; deleted_at?: string | null }>;
+    is_venue_counter?: boolean;
     button_config?: { label_a: string; label_b: string };
 }
 

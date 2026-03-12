@@ -10,7 +10,7 @@ import {
     ArrowRightLeft, LogIn, LogOut, Save, X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Clicr, FlowMode } from '@/lib/types';
+import { Clicr } from '@/lib/types';
 import Link from 'next/link';
 
 export default function AreaDetailPage() {
@@ -48,7 +48,7 @@ export default function AreaDetailPage() {
     // Add Clicr Form State
     const [newClicrName, setNewClicrName] = useState('');
     const [newClicrCommand, setNewClicrCommand] = useState('');
-    const [newClicrFlow, setNewClicrFlow] = useState<FlowMode>('BIDIRECTIONAL');
+    const [newClicrLabels, setNewClicrLabels] = useState<string[]>(['General']);
     const [isSavingClicr, setIsSavingClicr] = useState(false);
 
     useEffect(() => {
@@ -80,12 +80,18 @@ export default function AreaDetailPage() {
         if (!newClicrName.trim()) return;
         setIsSavingClicr(true);
 
+        const deviceId = crypto.randomUUID();
         const res = await addClicr({
-            id: crypto.randomUUID(),
+            id: deviceId,
             area_id: area.id,
             name: newClicrName,
             command: newClicrCommand.trim() || undefined,
-            flow_mode: newClicrFlow,
+            counter_labels: newClicrLabels.map((lbl, i) => ({
+                id: crypto.randomUUID(),
+                device_id: deviceId,
+                label: lbl,
+                position: i,
+            })),
             current_count: 0,
             active: true
         });
@@ -95,7 +101,7 @@ export default function AreaDetailPage() {
             setShowAddClicr(false);
             setNewClicrName('');
             setNewClicrCommand('');
-            setNewClicrFlow('BIDIRECTIONAL');
+            setNewClicrLabels(['General']);
         } else {
             alert(`Failed to save Clicr: ${res.error || 'Unknown error'}`);
         }
@@ -270,23 +276,21 @@ export default function AreaDetailPage() {
                                 </div>
 
                                 <div>
-                                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1">Flow Mode</label>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        {(['IN_ONLY', 'OUT_ONLY', 'BIDIRECTIONAL'] as const).map(mode => (
-                                            <button
-                                                key={mode}
-                                                onClick={() => setNewClicrFlow(mode)}
-                                                className={cn(
-                                                    "p-2 rounded-lg text-xs font-bold border transition-colors",
-                                                    newClicrFlow === mode
-                                                        ? "bg-primary/20 border-primary text-primary"
-                                                        : "bg-muted border-transparent text-muted-foreground hover:bg-muted"
+                                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1">Counter Labels</label>
+                                    <div className="flex flex-wrap gap-2 mb-2">
+                                        {newClicrLabels.map((lbl, i) => (
+                                            <span key={i} className="flex items-center gap-1 px-2 py-1 bg-muted rounded-full text-xs text-foreground">
+                                                {lbl}
+                                                {newClicrLabels.length > 1 && (
+                                                    <button type="button" onClick={() => setNewClicrLabels(prev => prev.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-red-400 ml-0.5">&times;</button>
                                                 )}
-                                            >
-                                                {mode.replace('_', ' ')}
-                                            </button>
+                                            </span>
                                         ))}
                                     </div>
+                                    <button type="button" onClick={() => {
+                                        const name = prompt('Label name:');
+                                        if (name?.trim()) setNewClicrLabels(prev => [...prev, name.trim()]);
+                                    }} className="text-xs text-primary hover:text-primary/80">+ Add label</button>
                                 </div>
                             </div>
 
@@ -373,16 +377,16 @@ function ClicrCard({ clicr, onArchive }: { clicr: Clicr, onArchive: () => void }
         <div className="bg-background/40 border border-border rounded-xl p-4 flex items-center justify-between group hover:border-border transition-colors">
             <div className="flex items-center gap-3">
                 <div className="p-2 bg-muted rounded-lg text-muted-foreground">
-                    {clicr.flow_mode === 'BIDIRECTIONAL' ? <ArrowRightLeft className="w-4 h-4" /> :
-                        clicr.flow_mode === 'IN_ONLY' ? <LogIn className="w-4 h-4 text-emerald-500" /> :
-                            <LogOut className="w-4 h-4 text-rose-500" />
-                    }
+                    <ArrowRightLeft className="w-4 h-4" />
                 </div>
                 <div>
                     <h4 className="text-foreground font-bold">{clicr.name}</h4>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span className="font-mono bg-card px-1 py-0.5 rounded text-foreground/80">{clicr.current_count}</span>
                         <span>recorded today</span>
+                        {(clicr.counter_labels ?? []).filter(l => !l.deleted_at).length > 0 && (
+                            <span className="text-muted-foreground/60">· {(clicr.counter_labels ?? []).filter(l => !l.deleted_at).map(l => l.label).join(', ')}</span>
+                        )}
                     </div>
                 </div>
             </div>

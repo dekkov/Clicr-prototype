@@ -73,7 +73,7 @@ export default async function CreateClicrTruthPage() {
                 <ul className="list-disc pl-5 space-y-1 text-slate-400">
                     <li>If 'status' is missing in keys above, we must add it or use correct column.</li>
                     <li>If 'name' is missing, check 'device_name'.</li>
-                    <li>If 'direction_mode' is missing, we must add it.</li>
+                    <li>If 'device_counter_labels' is missing, check migration 020.</li>
                 </ul>
             </section>
         </div>

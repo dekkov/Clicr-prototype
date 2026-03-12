@@ -48,6 +48,7 @@ export async function GET(req: Request) {
         flow_type: e.flow_type,
         event_type: e.event_type,
         gender: e.gender ?? undefined,
+        counter_label_id: e.counter_label_id ?? null,
     }));
 
     const mappedScans = (scans ?? []).map((s: any) => ({

@@ -10,7 +10,7 @@ import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/components/providers/theme-provider';
 import { GettingStartedChecklist } from './_components/GettingStartedChecklist';
-import type { CountEvent, Venue } from '@/lib/types';
+import type { CountEvent, Venue, Clicr } from '@/lib/types';
 import type { HeatmapData } from '@/app/api/reports/heatmap/route';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { useReset } from '@/lib/reset-context';
@@ -64,42 +64,44 @@ const AgeBand = ({ band, count, max }: { band: string; count: number; max: numbe
     </div>
 );
 
-const GenderBreakdown = ({ events }: { events: CountEvent[] }) => {
+const LABEL_COLORS = ['bg-emerald-500', 'bg-blue-500', 'bg-amber-500', 'bg-purple-500', 'bg-pink-500', 'bg-cyan-500'];
+
+const CounterLabelBreakdown = ({ events, clicrs }: { events: CountEvent[]; clicrs: Clicr[] }) => {
     const entries = events.filter(e => e.delta > 0);
     const total = entries.length;
-    const male = entries.filter(e => e.gender === 'M').length;
-    const female = entries.filter(e => e.gender === 'F').length;
-    const unknown = total - male - female;
 
-    const malePct = total > 0 ? Math.round((male / total) * 100) : 0;
-    const femalePct = total > 0 ? Math.round((female / total) * 100) : 0;
-    const unknownPct = total > 0 ? 100 - malePct - femalePct : 0;
+    // Build label name map
+    const labelMap = new Map<string, string>();
+    clicrs.forEach(c => (c.counter_labels ?? []).forEach(l => labelMap.set(l.id, l.label)));
+
+    // Count by label
+    const counts: Record<string, number> = {};
+    entries.forEach(e => {
+        const name = (e.counter_label_id && labelMap.get(e.counter_label_id)) || 'Unlabeled';
+        counts[name] = (counts[name] || 0) + 1;
+    });
+
+    const sorted = Object.entries(counts).sort(([, a], [, b]) => b - a);
 
     return (
         <div className="bg-card border border-border rounded-xl p-6">
             <div className="flex items-center gap-2 mb-1">
                 <Users className="w-4 h-4 text-muted-foreground" />
-                <span className="text-lg">Gender Breakdown</span>
+                <span className="text-lg">Counter Labels</span>
             </div>
-            <p className="text-xs text-gray-500 mb-4">Based on gender-tagged entries tonight</p>
+            <p className="text-xs text-gray-500 mb-4">Entry breakdown by counter label tonight</p>
             <div className="flex h-4 rounded-full overflow-hidden mb-3">
-                <div className="bg-blue-500 transition-all" style={{ width: `${malePct}%` }} />
-                <div className="bg-pink-500 transition-all" style={{ width: `${femalePct}%` }} />
-                <div className="bg-gray-600 transition-all" style={{ width: `${unknownPct}%` }} />
+                {sorted.map(([, count], i) => (
+                    <div key={i} className={`${LABEL_COLORS[i % LABEL_COLORS.length]} transition-all`} style={{ width: `${total > 0 ? (count / total) * 100 : 0}%` }} />
+                ))}
             </div>
-            <div className="flex items-center gap-6 text-sm">
-                <span className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />
-                    Male <span className="text-foreground ml-1">{malePct}%</span>
-                </span>
-                <span className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-pink-500 inline-block" />
-                    Female <span className="text-foreground ml-1">{femalePct}%</span>
-                </span>
-                <span className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-gray-500 inline-block" />
-                    Unknown <span className="text-foreground ml-1">{unknownPct}%</span>
-                </span>
+            <div className="flex items-center gap-6 text-sm flex-wrap">
+                {sorted.map(([name, count], i) => (
+                    <span key={name} className="flex items-center gap-1.5">
+                        <span className={`w-2.5 h-2.5 rounded-full ${LABEL_COLORS[i % LABEL_COLORS.length]} inline-block`} />
+                        {name} <span className="text-foreground ml-1">{total > 0 ? Math.round((count / total) * 100) : 0}%</span>
+                    </span>
+                ))}
             </div>
         </div>
     );
@@ -517,6 +519,7 @@ export default function DashboardPage() {
         businesses,
         areas,
         venues,
+        clicrs,
         events,
         scanEvents,
         currentUser,
@@ -699,7 +702,7 @@ export default function DashboardPage() {
             ts: number;
             kind: 'ENTRY' | 'EXIT';
             areaId?: string;
-            gender?: 'M' | 'F';
+            counterLabelId?: string;
         };
 
         return todayEvents
@@ -708,7 +711,7 @@ export default function DashboardPage() {
                 ts: e.timestamp,
                 kind: e.delta > 0 ? 'ENTRY' : 'EXIT',
                 areaId: e.area_id ?? undefined,
-                gender: e.gender as 'M' | 'F' | undefined,
+                counterLabelId: e.counter_label_id ?? undefined,
             }))
             .sort((a, b) => b.ts - a.ts)
             .slice(0, 5);
@@ -1078,14 +1081,18 @@ export default function DashboardPage() {
                                     )}>
                                         {badgeLabel[entry.kind]}
                                     </span>
-                                    {entry.gender && (
-                                        <span className={cn(
-                                            "text-[10px] font-bold px-1 rounded",
-                                            entry.gender === 'M' ? "bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-300" : "bg-pink-100 dark:bg-pink-900/60 text-pink-600 dark:text-pink-300"
-                                        )}>
-                                            {entry.gender}
-                                        </span>
-                                    )}
+                                    {entry.counterLabelId && (() => {
+                                        let labelName = entry.counterLabelId;
+                                        for (const c of clicrs) {
+                                            const found = (c.counter_labels ?? []).find((cl: any) => cl.id === entry.counterLabelId);
+                                            if (found) { labelName = found.label; break; }
+                                        }
+                                        return (
+                                            <span className="text-[10px] font-bold px-1 rounded bg-muted text-muted-foreground">
+                                                {labelName}
+                                            </span>
+                                        );
+                                    })()}
                                 </div>
                                 <div className="text-sm text-foreground/80">
                                     {entry.areaId ? areaMap[entry.areaId] ?? 'Unknown Area' : '—'}
@@ -1098,7 +1105,7 @@ export default function DashboardPage() {
             </div>}
 
             {/* Gender Breakdown */}
-            {isToday && <GenderBreakdown events={todayEvents} />}
+            {isToday && <CounterLabelBreakdown events={todayEvents} clicrs={clicrs} />}
 
             {/* Hourly Traffic + Occupancy Over Time */}
             {isToday && <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

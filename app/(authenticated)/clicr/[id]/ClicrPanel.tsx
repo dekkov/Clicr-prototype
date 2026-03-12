@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '@/lib/store';
 import { cn } from '@/lib/utils';
-import type { IDScanEvent } from '@/lib/types';
+import type { IDScanEvent, CounterLabel } from '@/lib/types';
 import { parseAAMVA } from '@/lib/aamva';
 import { evaluateScan } from '@/lib/scan-service';
 import { getVenueCapacityRules } from '@/lib/capacity';
@@ -29,30 +29,33 @@ const ConfigModalBody = React.memo(function ConfigModalBody({
     configRef: React.MutableRefObject<{
         initialName: string;
         clicrId: string;
-        hasTapToken: boolean;
-        tapToken: string;
         initialClassifyMode: boolean;
-        onSave: (name: string) => void;
+        counterLabels: Array<{ id: string; device_id: string; label: string; position: number; color?: string | null; deleted_at?: string | null }>;
+        onSave: (name: string, labels: Array<{ id: string; device_id: string; label: string; position: number; color?: string | null; deleted_at?: string | null }>) => void;
         onCancel: () => void;
-        onGenerateToken: () => void;
         onClassifyToggle: (newVal: boolean) => void;
-        onCopy: () => void;
     } | null>;
 }) {
     const snap = configRef.current;
     if (!snap) return null;
     const [name, setName] = useState(() => snap.initialName);
     const [classifyMode, setClassifyMode] = useState(() => snap.initialClassifyMode);
-    const [copyFeedback, setCopyFeedback] = useState(false);
-    const handleCopy = () => {
-        snap.onCopy();
-        setCopyFeedback(true);
-        setTimeout(() => setCopyFeedback(false), 1500);
-    };
+    const [labels, setLabels] = useState(() => snap.counterLabels.filter(l => !l.deleted_at));
+    const [newLabelName, setNewLabelName] = useState('');
     const handleClassifyToggle = () => {
         const newVal = !classifyMode;
         setClassifyMode(newVal);
         snap.onClassifyToggle(newVal);
+    };
+    const addLabel = () => {
+        if (!newLabelName.trim()) return;
+        setLabels(prev => [...prev, { id: crypto.randomUUID(), device_id: snap.clicrId, label: newLabelName.trim(), position: prev.length }]);
+        setNewLabelName('');
+    };
+    const deleteLabel = (id: string) => {
+        if (labels.length <= 1) return;
+        if (!window.confirm('Historical data for this label will still be visible in reports, but the counter will be removed from the clicker.')) return;
+        setLabels(prev => prev.filter(l => l.id !== id).map((l, i) => ({ ...l, position: i })));
     };
     return (
         <>
@@ -75,22 +78,28 @@ const ConfigModalBody = React.memo(function ConfigModalBody({
                 </div>
             </div>
             <div className="space-y-2">
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Remote Tap Link</label>
-                {snap.hasTapToken ? (
-                    <div className="space-y-2">
-                        <div className="flex gap-2">
-                            <input readOnly value={`${typeof window !== 'undefined' ? window.location.origin : ''}/tap/${snap.tapToken}`} className="flex-1 bg-background border border-border rounded-xl px-3 py-2.5 text-foreground/60 text-xs font-mono focus:outline-none truncate" />
-                            <button type="button" onClick={handleCopy} className="px-3 py-2.5 rounded-xl bg-card hover:bg-card/80 text-foreground text-xs font-bold transition-colors shrink-0">{copyFeedback ? 'Copied!' : 'Copy'}</button>
-                        </div>
-                        <button type="button" onClick={snap.onGenerateToken} className="w-full py-2.5 rounded-xl bg-background border border-border hover:border-foreground/60 text-foreground/60 text-xs font-bold transition-colors">Regenerate Link</button>
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Counter Labels</label>
+                {labels.map(l => (
+                    <div key={l.id} className="flex items-center gap-2">
+                        <input value={l.label} onChange={e => setLabels(prev => prev.map(lb => lb.id === l.id ? { ...lb, label: e.target.value } : lb))}
+                            className="flex-1 bg-background border border-border rounded-xl px-3 py-2 text-foreground text-sm focus:outline-none focus:border-foreground" />
+                        {labels.length > 1 && (
+                            <button type="button" onClick={() => deleteLabel(l.id)} className="text-red-400 hover:text-red-300 p-1">
+                                <XCircle className="w-4 h-4" />
+                            </button>
+                        )}
                     </div>
-                ) : (
-                    <button type="button" onClick={snap.onGenerateToken} className="w-full py-2.5 rounded-xl bg-background border border-border hover:border-foreground text-foreground text-xs font-bold transition-colors">Generate Link</button>
-                )}
+                ))}
+                <div className="flex gap-2">
+                    <input value={newLabelName} onChange={e => setNewLabelName(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addLabel(); } }}
+                        placeholder="Add label..." className="flex-1 bg-background border border-border rounded-xl px-3 py-2 text-foreground text-sm focus:outline-none" />
+                    <button type="button" onClick={addLabel} disabled={!newLabelName.trim()} className="px-3 py-2 bg-card rounded-xl text-sm font-medium disabled:opacity-50">Add</button>
+                </div>
             </div>
             <div className="grid grid-cols-2 gap-3 pt-2">
                 <button type="button" onClick={snap.onCancel} className="py-3 rounded-xl text-foreground/60 bg-card border border-border hover:bg-border font-semibold text-sm transition-colors">Cancel</button>
-                <button type="button" onClick={() => snap.onSave(name)} className="py-3 rounded-xl bg-white text-black font-bold text-sm hover:bg-muted shadow-lg transition-all active:scale-95">Save Changes</button>
+                <button type="button" onClick={() => snap.onSave(name, labels)} className="py-3 rounded-xl bg-white text-black font-bold text-sm hover:bg-muted shadow-lg transition-all active:scale-95">Save Changes</button>
             </div>
         </>
     );
@@ -164,7 +173,7 @@ export default function ClicrPanel({
     const [bulkValue, setBulkValue] = useState(0);
     const [showConfigModal, setShowConfigModal] = useState(false);
     const [showDebug, setShowDebug] = useState(false);
-    const [generatingToken, setGeneratingToken] = useState(false);
+    // const [generatingToken, setGeneratingToken] = useState(false); // Removed: tap page deleted
     const [turnaroundFlash, setTurnaroundFlash] = useState(false);
 
     const isModalOpenRef = useRef(false);
@@ -314,37 +323,25 @@ export default function ClicrPanel({
     const configModalRef = useRef<{
         initialName: string;
         clicrId: string;
-        hasTapToken: boolean;
-        tapToken: string;
         initialClassifyMode: boolean;
-        onSave: (name: string) => void;
+        counterLabels: Array<{ id: string; device_id: string; label: string; position: number; color?: string | null; deleted_at?: string | null }>;
+        onSave: (name: string, labels: Array<{ id: string; device_id: string; label: string; position: number; color?: string | null; deleted_at?: string | null }>) => void;
         onCancel: () => void;
-        onGenerateToken: () => void;
         onClassifyToggle: (newVal: boolean) => void;
-        onCopy: () => void;
     } | null>(null);
 
-    const saveConfig = async (name: string) => {
+    const saveConfig = async (name: string, labels: Array<{ id: string; device_id: string; label: string; position: number; color?: string | null; deleted_at?: string | null }>) => {
         if (clicr) {
-            await updateClicr({ ...clicr, name, button_config: { ...(clicr.button_config ?? {}) } });
+            await updateClicr({ ...clicr, name, counter_labels: labels, button_config: { ...(clicr.button_config ?? {}) } });
         }
         setShowConfigModal(false);
         setPollingPaused?.(false);
     };
 
-    const generateTapToken = async () => {
-        if (!clicr || generatingToken) return;
-        setGeneratingToken(true);
-        try {
-            const token = Math.random().toString(36).slice(2, 10);
-            await updateClicr({ ...clicr, button_config: { ...(clicr.button_config ?? {}), tap_token: token } });
-        } finally {
-            setGeneratingToken(false);
-        }
-    };
-
     // --- COUNT HANDLERS ---
-    const handleIn = (gender: 'M' | 'F') => {
+    const activeLabels: CounterLabel[] = (clicr?.counter_labels ?? []).filter((l: CounterLabel) => !l.deleted_at).sort((a: CounterLabel, b: CounterLabel) => a.position - b.position);
+
+    const handleIn = (counterLabelId: string) => {
         if (!clicr || !venueId) return;
         const { maxCapacity, mode: capMode } = getVenueCapacityRules(venue);
         if (maxCapacity > 0 && currentVenueOccupancy >= maxCapacity) {
@@ -367,13 +364,13 @@ export default function ClicrPanel({
             clicr_id: clicr.id,
             delta: 1,
             flow_type: 'IN',
-            gender,
+            counter_label_id: counterLabelId,
             event_type: 'TAP',
             idempotency_key: Math.random().toString(36),
         });
     };
 
-    const handleOut = (gender: 'M' | 'F') => {
+    const handleOut = (counterLabelId: string) => {
         if (!clicr || !venueId) return;
         if (navigator.vibrate) navigator.vibrate(50);
         recordEvent({
@@ -382,7 +379,7 @@ export default function ClicrPanel({
             clicr_id: clicr.id,
             delta: -1,
             flow_type: 'OUT',
-            gender,
+            counter_label_id: counterLabelId,
             event_type: 'TAP',
             idempotency_key: Math.random().toString(36),
         });
@@ -469,13 +466,14 @@ export default function ClicrPanel({
         if (result.status === 'ACCEPTED') {
             if (addToCountOnAccept) {
                 if (!clicr?.area_id || !clicr?.id) return;
+                const firstLabel = activeLabels[0];
                 recordEvent({
                     venue_id: venueId,
                     area_id: clicr.area_id,
                     clicr_id: clicr.id,
                     delta: 1,
                     flow_type: 'IN',
-                    gender: parsed.sex as 'M' | 'F' | undefined,
+                    counter_label_id: firstLabel?.id ?? null,
                     event_type: 'SCAN',
                     idempotency_key: Math.random().toString(36),
                 });
@@ -584,7 +582,6 @@ export default function ClicrPanel({
         </div>
     );
 
-    const showOutButtons = clicr.direction_mode !== 'in_only' && clicr.flow_mode !== 'IN_ONLY';
     const debugAny = debug as any;
     // debug is boolean in store; treat any loaded, non-loading state as connected.
     // In demo mode there is no Supabase WS — show "Demo" instead of Offline.
@@ -639,14 +636,11 @@ export default function ClicrPanel({
                             configModalRef.current = {
                                 initialName: clicr.name,
                                 clicrId: clicr.id,
-                                hasTapToken: !!clicr.button_config?.tap_token,
-                                tapToken: clicr.button_config?.tap_token ?? '',
                                 initialClassifyMode: classifyMode,
+                                counterLabels: clicr.counter_labels ?? [],
                                 onSave: saveConfig,
                                 onCancel: () => { setShowConfigModal(false); setPollingPaused?.(false); },
-                                onGenerateToken: generateTapToken,
                                 onClassifyToggle: (v) => { setClassifyMode(v); localStorage.setItem(`clicr_classify_mode_${clicr.id}`, String(v)); },
-                                onCopy: async () => { try { await navigator.clipboard.writeText(`${window.location.origin}/tap/${clicr.button_config!.tap_token}`); } catch { } },
                             };
                         }}
                         className="p-1.5 text-foreground/40 hover:text-foreground/70 hover:bg-card rounded-lg transition-colors"
@@ -812,45 +806,30 @@ export default function ClicrPanel({
                 {/* ── COUNT MODE ───────────────────────────────────── */}
                 {mode === 'count' && (
                     <>
-                        {/* M/F Counter Grid */}
-                        <div className="grid grid-cols-2 gap-3">
-                            {/* +MALE */}
-                            <button
-                                onClick={() => handleIn('M')}
-                                className="relative overflow-hidden bg-gradient-to-br from-blue-500 to-blue-700 hover:from-blue-400 hover:to-blue-600 active:scale-[0.97] transition-all rounded-2xl border-2 border-blue-400/40 shadow-lg shadow-blue-500/20 py-8 flex flex-col items-center justify-center touch-manipulation"
-                            >
-                                <span className="text-4xl font-bold text-foreground leading-none drop-shadow">+</span>
-                                <span className="text-foreground font-bold tracking-[0.2em] text-sm mt-1">MALE</span>
-                            </button>
-
-                            {/* +FEMALE */}
-                            <button
-                                onClick={() => handleIn('F')}
-                                className="relative overflow-hidden bg-gradient-to-br from-pink-500 to-pink-700 hover:from-pink-400 hover:to-pink-600 active:scale-[0.97] transition-all rounded-2xl border-2 border-pink-400/40 shadow-lg shadow-pink-500/20 py-8 flex flex-col items-center justify-center touch-manipulation"
-                            >
-                                <span className="text-4xl font-bold text-foreground leading-none drop-shadow">+</span>
-                                <span className="text-foreground font-bold tracking-[0.2em] text-sm mt-1">FEMALE</span>
-                            </button>
-
-                            {/* -MALE */}
-                            {showOutButtons && (
+                        {/* Dynamic Counter Label Grid */}
+                        <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${activeLabels.length || 1}, 1fr)` }}>
+                            {/* + ROW */}
+                            {activeLabels.map(label => (
                                 <button
-                                    onClick={() => handleOut('M')}
-                                    className="relative overflow-hidden bg-gradient-to-br from-blue-700 to-blue-900 hover:from-blue-600 hover:to-blue-800 active:scale-[0.97] transition-all rounded-2xl border-2 border-blue-600/40 shadow-lg shadow-blue-900/20 py-5 flex items-center justify-center touch-manipulation"
+                                    key={`in-${label.id}`}
+                                    onClick={() => handleIn(label.id)}
+                                    className="relative overflow-hidden bg-gradient-to-br from-emerald-500 to-emerald-700 hover:from-emerald-400 hover:to-emerald-600 active:scale-[0.97] transition-all rounded-2xl border-2 border-emerald-400/40 shadow-lg shadow-emerald-500/20 py-8 flex flex-col items-center justify-center touch-manipulation"
+                                >
+                                    <span className="text-4xl font-bold text-foreground leading-none drop-shadow">+</span>
+                                    <span className="text-foreground font-bold tracking-[0.2em] text-sm mt-1 uppercase">{label.label}</span>
+                                </button>
+                            ))}
+                            {/* - ROW */}
+                            {activeLabels.map(label => (
+                                <button
+                                    key={`out-${label.id}`}
+                                    onClick={() => handleOut(label.id)}
+                                    className="relative overflow-hidden bg-gradient-to-br from-slate-700 to-slate-900 hover:from-slate-600 hover:to-slate-800 active:scale-[0.97] transition-all rounded-2xl border-2 border-slate-600/40 shadow-lg shadow-slate-900/20 py-5 flex items-center justify-center touch-manipulation"
                                 >
                                     <span className="text-3xl font-bold text-foreground/80 leading-none">−</span>
+                                    <span className="text-foreground/60 font-bold tracking-[0.2em] text-xs ml-2 uppercase">{label.label}</span>
                                 </button>
-                            )}
-
-                            {/* -FEMALE */}
-                            {showOutButtons && (
-                                <button
-                                    onClick={() => handleOut('F')}
-                                    className="relative overflow-hidden bg-gradient-to-br from-pink-700 to-pink-900 hover:from-pink-600 hover:to-pink-800 active:scale-[0.97] transition-all rounded-2xl border-2 border-pink-600/40 shadow-lg shadow-pink-900/20 py-5 flex items-center justify-center touch-manipulation"
-                                >
-                                    <span className="text-3xl font-bold text-foreground/80 leading-none">−</span>
-                                </button>
-                            )}
+                            ))}
                         </div>
 
                         {/* End Shift */}

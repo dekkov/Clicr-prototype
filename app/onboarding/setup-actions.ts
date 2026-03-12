@@ -90,11 +90,14 @@ export type OnboardingBatchInput = {
     logoUrl?: string;
     venue: { name: string; city?: string; state?: string; capacity?: number };
     areas: { name: string; capacity?: number; area_type?: string }[];
-    venueCounterName?: string;
+    venueCounters?: Array<{
+        name: string;
+        labels: Array<{ id: string; label: string; position: number; color?: string }>;
+    }>;
 };
 
 export type OnboardingBatchResult =
-    | { success: true; businessId: string; venueId: string; areaIds: string[]; venueCounterId: string }
+    | { success: true; businessId: string; venueId: string; areaIds: string[]; venueCounterIds: string[] }
     | { success: false; error: string };
 
 export async function createBusinessVenueAndAreas(input: OnboardingBatchInput): Promise<OnboardingBatchResult> {
@@ -168,25 +171,49 @@ export async function createBusinessVenueAndAreas(input: OnboardingBatchInput): 
             areaIds.push(areaId);
         }
 
-        // Auto-create the venue's dedicated counter clicr (device)
-        const venueCounterId = crypto.randomUUID();
-        const { error: vcError } = await supabaseAdmin
-            .from('devices')
-            .insert({
-                id: venueCounterId,
-                business_id: business.id,
-                venue_id: venueId,
-                area_id: null,
-                name: input.venueCounterName?.trim() || 'Venue Counter',
-                device_type: 'COUNTER',
-                direction_mode: 'bidirectional',
-                is_venue_counter: true,
-                status: 'ACTIVE',
-            });
-        if (vcError) throw vcError;
+        // Auto-create venue counter clicrs (devices) with labels
+        const venueCounters = input.venueCounters?.length
+            ? input.venueCounters
+            : [{ name: 'Venue Counter', labels: [{ id: crypto.randomUUID(), label: 'General', position: 0 }] }];
+
+        const venueCounterIds: string[] = [];
+
+        for (const vc of venueCounters) {
+            const vcId = crypto.randomUUID();
+            venueCounterIds.push(vcId);
+
+            const { error: vcError } = await supabaseAdmin
+                .from('devices')
+                .insert({
+                    id: vcId,
+                    business_id: business.id,
+                    venue_id: venueId,
+                    area_id: null,
+                    name: vc.name.trim() || 'Venue Counter',
+                    device_type: 'COUNTER',
+                    is_venue_counter: true,
+                    status: 'ACTIVE',
+                });
+            if (vcError) throw vcError;
+
+            const labels = vc.labels.length > 0
+                ? vc.labels
+                : [{ id: crypto.randomUUID(), label: 'General', position: 0 }];
+
+            const { error: lblError } = await supabaseAdmin
+                .from('device_counter_labels')
+                .insert(labels.map(l => ({
+                    id: l.id || crypto.randomUUID(),
+                    device_id: vcId,
+                    label: l.label,
+                    position: l.position,
+                    color: (l as any).color || null,
+                })));
+            if (lblError) throw lblError;
+        }
 
         revalidatePath('/dashboard');
-        return { success: true, businessId: business.id, venueId, areaIds, venueCounterId };
+        return { success: true, businessId: business.id, venueId, areaIds, venueCounterIds };
     } catch (e: any) {
         console.error('[setup] createBusinessVenueAndAreas error:', e);
         return { success: false, error: e.message || 'Failed to create business, venue, and areas' };

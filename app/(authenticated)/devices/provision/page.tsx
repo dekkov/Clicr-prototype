@@ -42,13 +42,7 @@ export default function DeviceProvisioningPage() {
     };
 
     const handleConfigSubmit = async () => {
-        // Here we would perform the actual Supabase update
-        // await supabase.from('devices').update({ 
-        //   device_name: deviceName, 
-        //   venue_id: selectedVenueId,
-        //   area_id: selectedAreaId,
-        //   direction_mode: directionMode
-        // }).eq('pairing_code', pairingCode);
+        // TODO: Supabase update for device provisioning
 
         setStep('SUCCESS');
     };

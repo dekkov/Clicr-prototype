@@ -9,7 +9,7 @@ import { listBoardViews } from '@/app/actions/board';
 import { canAddClicr } from '@/lib/permissions';
 import type { Role } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { Clicr, Area, FlowMode } from '@/lib/types';
+import { Clicr, Area } from '@/lib/types';
 
 export default function ClicrListPage() {
     const { clicrs, areas, venues, isLoading, activeBusiness, currentUser, addClicr } = useApp();
@@ -30,7 +30,7 @@ export default function ClicrListPage() {
     }, [activeBusiness]);
     const [newClicrAreaId, setNewClicrAreaId] = useState('');
     const [newClicrName, setNewClicrName] = useState('');
-    const [newClicrFlow, setNewClicrFlow] = useState<FlowMode>('BIDIRECTIONAL');
+    const [newClicrLabels, setNewClicrLabels] = useState<string[]>(['General']);
 
     if (!activeBusiness && !isLoading) {
         return (
@@ -155,13 +155,21 @@ export default function ClicrListPage() {
                                     className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground text-sm" />
                             </div>
                             <div>
-                                <label className="text-xs font-medium text-muted-foreground mb-1 block">Flow Mode</label>
-                                <select value={newClicrFlow} onChange={e => setNewClicrFlow(e.target.value as FlowMode)}
-                                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground text-sm">
-                                    <option value="BIDIRECTIONAL">Both (in + out)</option>
-                                    <option value="IN_ONLY">In only</option>
-                                    <option value="OUT_ONLY">Out only</option>
-                                </select>
+                                <label className="text-xs font-medium text-muted-foreground mb-1 block">Counter Labels</label>
+                                <div className="flex flex-wrap gap-2 mb-2">
+                                    {newClicrLabels.map((lbl, i) => (
+                                        <span key={i} className="flex items-center gap-1 px-2 py-1 bg-muted rounded-full text-xs text-foreground">
+                                            {lbl}
+                                            {newClicrLabels.length > 1 && (
+                                                <button type="button" onClick={() => setNewClicrLabels(prev => prev.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-red-400 ml-0.5">&times;</button>
+                                            )}
+                                        </span>
+                                    ))}
+                                </div>
+                                <button type="button" onClick={() => {
+                                    const name = prompt('Label name:');
+                                    if (name?.trim()) setNewClicrLabels(prev => [...prev, name.trim()]);
+                                }} className="text-xs text-primary hover:text-primary/80">+ Add label</button>
                             </div>
                         </div>
                         <div className="flex gap-3 pt-2">
@@ -171,18 +179,24 @@ export default function ClicrListPage() {
                             </button>
                             <button onClick={async () => {
                                 if (!newClicrAreaId || !newClicrName.trim()) return;
+                                const deviceId = crypto.randomUUID();
                                 await addClicr({
-                                    id: crypto.randomUUID(),
+                                    id: deviceId,
                                     area_id: newClicrAreaId,
                                     name: newClicrName.trim(),
-                                    flow_mode: newClicrFlow,
+                                    counter_labels: newClicrLabels.map((lbl, i) => ({
+                                        id: crypto.randomUUID(),
+                                        device_id: deviceId,
+                                        label: lbl,
+                                        position: i,
+                                    })),
                                     active: true,
                                     current_count: 0,
                                 });
                                 setShowAddClicr(false);
                                 setNewClicrName('');
                                 setNewClicrAreaId('');
-                                setNewClicrFlow('BIDIRECTIONAL');
+                                setNewClicrLabels(['General']);
                             }} disabled={!newClicrAreaId || !newClicrName.trim()}
                                 className="flex-1 py-2 bg-primary hover:bg-primary/90 text-white rounded-xl text-sm font-bold transition-colors disabled:opacity-50">
                                 Add
@@ -225,18 +239,8 @@ function PageHeader({ canAddClicr, onAddClicr, onBoardView }: { canAddClicr: boo
     );
 }
 
-function getFlowModeLabel(flowMode: string | undefined): string {
-    switch (flowMode) {
-        case 'IN_ONLY': return 'In Only';
-        case 'OUT_ONLY': return 'Out Only';
-        case 'BIDIRECTIONAL':
-        default:
-            return 'Bidirectional';
-    }
-}
-
 function ClicrCard({ clicr, area, isVenueCounter, venue, isOnBoard }: { clicr: Clicr; area: (Area & { clicrs: Clicr[] }) | null; isVenueCounter?: boolean; venue?: any; isOnBoard?: boolean }) {
-    const flowModeLabel = getFlowModeLabel(clicr.flow_mode);
+    const activeLabels = (clicr.counter_labels ?? []).filter(l => !l.deleted_at);
     const scanEnabled = clicr.scan_enabled;
 
     const occupancy = isVenueCounter
@@ -292,8 +296,12 @@ function ClicrCard({ clicr, area, isVenueCounter, venue, isOnBoard }: { clicr: C
                     <Wifi className="w-4 h-4 text-emerald-400" />
                     <span className="text-emerald-400">Online</span>
                 </div>
-                <div className="text-muted-foreground">·</div>
-                <div className="text-muted-foreground">{flowModeLabel}</div>
+                {activeLabels.length > 0 && (
+                    <>
+                        <div className="text-muted-foreground">·</div>
+                        <div className="text-muted-foreground">{activeLabels.map(l => l.label).join(', ')}</div>
+                    </>
+                )}
                 {scanEnabled && (
                     <>
                         <div className="text-muted-foreground">·</div>

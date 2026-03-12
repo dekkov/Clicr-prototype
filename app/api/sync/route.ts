@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { CountEvent, IDScanEvent, User, Clicr, Area, Venue } from '@/lib/types';
+import { CountEvent, IDScanEvent, User, Clicr, Area, Venue, CounterLabel } from '@/lib/types';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createInitialDBData, type DBData } from '@/lib/sync-data';
 import { getAuthenticatedUser } from '@/lib/api-auth';
@@ -80,6 +80,7 @@ async function hydrateData(data: DBData): Promise<DBData> {
                 flow_type: e.flow_type as any,
                 event_type: e.event_type as any,
                 gender: e.gender ?? undefined,
+                counter_label_id: e.counter_label_id ?? null,
             }));
         }
 
@@ -98,9 +99,23 @@ async function hydrateData(data: DBData): Promise<DBData> {
 
         const { data: devices, error: devError } = await supabaseAdmin
             .from('devices')
-            .select('*');
+            .select('*, device_counter_labels(*)');
 
         if (!devError && devices) {
+            const mapLabels = (d: any): CounterLabel[] =>
+                (d.device_counter_labels || [])
+                    .filter((l: any) => !l.deleted_at)
+                    .sort((a: any, b: any) => a.position - b.position)
+                    .map((l: any) => ({
+                        id: l.id,
+                        device_id: l.device_id,
+                        label: l.label,
+                        position: l.position,
+                        color: l.color || null,
+                        deleted_at: l.deleted_at || null,
+                        created_at: l.created_at,
+                    }));
+
             devices.forEach((d: any) => {
                 const exists = data.clicrs.find(c => c.id === d.id);
                 if (!exists && d.device_type === 'COUNTER') {
@@ -111,7 +126,7 @@ async function hydrateData(data: DBData): Promise<DBData> {
                         is_venue_counter: d.is_venue_counter ?? false,
                         name: d.name,
                         current_count: 0,
-                        flow_mode: d.direction_mode === 'in_only' ? 'IN_ONLY' : d.direction_mode === 'out_only' ? 'OUT_ONLY' : 'BIDIRECTIONAL',
+                        counter_labels: mapLabels(d),
                         active: d.status === 'ACTIVE',
                         button_config: d.button_config || {
                             left: { label: 'IN', delta: 1, color: 'green' },
@@ -130,6 +145,7 @@ async function hydrateData(data: DBData): Promise<DBData> {
                         area_id: match.area_id ?? null,
                         venue_id: match.venue_id || c.venue_id,
                         is_venue_counter: match.is_venue_counter ?? c.is_venue_counter ?? false,
+                        counter_labels: mapLabels(match),
                         button_config: match.button_config || c.button_config
                     };
                 }
@@ -392,8 +408,9 @@ export async function POST(request: Request) {
                     p_delta: event.delta,
                     p_source: event.event_type === 'SCAN' ? 'scan' : event.event_type === 'AUTO_SCAN' ? 'auto_scan' : 'manual',
                     p_device_id: deviceId || null,
-                    p_gender: event.gender || null,
+                    p_gender: null,
                     p_idempotency_key: event.idempotency_key || null,
+                    p_counter_label_id: event.counter_label_id || null,
                 };
                 if (hasAreaId) {
                     rpcParams.p_area_id = event.area_id;
@@ -496,19 +513,38 @@ export async function POST(request: Request) {
                 const newClicr = payload as Clicr;
                 const clicrBizId = await getBusinessId();
                 if (!clicrBizId) return NextResponse.json({ error: 'Could not resolve business_id for ADD_CLICR' }, { status: 400 });
+                const newDeviceId = newClicr.id;
                 const { error } = await supabaseAdmin.from('devices').insert({
-                    id: newClicr.id,
+                    id: newDeviceId,
                     business_id: clicrBizId,
                     area_id: newClicr.area_id ?? null,
                     venue_id: newClicr.venue_id ?? null,
                     is_venue_counter: newClicr.is_venue_counter ?? false,
                     name: newClicr.name,
                     device_type: 'COUNTER',
-                    direction_mode: newClicr.flow_mode === 'IN_ONLY' ? 'in_only' : newClicr.flow_mode === 'OUT_ONLY' ? 'out_only' : 'bidirectional',
                     status: (newClicr.active ?? true) ? 'ACTIVE' : 'INACTIVE',
                     button_config: newClicr.button_config || { label_a: 'GUEST IN', label_b: 'GUEST OUT' }
                 });
                 if (error) return NextResponse.json({ error: `Database Insert Failed: ${error.message}` }, { status: 500 });
+
+                // Insert counter labels
+                if (newClicr.counter_labels?.length) {
+                    await supabaseAdmin.from('device_counter_labels').insert(
+                        newClicr.counter_labels.map((l: any) => ({
+                            id: l.id || crypto.randomUUID(),
+                            device_id: newDeviceId,
+                            label: l.label,
+                            position: l.position,
+                            color: l.color || null,
+                        }))
+                    );
+                } else {
+                    await supabaseAdmin.from('device_counter_labels').insert({
+                        device_id: newDeviceId,
+                        label: 'General',
+                        position: 0,
+                    });
+                }
                 break;
             }
 
@@ -586,8 +622,21 @@ export async function POST(request: Request) {
                 await supabaseAdmin.from('devices').update({
                     name: clicrPayload.name,
                     button_config: clicrPayload.button_config || null,
-                    direction_mode: clicrPayload.direction_mode || 'bidirectional',
                 }).eq('id', clicrPayload.id);
+
+                // Sync counter labels
+                if (clicrPayload.counter_labels) {
+                    for (const label of clicrPayload.counter_labels) {
+                        await supabaseAdmin.from('device_counter_labels').upsert({
+                            id: label.id,
+                            device_id: clicrPayload.id,
+                            label: label.label,
+                            position: label.position,
+                            color: label.color || null,
+                            deleted_at: label.deleted_at || null,
+                        });
+                    }
+                }
                 break;
             }
 

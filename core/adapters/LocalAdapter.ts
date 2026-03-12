@@ -58,7 +58,7 @@ type LocalState = {
         flowType: 'IN' | 'OUT';
         eventType: string;
         source: string;
-        gender?: string;
+        counterLabelId?: string;
         createdAt: string;
     }>;
     scans: ScanRecord[];
@@ -242,11 +242,14 @@ export class LocalAdapter implements DataClient {
     // ── DEVICES ─────────────────────────────────────────────────────────
 
     async createDevice(areaId: string, device: Omit<Device, 'id'>): Promise<Device> {
-        const newDevice: Device = {
-            ...device,
-            id: `dev_${generateId()}`,
-            area_id: areaId,
-        };
+        const id = `dev_${generateId()}`;
+        let labels = device.counter_labels ?? [];
+        if (labels.length === 0) {
+            labels = [{ id: `lbl_${generateId()}`, device_id: id, label: 'General', position: 0 }];
+        } else {
+            labels = labels.map(l => ({ ...l, device_id: id }));
+        }
+        const newDevice: Device = { ...device, id, area_id: areaId, counter_labels: labels };
         this.state.devices.push(newDevice);
         this.saveState();
         return newDevice;
@@ -255,7 +258,11 @@ export class LocalAdapter implements DataClient {
     async updateDevice(deviceId: string, patch: Partial<Device>): Promise<Device> {
         const idx = this.state.devices.findIndex(d => d.id === deviceId);
         if (idx === -1) throw new Error('Device not found');
-        this.state.devices[idx] = { ...this.state.devices[idx], ...patch };
+        const existing = this.state.devices[idx];
+        this.state.devices[idx] = { ...existing, ...patch };
+        if (patch.counter_labels) {
+            this.state.devices[idx].counter_labels = patch.counter_labels;
+        }
         this.saveState();
         return this.state.devices[idx];
     }
@@ -308,7 +315,7 @@ export class LocalAdapter implements DataClient {
             flowType: payload.delta > 0 ? 'IN' : 'OUT',
             eventType: 'TAP',
             source: payload.source,
-            gender: payload.gender,
+            counterLabelId: payload.counterLabelId,
             createdAt: nowISO(),
         });
 
@@ -581,7 +588,7 @@ export class LocalAdapter implements DataClient {
             type: e.eventType as EventLogEntry['type'],
             delta: e.delta,
             flowType: e.flowType as 'IN' | 'OUT',
-            gender: e.gender,
+            counterLabelId: e.counterLabelId,
             source: e.source,
             deviceId: e.deviceId,
         })).sort((a, b) => b.timestamp.localeCompare(a.timestamp));

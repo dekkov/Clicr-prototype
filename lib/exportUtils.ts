@@ -67,30 +67,24 @@ export const exportReportsToExcel = (
     }));
 
 
-    // C. Gender Split
-    let male = 0;
-    let female = 0;
-    let other = 0;
-
-    // First try via scans (verified)
-    scans.forEach(s => {
-        if (s.sex === 'M') male++;
-        else if (s.sex === 'F') female++;
-        else other++;
+    // C. Counter Label Breakdown
+    const labelCounts: Record<string, number> = {};
+    events.forEach(e => {
+        if (e.counter_label_id) {
+            // Find label name from clicrs
+            let labelName = e.counter_label_id;
+            for (const c of clicrs) {
+                const label = (c.counter_labels ?? []).find(l => l.id === e.counter_label_id);
+                if (label) { labelName = label.label; break; }
+            }
+            labelCounts[labelName] = (labelCounts[labelName] || 0) + Math.abs(e.delta);
+        }
     });
 
-    // Fallback/Supplement via manual Taps if scans missing?
-    // Actually, Taps also have gender.
-    // Let's create a separate "Gender Flow" table from EVENTS (Taps + Scans + Bulk)
-    // Filter for events that have gender data
-    const genderEvents = events.filter(e => e.gender);
-    const mFlow = genderEvents.filter(e => e.gender === 'M').reduce((acc, e) => acc + Math.abs(e.delta), 0);
-    const fFlow = genderEvents.filter(e => e.gender === 'F').reduce((acc, e) => acc + Math.abs(e.delta), 0);
-
-    const genderData = [
-        { Gender: 'Male', Count: Math.max(male, mFlow), Source: male > mFlow ? 'Scans' : 'Traffic Count' },
-        { Gender: 'Female', Count: Math.max(female, fFlow), Source: female > fFlow ? 'Scans' : 'Traffic Count' }
-    ];
+    const labelData = Object.entries(labelCounts).map(([label, count]) => ({
+        Label: label,
+        Count: count,
+    }));
 
 
     // --- 2. Create Sheets ---
@@ -110,7 +104,7 @@ export const exportReportsToExcel = (
     // Chart Data Sheets
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(trafficData), "Traffic Chart Data");
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(demographicData), "Age Chart Data");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(genderData), "Gender Chart Data");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(labelData), "Counter Labels Data");
 
     // Raw Logs
     const eventLogData = events.map(e => ({
@@ -118,7 +112,7 @@ export const exportReportsToExcel = (
         Type: e.event_type,
         Flow: e.flow_type,
         Delta: e.delta,
-        Gender: e.gender || '-',
+        CounterLabel: e.counter_label_id || '-',
         Clicr: clicrs.find(c => c.id === e.clicr_id)?.name || e.clicr_id,
         User: e.user_id
     }));

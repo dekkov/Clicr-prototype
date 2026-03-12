@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/store';
-import { Venue, Area, AreaType, Clicr, FlowMode } from '@/lib/types';
+import { Venue, Area, AreaType, Clicr } from '@/lib/types';
 import { ArrowLeft, Check, Plus, MapPin, Building2, Users, Pencil, Trash2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -30,7 +30,6 @@ export default function NewVenuePage() {
 
     // Clicr Form (Map areaId -> List of Clicr Names)
     const [clicrInputs, setClicrInputs] = useState<Record<string, string>>({});
-    const [clicrFlowModes, setClicrFlowModes] = useState<Record<string, FlowMode>>({});
     const [createdClicrs, setCreatedClicrs] = useState<Clicr[]>([]);
 
     // Inline-edit state for areas
@@ -42,7 +41,6 @@ export default function NewVenuePage() {
     // Inline-edit state for clicrs
     const [editingClicrId, setEditingClicrId] = useState<string | null>(null);
     const [editingClicrName, setEditingClicrName] = useState('');
-    const [editingClicrFlow, setEditingClicrFlow] = useState<FlowMode>('BIDIRECTIONAL');
 
     const handleSaveArea = (id: string) => {
         const trimmed = editingAreaName.trim();
@@ -61,7 +59,6 @@ export default function NewVenuePage() {
         if (trimmed) setCreatedClicrs(prev => prev.map(c => c.id === id ? {
             ...c,
             name: trimmed,
-            flow_mode: editingClicrFlow,
         } : c));
         setEditingClicrId(null);
     };
@@ -104,11 +101,12 @@ export default function NewVenuePage() {
     const handleAddClicr = (areaId: string) => {
         const name = clicrInputs[areaId];
         if (!name) return;
+        const deviceId = crypto.randomUUID();
         const clicr: Clicr = {
-            id: crypto.randomUUID(),
+            id: deviceId,
             area_id: areaId,
             name,
-            flow_mode: clicrFlowModes[areaId] || 'BIDIRECTIONAL',
+            counter_labels: [{ id: crypto.randomUUID(), device_id: deviceId, label: 'General', position: 0 }],
             active: true,
             current_count: 0,
         };
@@ -378,11 +376,11 @@ export default function NewVenuePage() {
                                                         <div className="flex items-center gap-2 text-foreground/80">
                                                             <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                                                             <span className="font-medium">{clicr.name}</span>
-                                                            <span className="text-xs text-muted-foreground">{clicr.flow_mode === 'BIDIRECTIONAL' ? 'Both' : clicr.flow_mode === 'IN_ONLY' ? 'In Only' : 'Out Only'}</span>
+                                                            <span className="text-xs text-muted-foreground">{(clicr.counter_labels ?? []).filter(l => !l.deleted_at).map(l => l.label).join(', ')}</span>
                                                         </div>
                                                         <div className="flex items-center gap-1">
                                                             <button type="button"
-                                                                onClick={() => { setEditingClicrId(clicr.id); setEditingClicrName(clicr.name); setEditingClicrFlow(clicr.flow_mode); }}
+                                                                onClick={() => { setEditingClicrId(clicr.id); setEditingClicrName(clicr.name); }}
                                                                 className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
                                                                 <Pencil className="w-3 h-3" />
                                                             </button>
@@ -399,12 +397,6 @@ export default function NewVenuePage() {
                                                             onChange={e => setEditingClicrName(e.target.value)}
                                                             onKeyDown={e => { if (e.key === 'Escape') setEditingClicrId(null); }}
                                                             className="flex-1 bg-card border border-primary/50 rounded-lg px-3 py-1.5 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
-                                                        <select value={editingClicrFlow} onChange={e => setEditingClicrFlow(e.target.value as FlowMode)}
-                                                            className="flex-1 bg-card border border-primary/50 rounded-lg px-2 py-1.5 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary">
-                                                            <option value="BIDIRECTIONAL">Both (in + out)</option>
-                                                            <option value="IN_ONLY">In only</option>
-                                                            <option value="OUT_ONLY">Out only</option>
-                                                        </select>
                                                         <div className="flex gap-2">
                                                             <button type="button" onClick={() => handleSaveClicr(clicr.id)}
                                                                 className="flex-1 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 text-sm font-medium transition-colors flex items-center justify-center gap-1">
@@ -431,13 +423,6 @@ export default function NewVenuePage() {
                                         onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddClicr(area.id); } }}
                                         className="flex-1 bg-card border border-border rounded-lg px-3 py-2 text-foreground text-sm focus:ring-1 focus:ring-primary focus:outline-none"
                                     />
-                                    <select value={clicrFlowModes[area.id] || 'BIDIRECTIONAL'}
-                                        onChange={e => setClicrFlowModes(p => ({ ...p, [area.id]: e.target.value as FlowMode }))}
-                                        className="bg-card border border-border rounded-lg px-2 py-2 text-foreground text-sm focus:ring-1 focus:ring-primary focus:outline-none">
-                                        <option value="BIDIRECTIONAL">Both</option>
-                                        <option value="IN_ONLY">In only</option>
-                                        <option value="OUT_ONLY">Out only</option>
-                                    </select>
                                     <button
                                         onClick={() => handleAddClicr(area.id)}
                                         disabled={!clicrInputs[area.id]}

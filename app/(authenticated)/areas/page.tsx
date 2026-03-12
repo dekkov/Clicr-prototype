@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/store';
-import { Area, AreaType, CountingMode, FlowMode, ShiftMode, Role } from '@/lib/types';
+import { Area, AreaType, CountingMode, ShiftMode, Role } from '@/lib/types';
 import { Search, RefreshCw, ArrowUp, ArrowDown, Plus, ChevronDown, Play, Square, Settings2, Layers, LayoutGrid } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -85,32 +85,37 @@ export default function AreasPage() {
     // Add Clicr modal state
     const [addClicrAreaId, setAddClicrAreaId] = useState<string | null>(null);
     const [newClicrName, setNewClicrName] = useState('');
-    const [newClicrFlow, setNewClicrFlow] = useState<FlowMode>('BIDIRECTIONAL');
+    const [newClicrLabels, setNewClicrLabels] = useState<string[]>(['General']);
     const [isAddingClicr, setIsAddingClicr] = useState(false);
 
 
     // Cascading clicr creation state (shown after area is created)
     const [justCreatedAreaId, setJustCreatedAreaId] = useState<string | null>(null);
     const [cascadeClicrName, setCascadeClicrName] = useState('');
-    const [cascadeClicrFlow, setCascadeClicrFlow] = useState<FlowMode>('BIDIRECTIONAL');
 
 
     const handleAddClicr = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!addClicrAreaId || !newClicrName.trim()) return;
         setIsAddingClicr(true);
+        const deviceId = crypto.randomUUID();
         await addClicr({
-            id: crypto.randomUUID(),
+            id: deviceId,
             area_id: addClicrAreaId,
             name: newClicrName.trim(),
-            flow_mode: newClicrFlow,
+            counter_labels: newClicrLabels.map((lbl, i) => ({
+                id: crypto.randomUUID(),
+                device_id: deviceId,
+                label: lbl,
+                position: i,
+            })),
             current_count: 0,
             active: true,
         });
         setIsAddingClicr(false);
         setAddClicrAreaId(null);
         setNewClicrName('');
-        setNewClicrFlow('BIDIRECTIONAL');
+        setNewClicrLabels(['General']);
     };
 
 
@@ -617,17 +622,12 @@ export default function AreasPage() {
                     <div className="flex gap-2">
                         <input type="text" placeholder="Clicr name" value={cascadeClicrName}
                             onChange={e => setCascadeClicrName(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter' && cascadeClicrName.trim()) { e.preventDefault(); addClicr({ id: crypto.randomUUID(), area_id: justCreatedAreaId, name: cascadeClicrName.trim(), flow_mode: cascadeClicrFlow, active: true, current_count: 0 }); setCascadeClicrName(''); } }}
+                            onKeyDown={e => { if (e.key === 'Enter' && cascadeClicrName.trim()) { e.preventDefault(); const did = crypto.randomUUID(); addClicr({ id: did, area_id: justCreatedAreaId, name: cascadeClicrName.trim(), counter_labels: [{ id: crypto.randomUUID(), device_id: did, label: 'General', position: 0 }], active: true, current_count: 0 }); setCascadeClicrName(''); } }}
                             className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-foreground text-sm" />
-                        <select value={cascadeClicrFlow} onChange={e => setCascadeClicrFlow(e.target.value as FlowMode)}
-                            className="bg-background border border-border rounded-lg px-2 py-2 text-foreground text-sm">
-                            <option value="BIDIRECTIONAL">Both</option>
-                            <option value="IN_ONLY">In only</option>
-                            <option value="OUT_ONLY">Out only</option>
-                        </select>
                         <button onClick={async () => {
                             if (!cascadeClicrName.trim()) return;
-                            await addClicr({ id: crypto.randomUUID(), area_id: justCreatedAreaId, name: cascadeClicrName.trim(), flow_mode: cascadeClicrFlow, active: true, current_count: 0 });
+                            const did = crypto.randomUUID();
+                            await addClicr({ id: did, area_id: justCreatedAreaId, name: cascadeClicrName.trim(), counter_labels: [{ id: crypto.randomUUID(), device_id: did, label: 'General', position: 0 }], active: true, current_count: 0 });
                             setCascadeClicrName('');
                         }} disabled={!cascadeClicrName.trim()}
                             className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium disabled:opacity-50">
@@ -646,7 +646,7 @@ export default function AreasPage() {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
-                        onClick={() => { setAddClicrAreaId(null); setNewClicrName(''); setNewClicrFlow('BIDIRECTIONAL'); }}
+                        onClick={() => { setAddClicrAreaId(null); setNewClicrName(''); setNewClicrLabels(['General']); }}
                     >
                         <motion.div
                             initial={{ scale: 0.95, opacity: 0 }}
@@ -673,29 +673,26 @@ export default function AreasPage() {
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-muted-foreground">Flow Mode</label>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        {(['BIDIRECTIONAL', 'IN_ONLY', 'OUT_ONLY'] as FlowMode[]).map(mode => (
-                                            <button
-                                                key={mode}
-                                                type="button"
-                                                onClick={() => setNewClicrFlow(mode)}
-                                                className={cn(
-                                                    "px-2 py-2 rounded-lg text-xs font-medium border transition-colors",
-                                                    newClicrFlow === mode
-                                                        ? "bg-primary/20 text-primary border-primary/50"
-                                                        : "bg-background border-border text-muted-foreground hover:bg-card"
+                                    <label className="text-sm font-medium text-muted-foreground">Counter Labels</label>
+                                    <div className="flex flex-wrap gap-2 mb-2">
+                                        {newClicrLabels.map((lbl, i) => (
+                                            <span key={i} className="flex items-center gap-1 px-2 py-1 bg-muted rounded-full text-xs text-foreground">
+                                                {lbl}
+                                                {newClicrLabels.length > 1 && (
+                                                    <button type="button" onClick={() => setNewClicrLabels(prev => prev.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-red-400 ml-0.5">&times;</button>
                                                 )}
-                                            >
-                                                {mode === 'BIDIRECTIONAL' ? 'Both' : mode === 'IN_ONLY' ? 'In Only' : 'Out Only'}
-                                            </button>
+                                            </span>
                                         ))}
                                     </div>
+                                    <button type="button" onClick={() => {
+                                        const name = prompt('Label name:');
+                                        if (name?.trim()) setNewClicrLabels(prev => [...prev, name.trim()]);
+                                    }} className="text-xs text-primary hover:text-primary/80">+ Add label</button>
                                 </div>
                                 <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
                                     <button
                                         type="button"
-                                        onClick={() => { setAddClicrAreaId(null); setNewClicrName(''); setNewClicrFlow('BIDIRECTIONAL'); }}
+                                        onClick={() => { setAddClicrAreaId(null); setNewClicrName(''); setNewClicrLabels(['General']); }}
                                         className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
                                     >
                                         Cancel

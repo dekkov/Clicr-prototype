@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useApp } from '@/lib/store';
-import { Area, AreaType, CountingMode, ShiftMode, Clicr, FlowMode } from '@/lib/types';
+import { Area, AreaType, CountingMode, ShiftMode, Clicr } from '@/lib/types';
 import { ArrowLeft, Check, Plus, Layers, MapPin, Pencil, Trash2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -47,17 +47,16 @@ export default function NewAreaPage() {
     });
 
     const [clicrInput, setClicrInput] = useState('');
-    const [clicrFlow, setClicrFlow] = useState<FlowMode>('BIDIRECTIONAL');
+    const [clicrLabels, setClicrLabels] = useState<string[]>(['General']);
     const [createdClicrs, setCreatedClicrs] = useState<Clicr[]>([]);
 
     // Inline-edit state for clicrs
     const [editingClicrId, setEditingClicrId] = useState<string | null>(null);
     const [editingClicrName, setEditingClicrName] = useState('');
-    const [editingClicrFlow, setEditingClicrFlow] = useState<FlowMode>('BIDIRECTIONAL');
 
     const handleSaveClicr = (id: string) => {
         const trimmed = editingClicrName.trim();
-        if (trimmed) setCreatedClicrs(prev => prev.map(c => c.id === id ? { ...c, name: trimmed, flow_mode: editingClicrFlow } : c));
+        if (trimmed) setCreatedClicrs(prev => prev.map(c => c.id === id ? { ...c, name: trimmed } : c));
         setEditingClicrId(null);
     };
 
@@ -68,16 +67,22 @@ export default function NewAreaPage() {
 
     const handleAddClicr = () => {
         if (!clicrInput.trim()) return;
+        const deviceId = crypto.randomUUID();
         setCreatedClicrs(prev => [...prev, {
-            id: crypto.randomUUID(),
+            id: deviceId,
             area_id: areaId,
             name: clicrInput.trim(),
-            flow_mode: clicrFlow,
+            counter_labels: clicrLabels.map((lbl, i) => ({
+                id: crypto.randomUUID(),
+                device_id: deviceId,
+                label: lbl,
+                position: i,
+            })),
             active: true,
             current_count: 0,
         }]);
         setClicrInput('');
-        setClicrFlow('BIDIRECTIONAL');
+        setClicrLabels(['General']);
     };
 
     const backTarget = preselectedVenueId ? `/venues/${preselectedVenueId}` : '/areas';
@@ -320,11 +325,11 @@ export default function NewAreaPage() {
                                             <div className="flex items-center gap-2 text-foreground/80">
                                                 <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                                                 <span className="font-medium">{c.name}</span>
-                                                <span className="text-xs text-muted-foreground">{c.flow_mode === 'BIDIRECTIONAL' ? 'Both' : c.flow_mode === 'IN_ONLY' ? 'In Only' : 'Out Only'}</span>
+                                                <span className="text-xs text-muted-foreground">{(c.counter_labels ?? []).filter(l => !l.deleted_at).map(l => l.label).join(', ')}</span>
                                             </div>
                                             <div className="flex items-center gap-1">
                                                 <button type="button"
-                                                    onClick={() => { setEditingClicrId(c.id); setEditingClicrName(c.name); setEditingClicrFlow(c.flow_mode); }}
+                                                    onClick={() => { setEditingClicrId(c.id); setEditingClicrName(c.name); }}
                                                     className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
                                                     <Pencil className="w-3 h-3" />
                                                 </button>
@@ -341,12 +346,6 @@ export default function NewAreaPage() {
                                                 onChange={e => setEditingClicrName(e.target.value)}
                                                 onKeyDown={e => { if (e.key === 'Escape') setEditingClicrId(null); }}
                                                 className="flex-1 bg-card border border-primary/50 rounded-lg px-3 py-1.5 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
-                                            <select value={editingClicrFlow} onChange={e => setEditingClicrFlow(e.target.value as FlowMode)}
-                                                className="flex-1 bg-card border border-primary/50 rounded-lg px-2 py-1.5 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary">
-                                                <option value="BIDIRECTIONAL">Both (in + out)</option>
-                                                <option value="IN_ONLY">In only</option>
-                                                <option value="OUT_ONLY">Out only</option>
-                                            </select>
                                             <div className="flex gap-2">
                                                 <button type="button" onClick={() => handleSaveClicr(c.id)}
                                                     className="flex-1 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 text-sm font-medium transition-colors flex items-center justify-center gap-1">
@@ -374,15 +373,16 @@ export default function NewAreaPage() {
                                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddClicr(); } }}
                                 className="flex-1 bg-card border border-border rounded-lg px-3 py-2 text-foreground text-sm focus:ring-1 focus:ring-primary focus:outline-none"
                             />
-                            <select
-                                value={clicrFlow}
-                                onChange={e => setClicrFlow(e.target.value as FlowMode)}
-                                className="bg-card border border-border rounded-lg px-2 py-2 text-foreground text-sm focus:ring-1 focus:ring-primary focus:outline-none"
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const name = prompt('Add label:');
+                                    if (name?.trim()) setClicrLabels(prev => [...prev, name.trim()]);
+                                }}
+                                className="px-3 py-2 bg-card border border-border rounded-lg text-xs text-primary hover:bg-muted transition-colors whitespace-nowrap"
                             >
-                                <option value="BIDIRECTIONAL">Both</option>
-                                <option value="IN_ONLY">In only</option>
-                                <option value="OUT_ONLY">Out only</option>
-                            </select>
+                                + Label
+                            </button>
                         </div>
                         <button
                             type="button"

@@ -33,7 +33,8 @@ export default function VenueDevices({ venueId }: { venueId: string }) {
             serial_number: `SN-${Math.floor(Math.random() * 10000)}`,
             status: 'ACTIVE',
             created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
+            counter_labels: [],
         };
         await addDevice(newDevice);
     };

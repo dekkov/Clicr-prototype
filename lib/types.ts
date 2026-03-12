@@ -130,28 +130,34 @@ export type Area = {
 };
 
 
-export type FlowMode = 'IN_ONLY' | 'OUT_ONLY' | 'BIDIRECTIONAL';
+export type CounterLabel = {
+    id: string;
+    device_id: string;
+    label: string;
+    position: number;
+    color?: string | null;
+    deleted_at?: string | null;
+    created_at?: string;
+};
 
-// Legacy Clicr type - plan to migrate to Device
 export type Clicr = {
     id: string;
     area_id: string | null;
     venue_id?: string;
     is_venue_counter?: boolean;
     name: string;
-    flow_mode: FlowMode;
-    current_count: number; // Cached value
+    counter_labels: CounterLabel[];
+    current_count: number;
     active: boolean;
     button_config?: {
         auto_reset?: {
             enabled: boolean;
-            time: string;     // "HH:MM" 24-hour format
-            timezone: string; // IANA timezone e.g. "America/New_York"
+            time: string;
+            timezone: string;
         };
-        tap_token?: string;  // Random token for public /tap/[token] page
+        tap_token?: string;
     };
-    command?: string; // Hardware mapping/pairing code
-    direction_mode?: 'in_only' | 'out_only' | 'bidirectional';
+    command?: string;
     scan_enabled?: boolean;
 };
 
@@ -164,14 +170,15 @@ export type Device = {
     venue_id?: string | null;
     area_id?: string | null;
     device_type: DeviceType;
-    name: string; // Was device_name
+    name: string;
     serial_number: string;
     status: DeviceStatus;
     last_seen_at?: string | null;
     firmware_version?: string;
     created_at: string;
     updated_at: string;
-    direction_mode?: 'in_only' | 'out_only' | 'bidirectional';
+    counter_labels: CounterLabel[];
+    is_venue_counter?: boolean;
 };
 
 export type CapacityOverride = {
@@ -205,12 +212,13 @@ export type CountEvent = {
     user_id: string;
     business_id: string;
     timestamp: number;
-    delta: number; // +1 or -1 (or more for bulk)
+    delta: number;
     flow_type: 'IN' | 'OUT';
-    gender?: 'M' | 'F' | 'OTHER' | 'DECLINE';
+    gender?: 'M' | 'F' | 'OTHER' | 'DECLINE'; // Historical only
+    counter_label_id?: string | null;
     first_name?: string;
     last_name?: string;
-    dob?: string; // YYYYMMDD
+    dob?: string;
     event_type: 'TAP' | 'SCAN' | 'AUTO_SCAN' | 'BULK' | 'RESET';
     idempotency_key?: string;
     shift_id?: string;

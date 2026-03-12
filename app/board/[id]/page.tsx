@@ -56,7 +56,7 @@ export default function BoardDisplayPage({ params }: { params: Promise<{ id: str
                         ? allVenues.find(v => v.id === clicr.venue_id)
                         : undefined;
                     return {
-                        clicr: clicr || { id: did, name: 'Unknown', area_id: '', active: false, current_count: 0 } as Clicr,
+                        clicr: clicr || { id: did, name: 'Unknown', area_id: '', active: false, current_count: 0, counter_labels: [] } as Clicr,
                         area,
                         venue,
                         label: boardView.labels[did] || clicr?.name || 'Unknown',
@@ -75,7 +75,7 @@ export default function BoardDisplayPage({ params }: { params: Promise<{ id: str
         document.documentElement.requestFullscreen?.();
     };
 
-    const handleTap = (clicrId: string, delta: number, gender: 'M' | 'F') => {
+    const handleTap = (clicrId: string, delta: number, counterLabelId: string) => {
         const tile = tiles.find(t => t.clicr.id === clicrId);
         if (!tile || !tile.area?.venue_id || !tile.clicr.area_id || !recordEvent) return;
         recordEvent({
@@ -84,7 +84,7 @@ export default function BoardDisplayPage({ params }: { params: Promise<{ id: str
             clicr_id: clicrId,
             delta,
             flow_type: delta > 0 ? 'IN' : 'OUT',
-            gender,
+            counter_label_id: counterLabelId,
             event_type: 'TAP',
             idempotency_key: `board-${clicrId}-${Date.now()}-${delta}`,
         });

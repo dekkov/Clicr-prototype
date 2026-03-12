@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/store';
-import { Area, AreaType, Clicr, FlowMode } from '@/lib/types';
+import { Area, AreaType, Clicr, CounterLabel } from '@/lib/types';
 import { Building2, MapPin, Users, Check, Plus, ArrowRight, ArrowLeft, Mail, Scan, Ban, Trash2, Pencil, X } from 'lucide-react';
 import { LogoUploader } from '@/components/ui/logo-uploader';
 import { createBusinessVenueAndAreas, updateBusinessSettings } from '@/app/onboarding/setup-actions';
@@ -76,15 +76,23 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
     const [editingAreaType, setEditingAreaType] = useState<AreaType>('MAIN');
     const [editingClicrId, setEditingClicrId] = useState<string | null>(null);
     const [editingClicrName, setEditingClicrName] = useState('');
-    const [editingClicrFlowMode, setEditingClicrFlowMode] = useState<FlowMode>('BIDIRECTIONAL');
-    const [clicrFlowModes, setClicrFlowModes] = useState<Record<string, FlowMode>>({});
 
-    // Venue counter state
-    const [venueCounterName, setVenueCounterName] = useState('Venue Counter');
-    const [venueCounterFlowMode, setVenueCounterFlowMode] = useState<FlowMode>('BIDIRECTIONAL');
-    const [editingVenueCounter, setEditingVenueCounter] = useState(false);
-    const [editingVCName, setEditingVCName] = useState('');
-    const [editingVCFlowMode, setEditingVCFlowMode] = useState<FlowMode>('BIDIRECTIONAL');
+    // Venue counters state (multi-counter with labels)
+    type WizardVenueCounter = {
+        id: string;
+        name: string;
+        labels: Array<{ id: string; label: string; position: number; color?: string }>;
+        isPrimary: boolean;
+    };
+    const [venueCounters, setVenueCounters] = useState<WizardVenueCounter[]>([
+        {
+            id: crypto.randomUUID(),
+            name: 'Venue Counter',
+            labels: [{ id: crypto.randomUUID(), label: 'General', position: 0 }],
+            isPrimary: true,
+        },
+    ]);
+    const [editingVCId, setEditingVCId] = useState<string | null>(null);
 
     const currentIndex = STEP_LABELS.indexOf(step);
 
@@ -142,7 +150,6 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
         if (trimmed) setCreatedClicrs(prev => prev.map(c => c.id === id ? {
             ...c,
             name: trimmed,
-            flow_mode: editingClicrFlowMode,
         } : c));
         setEditingClicrId(null);
     };
@@ -154,7 +161,7 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
             id: crypto.randomUUID(),
             area_id: areaId,
             name,
-            flow_mode: clicrFlowModes[areaId] || 'BIDIRECTIONAL',
+            counter_labels: [{ id: crypto.randomUUID(), device_id: '', label: 'General', position: 0 }],
             active: true,
             current_count: 0,
         };
@@ -190,7 +197,10 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                         capacity: a.default_capacity ?? undefined,
                         area_type: a.area_type,
                     })),
-                    venueCounterName,
+                    venueCounters: venueCounters.map(vc => ({
+                        name: vc.name,
+                        labels: vc.labels,
+                    })),
                 });
 
                 if (!result.success) {
@@ -527,48 +537,89 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                     </div>
                     <p className="text-muted-foreground text-sm">Name your counters. The venue counter tracks overall venue occupancy.</p>
 
-                    {/* VENUE COUNTER — dedicated, non-deletable */}
-                    <div className="bg-amber-50 dark:bg-amber-950/10 p-4 rounded-xl border border-amber-200 dark:border-amber-500/20">
-                        <h3 className="text-xs font-bold uppercase tracking-widest text-amber-500 mb-3">{venueData.name || 'Venue'}</h3>
-                        {!editingVenueCounter ? (
-                            <div className="flex items-center justify-between text-sm">
-                                <div className="flex items-center gap-2 text-amber-600 dark:text-amber-300">
-                                    <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                                    {venueCounterName}
-                                    <span className="text-xs text-amber-600">Guest Flow: {venueCounterFlowMode === 'BIDIRECTIONAL' ? 'Both' : venueCounterFlowMode === 'IN_ONLY' ? 'In Only' : 'Out Only'}</span>
-                                </div>
-                                <button type="button"
-                                    onClick={() => { setEditingVenueCounter(true); setEditingVCName(venueCounterName); setEditingVCFlowMode(venueCounterFlowMode); }}
-                                    className="p-1.5 rounded-lg text-amber-600 hover:text-amber-400 hover:bg-amber-500/10 transition-colors" title="Edit">
-                                    <Pencil className="w-3 h-3" />
-                                </button>
+                    {/* VENUE COUNTERS — list with add/edit/delete */}
+                    <div className="space-y-3">
+                        <h3 className="text-xs font-bold uppercase tracking-widest text-amber-500">
+                            {venueData.name || 'Venue'} Counters
+                        </h3>
+                        {venueCounters.map(vc => (
+                            <div key={vc.id} className="bg-amber-50 dark:bg-amber-950/10 p-4 rounded-xl border border-amber-200 dark:border-amber-500/20">
+                                {editingVCId === vc.id ? (
+                                    <div className="flex flex-col gap-3 w-full">
+                                        <div>
+                                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Counter Name</label>
+                                            <input autoFocus type="text" value={vc.name}
+                                                onChange={e => setVenueCounters(prev => prev.map(v => v.id === vc.id ? { ...v, name: e.target.value } : v))}
+                                                onKeyDown={e => { if (e.key === 'Escape') setEditingVCId(null); }}
+                                                className="w-full bg-card border border-amber-200 dark:border-amber-500/30 rounded-lg px-3 py-1.5 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                                placeholder="e.g. Front Door" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-medium text-muted-foreground block">Counter Labels</label>
+                                            {vc.labels.map(l => (
+                                                <div key={l.id} className="flex items-center gap-2">
+                                                    <input value={l.label} onChange={e => setVenueCounters(prev => prev.map(v => v.id === vc.id ? { ...v, labels: v.labels.map(lb => lb.id === l.id ? { ...lb, label: e.target.value } : lb) } : v))}
+                                                        className="flex-1 bg-card border border-border rounded-lg px-2 py-1 text-sm" />
+                                                    {vc.labels.length > 1 && (
+                                                        <button type="button" onClick={() => setVenueCounters(prev => prev.map(v => v.id === vc.id ? { ...v, labels: v.labels.filter(lb => lb.id !== l.id).map((lb, i) => ({ ...lb, position: i })) } : v))}
+                                                            className="text-red-400 hover:text-red-300">
+                                                            <X className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                            <button type="button" onClick={() => setVenueCounters(prev => prev.map(v => v.id === vc.id ? { ...v, labels: [...v.labels, { id: crypto.randomUUID(), label: '', position: v.labels.length }] } : v))}
+                                                className="text-xs text-amber-500 hover:text-amber-400">+ Add label</button>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button type="button" onClick={() => setEditingVCId(null)}
+                                                className="flex-1 py-1 rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 text-sm font-medium transition-colors flex items-center justify-center gap-1">
+                                                <Check className="w-3.5 h-3.5" /> Done
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="flex items-center justify-between text-sm">
+                                            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-300">
+                                                <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                                                {vc.name || 'Venue Counter'}
+                                                <span className="text-xs text-amber-600/60">
+                                                    {vc.labels.length} label{vc.labels.length !== 1 ? 's' : ''}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                                <button type="button" onClick={() => setEditingVCId(vc.id)}
+                                                    className="p-1.5 rounded-lg text-amber-600 hover:text-amber-400 hover:bg-amber-500/10 transition-colors" title="Edit">
+                                                    <Pencil className="w-3 h-3" />
+                                                </button>
+                                                {!vc.isPrimary && (
+                                                    <button type="button" onClick={() => setVenueCounters(prev => prev.filter(v => v.id !== vc.id))}
+                                                        className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors" title="Remove">
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1 mt-2">
+                                            {vc.labels.map(l => (
+                                                <span key={l.id} className="text-xs bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded-full text-amber-700 dark:text-amber-300">
+                                                    {l.label || 'Unnamed'}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
                             </div>
-                        ) : (
-                            <div className="flex flex-col gap-2 w-full">
-                                <input autoFocus type="text" value={editingVCName}
-                                    onChange={e => setEditingVCName(e.target.value)}
-                                    onKeyDown={e => { if (e.key === 'Escape') setEditingVenueCounter(false); }}
-                                    className="flex-1 bg-card border border-amber-200 dark:border-amber-500/30 rounded-lg px-3 py-1.5 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
-                                <select value={editingVCFlowMode} onChange={e => setEditingVCFlowMode(e.target.value as FlowMode)}
-                                    className="flex-1 bg-card border border-amber-200 dark:border-amber-500/30 rounded-lg px-2 py-1.5 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-amber-500">
-                                    <option value="BIDIRECTIONAL">Both (in + out)</option>
-                                    <option value="IN_ONLY">In only</option>
-                                    <option value="OUT_ONLY">Out only</option>
-                                </select>
-                                <div className="flex gap-2">
-                                    <button type="button" onClick={() => {
-                                        if (editingVCName.trim()) { setVenueCounterName(editingVCName.trim()); setVenueCounterFlowMode(editingVCFlowMode); }
-                                        setEditingVenueCounter(false);
-                                    }} className="flex-1 py-1 rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 text-sm font-medium transition-colors flex items-center justify-center gap-1">
-                                        <Check className="w-3.5 h-3.5" /> Save
-                                    </button>
-                                    <button type="button" onClick={() => setEditingVenueCounter(false)}
-                                        className="flex-1 py-1 rounded-lg bg-muted text-muted-foreground hover:text-foreground text-sm font-medium transition-colors flex items-center justify-center gap-1">
-                                        <X className="w-3.5 h-3.5" /> Cancel
-                                    </button>
-                                </div>
-                            </div>
-                        )}
+                        ))}
+                        <button type="button" onClick={() => setVenueCounters(prev => [...prev, {
+                            id: crypto.randomUUID(),
+                            name: '',
+                            labels: [{ id: crypto.randomUUID(), label: 'General', position: 0 }],
+                            isPrimary: false,
+                        }])} className="flex items-center gap-2 text-sm text-amber-500 hover:text-amber-400 transition-colors">
+                            <Plus className="w-4 h-4" /> Add venue clicker
+                        </button>
                     </div>
 
                     {/* AREA CLICRS */}
@@ -579,17 +630,19 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                                 <div key={area.id} className="bg-background/30 p-4 rounded-xl border border-border">
                                     <h3 className="font-bold text-foreground mb-3">{area.name}</h3>
                                     {areaClicrs.map(c => (
-                                        <div key={c.id} className="flex items-center justify-between mb-2 text-sm">
+                                        <div key={c.id} className="mb-3">
                                             {editingClicrId !== c.id ? (
-                                                <>
+                                                <div className="flex items-center justify-between text-sm">
                                                     <div className="flex items-center gap-2 text-foreground/80">
                                                         <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                                                         {c.name}
-                                                        <span className="text-xs text-muted-foreground">Guest Flow: {c.flow_mode === 'BIDIRECTIONAL' ? 'Both' : c.flow_mode === 'IN_ONLY' ? 'In Only' : 'Out Only'}</span>
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {c.counter_labels.length} label{c.counter_labels.length !== 1 ? 's' : ''}
+                                                        </span>
                                                     </div>
                                                     <div className="flex items-center gap-1">
                                                         <button type="button"
-                                                            onClick={() => { setEditingClicrId(c.id); setEditingClicrName(c.name); setEditingClicrFlowMode(c.flow_mode); }}
+                                                            onClick={() => { setEditingClicrId(c.id); setEditingClicrName(c.name); }}
                                                             className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Edit">
                                                             <Pencil className="w-3 h-3" />
                                                         </button>
@@ -599,19 +652,33 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                                                             <Trash2 className="w-3.5 h-3.5" />
                                                         </button>
                                                     </div>
-                                                </>
+                                                </div>
                                             ) : (
-                                                <div className="flex flex-col gap-2 w-full">
-                                                    <input autoFocus type="text" value={editingClicrName}
-                                                        onChange={e => setEditingClicrName(e.target.value)}
-                                                        onKeyDown={e => { if (e.key === 'Escape') setEditingClicrId(null); }}
-                                                        className="flex-1 bg-card border border-primary/50 rounded-lg px-3 py-1.5 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
-                                                    <select value={editingClicrFlowMode} onChange={e => setEditingClicrFlowMode(e.target.value as FlowMode)}
-                                                        className="flex-1 bg-card border border-primary/50 rounded-lg px-2 py-1.5 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary">
-                                                        <option value="BIDIRECTIONAL">Both (in + out)</option>
-                                                        <option value="IN_ONLY">In only</option>
-                                                        <option value="OUT_ONLY">Out only</option>
-                                                    </select>
+                                                <div className="flex flex-col gap-3 w-full">
+                                                    <div>
+                                                        <label className="text-xs font-medium text-muted-foreground mb-1 block">Counter Name</label>
+                                                        <input autoFocus type="text" value={editingClicrName}
+                                                            onChange={e => setEditingClicrName(e.target.value)}
+                                                            onKeyDown={e => { if (e.key === 'Escape') setEditingClicrId(null); }}
+                                                            className="w-full bg-card border border-primary/50 rounded-lg px-3 py-1.5 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <label className="text-xs font-medium text-muted-foreground block">Counter Labels</label>
+                                                        {c.counter_labels.map(l => (
+                                                            <div key={l.id} className="flex items-center gap-2">
+                                                                <input value={l.label} onChange={e => setCreatedClicrs(prev => prev.map(cl => cl.id === c.id ? { ...cl, counter_labels: cl.counter_labels.map(lb => lb.id === l.id ? { ...lb, label: e.target.value } : lb) } : cl))}
+                                                                    className="flex-1 bg-card border border-border rounded-lg px-2 py-1 text-sm" />
+                                                                {c.counter_labels.length > 1 && (
+                                                                    <button type="button" onClick={() => setCreatedClicrs(prev => prev.map(cl => cl.id === c.id ? { ...cl, counter_labels: cl.counter_labels.filter(lb => lb.id !== l.id).map((lb, i) => ({ ...lb, position: i })) } : cl))}
+                                                                        className="text-red-400 hover:text-red-300">
+                                                                        <X className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                        <button type="button" onClick={() => setCreatedClicrs(prev => prev.map(cl => cl.id === c.id ? { ...cl, counter_labels: [...cl.counter_labels, { id: crypto.randomUUID(), device_id: '', label: '', position: cl.counter_labels.length }] } : cl))}
+                                                            className="text-xs text-primary hover:text-primary/80">+ Add label</button>
+                                                    </div>
                                                     <div className="flex gap-2">
                                                         <button type="button" onClick={() => handleSaveClicr(c.id)}
                                                             className="flex-1 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 text-sm font-medium transition-colors flex items-center justify-center gap-1">
@@ -624,6 +691,15 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                                                     </div>
                                                 </div>
                                             )}
+                                            {editingClicrId !== c.id && (
+                                                <div className="flex flex-wrap gap-1 mt-1 ml-4">
+                                                    {c.counter_labels.map(l => (
+                                                        <span key={l.id} className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">
+                                                            {l.label || 'Unnamed'}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     ))}
                                     <div className="flex gap-2">
@@ -632,13 +708,6 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                                             onChange={e => setClicrInputs(p => ({ ...p, [area.id]: e.target.value }))}
                                             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddClicr(area.id); } }}
                                             className="flex-1 bg-card border border-border rounded-lg px-3 py-2 text-foreground text-sm focus:ring-1 focus:ring-primary focus:outline-none" />
-                                        <select value={clicrFlowModes[area.id] || 'BIDIRECTIONAL'}
-                                            onChange={e => setClicrFlowModes(p => ({ ...p, [area.id]: e.target.value as FlowMode }))}
-                                            className="bg-card border border-border rounded-lg px-2 py-2 text-foreground text-sm focus:ring-1 focus:ring-primary focus:outline-none">
-                                            <option value="BIDIRECTIONAL">Both</option>
-                                            <option value="IN_ONLY">In only</option>
-                                            <option value="OUT_ONLY">Out only</option>
-                                        </select>
                                         <button onClick={() => handleAddClicr(area.id)} disabled={!clicrInputs[area.id]}
                                             className="px-4 py-2 bg-muted hover:bg-muted text-foreground rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
                                             Add

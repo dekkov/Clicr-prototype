@@ -53,16 +53,16 @@ export default function VenueOverview({ venueId, setActiveTab }: { venueId: stri
         return { total, netEntries };
     }, [turnarounds, venueId, trafficStats.ins]);
 
-    // Chart Data (Last 6 Hours) - Breakdown by Gender
+    // Chart Data (Last 6 Hours) - Occupancy over time
     const chartData = useMemo(() => {
         if (events.length === 0) {
             return [
-                { time: '10PM', male: 40, female: 60 },
-                { time: '11PM', male: 90, female: 110 },
-                { time: '12AM', male: 150, female: 150 },
-                { time: '1AM', male: 180, female: 220 },
-                { time: '2AM', male: 140, female: 210 },
-                { time: '3AM', male: 60, female: 90 },
+                { time: '10PM', occupancy: 100 },
+                { time: '11PM', occupancy: 200 },
+                { time: '12AM', occupancy: 300 },
+                { time: '1AM', occupancy: 400 },
+                { time: '2AM', occupancy: 350 },
+                { time: '3AM', occupancy: 150 },
             ];
         }
 
@@ -74,19 +74,14 @@ export default function VenueOverview({ venueId, setActiveTab }: { venueId: stri
             const timePoint = new Date(now - i * 3600000);
             timePoint.setMinutes(59, 59, 999);
 
-            let m = 0, f = 0, u = 0;
+            let occ = 0;
             sortedEvents.forEach(e => {
                 if (e.timestamp <= timePoint.getTime()) {
-                    if (e.gender === 'M') m += e.delta;
-                    else if (e.gender === 'F') f += e.delta;
-                    else u += e.delta;
+                    occ += e.delta;
                 }
             });
 
-            // Clamp
-            if (m < 0) m = 0;
-            if (f < 0) f = 0;
-            if (u < 0) u = 0;
+            if (occ < 0) occ = 0;
 
             const hour = timePoint.getHours();
             const ampm = hour >= 12 ? 'PM' : 'AM';
@@ -94,10 +89,7 @@ export default function VenueOverview({ venueId, setActiveTab }: { venueId: stri
 
             points.push({
                 time: `${hour12}${ampm}`,
-                male: m,
-                female: f,
-                unknown: u,
-                occupancy: m + f + u // For reference
+                occupancy: occ,
             });
         }
         return points;
@@ -152,18 +144,14 @@ export default function VenueOverview({ venueId, setActiveTab }: { venueId: stri
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Chart Section */}
                 <div className="lg:col-span-2 bg-muted/30 border border-border rounded-2xl p-6">
-                    <h3 className="text-lg font-bold text-foreground mb-6">Demographics Flow</h3>
+                    <h3 className="text-lg font-bold text-foreground mb-6">Occupancy Flow</h3>
                     <div className="h-[300px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={chartData}>
                                 <defs>
-                                    <linearGradient id="colorMale" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                                    </linearGradient>
-                                    <linearGradient id="colorFemale" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#ec4899" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#ec4899" stopOpacity={0} />
+                                    <linearGradient id="colorOccupancy" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                                     </linearGradient>
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} vertical={false} />
@@ -174,23 +162,12 @@ export default function VenueOverview({ venueId, setActiveTab }: { venueId: stri
                                 />
                                 <RechartsArea
                                     type="monotone"
-                                    dataKey="male"
-                                    stroke="#3b82f6"
+                                    dataKey="occupancy"
+                                    stroke="#10b981"
                                     strokeWidth={3}
                                     fillOpacity={1}
-                                    fill="url(#colorMale)"
-                                    name="Male"
-                                    stackId="1"
-                                />
-                                <RechartsArea
-                                    type="monotone"
-                                    dataKey="female"
-                                    stroke="#ec4899"
-                                    strokeWidth={3}
-                                    fillOpacity={1}
-                                    fill="url(#colorFemale)"
-                                    name="Female"
-                                    stackId="1"
+                                    fill="url(#colorOccupancy)"
+                                    name="Occupancy"
                                 />
                             </AreaChart>
                         </ResponsiveContainer>

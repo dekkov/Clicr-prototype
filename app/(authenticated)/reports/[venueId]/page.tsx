@@ -176,18 +176,12 @@ export default function VenueReportingDashboard() {
             const entries = hourEvents.filter(e => e.flow_type === 'IN').reduce((acc, e) => acc + e.delta, 0);
             const exits = hourEvents.filter(e => e.flow_type === 'OUT').reduce((acc, e) => acc + Math.abs(e.delta), 0);
 
-            // Gender breakdown for flow
-            const maleEntries = hourEvents.filter(e => e.flow_type === 'IN' && e.gender === 'M').reduce((acc, e) => acc + e.delta, 0);
-            const femaleEntries = hourEvents.filter(e => e.flow_type === 'IN' && e.gender === 'F').reduce((acc, e) => acc + e.delta, 0);
-
             return {
                 hourLabel: format(hour, 'ha'), // 10pm
                 hourStart: hour,
                 entries,
                 exits,
                 net: entries - exits,
-                maleEntries,
-                femaleEntries
             };
         });
 
@@ -216,12 +210,6 @@ export default function VenueReportingDashboard() {
             if (s.zip_code) {
                 zipCounts[s.zip_code] = (zipCounts[s.zip_code] || 0) + 1;
             }
-        });
-
-        // Merge manual gender counts from Taps if available
-        filteredEvents.forEach(e => {
-            if (e.gender === 'M') genderCounts['Male'] += e.delta;
-            if (e.gender === 'F') genderCounts['Female'] += e.delta;
         });
 
         const ageChartData = Object.entries(ageBands).map(([name, value]) => ({ name, value })).filter(d => d.value > 0);
@@ -290,7 +278,7 @@ export default function VenueReportingDashboard() {
             const mockScans: any[] = [];
             for (let i = 0; i < 50; i++) {
                 const time = now - Math.floor(Math.random() * 5 * 3600000);
-                mockEvents.push({ id: `mock_e_${i}`, venue_id: venue.id, timestamp: time, delta: 1, flow_type: 'IN', event_type: 'TAP', gender: Math.random() > 0.5 ? 'M' : 'F', user_id: 'mock_user' });
+                mockEvents.push({ id: `mock_e_${i}`, venue_id: venue.id, timestamp: time, delta: 1, flow_type: 'IN', event_type: 'TAP', user_id: 'mock_user' });
                 mockScans.push({ id: `mock_s_${i}`, venue_id: venue.id, timestamp: time, scan_result: 'ACCEPTED', age: 18 + Math.floor(Math.random() * 30), sex: Math.random() > 0.5 ? 'M' : 'F', zip_code: '10001' });
             }
             exportEvents = mockEvents;

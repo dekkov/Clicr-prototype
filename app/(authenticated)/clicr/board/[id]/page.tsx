@@ -77,7 +77,7 @@ export default function BoardViewPage({ params }: { params: Promise<{ id: string
         return '';
     })();
 
-    const handleTap = (clicrId: string, delta: number, gender: 'M' | 'F') => {
+    const handleTap = (clicrId: string, delta: number, counterLabelId: string) => {
         const clicr = clicrs.find(c => c.id === clicrId);
         if (!clicr) return;
         const area = areas.find(a => a.id === clicr.area_id);
@@ -106,7 +106,7 @@ export default function BoardViewPage({ params }: { params: Promise<{ id: string
             clicr_id: clicr.id,
             delta,
             flow_type: delta > 0 ? 'IN' : 'OUT',
-            gender,
+            counter_label_id: counterLabelId,
             event_type: 'TAP',
             idempotency_key: Math.random().toString(36),
         });
