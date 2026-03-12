@@ -4,7 +4,7 @@ import React, { useMemo, useEffect, useState, useRef } from 'react';
 import { useApp } from '@/lib/store';
 import {
     Users, TrendingUp, ScanLine, ShieldBan,
-    Calendar, RefreshCw, Download, MapPin, RotateCcw, Timer
+    Calendar, RefreshCw, Download, MapPin, RotateCcw, Timer, ChevronLeft
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -14,7 +14,8 @@ import type { CountEvent, Venue } from '@/lib/types';
 import type { HeatmapData } from '@/app/api/reports/heatmap/route';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { useReset } from '@/lib/reset-context';
-import { getAutoDateLabel } from '@/lib/business-day';
+import { getAutoDateLabel, getBusinessDayStart } from '@/lib/business-day';
+import { CalendarGrid } from '@/components/reports/CalendarGrid';
 import {
     BarChart, Bar, AreaChart, Area,
     XAxis, YAxis, CartesianGrid, Tooltip,
@@ -531,6 +532,14 @@ export default function DashboardPage() {
     const [showSchedulePopover, setShowSchedulePopover] = useState(false);
     const [advanceDate, setAdvanceDate] = useState(() => getAutoDateLabel(new Date(), resetTime, resetTz));
 
+    // Date picker state
+    const [selectedDate, setSelectedDate] = useState<string | null>(null); // null = Today
+    const [showCalendar, setShowCalendar] = useState(false);
+    const [calYear, setCalYear] = useState(() => new Date().getFullYear());
+    const [calMonth, setCalMonth] = useState(() => new Date().getMonth());
+
+    const isToday = selectedDate === null;
+
     const [heatmapData, setHeatmapData] = useState<HeatmapData>({});
     const [heatmapLoading, setHeatmapLoading] = useState(true);
 
@@ -582,14 +591,27 @@ export default function DashboardPage() {
 
     // Dashboard metrics only use venue counter events (area_id is null/empty).
     // Area counter taps track area-level flow only and don't contribute to dashboard metrics.
+    const dateFrom = useMemo(() => {
+        if (isToday) {
+            return getBusinessDayStart(new Date(), resetTime, resetTz).getTime();
+        }
+        return 0; // Historical uses night_logs, not event filtering
+    }, [isToday, resetTime, resetTz]);
+
+    const dateTo = isToday ? Date.now() : 0;
+
     const todayEvents = useMemo(
-        () => events.filter((e) => e.timestamp >= todayStart && !e.area_id),
-        [events, todayStart]
+        () => isToday
+            ? events.filter((e) => e.timestamp >= dateFrom && e.timestamp <= dateTo && !e.area_id)
+            : [],
+        [events, isToday, dateFrom, dateTo]
     );
 
     const todayScanEvents = useMemo(
-        () => scanEvents.filter((s) => s.timestamp >= todayStart),
-        [scanEvents, todayStart]
+        () => isToday
+            ? scanEvents.filter((s) => s.timestamp >= dateFrom && s.timestamp <= dateTo)
+            : [],
+        [scanEvents, isToday, dateFrom, dateTo]
     );
 
     // Venue occupancy = sum of venues.current_occupancy
@@ -631,10 +653,12 @@ export default function DashboardPage() {
     );
 
     const totalTurnarounds = useMemo(
-        () => (turnarounds || [])
-            .filter(t => t.timestamp >= todayStart)
-            .reduce((sum, t) => sum + t.count, 0),
-        [turnarounds, todayStart]
+        () => isToday
+            ? (turnarounds || [])
+                .filter(t => t.timestamp >= dateFrom && t.timestamp <= dateTo)
+                .reduce((sum, t) => sum + t.count, 0)
+            : 0,
+        [turnarounds, isToday, dateFrom, dateTo]
     );
 
     const netAdjusted = useMemo(
@@ -821,50 +845,116 @@ export default function DashboardPage() {
                         <p className="text-foreground/60 text-sm">Real-time data from all connected devices.</p>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                        {/* Advance to Next Day */}
+                        {/* Calendar date picker button */}
                         <button
-                            onClick={() => {
-                                setAdvanceDate(getAutoDateLabel(new Date(), resetTime, resetTz));
-                                setShowAdvanceConfirm(true);
-                            }}
-                            className="px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-white transition-colors flex items-center gap-2 text-sm font-medium"
+                            onClick={() => setShowCalendar(prev => !prev)}
+                            className={cn(
+                                "p-2 rounded-lg transition-colors",
+                                showCalendar ? "bg-primary text-white" : "bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+                            )}
                         >
-                            <RotateCcw className="w-4 h-4" />
-                            Advance to Next Day
+                            <Calendar className="w-4 h-4" />
                         </button>
 
-                        {/* Operational Reset */}
-                        <button
-                            onClick={() => setShowOpResetConfirm(true)}
-                            className="px-4 py-2 rounded-lg bg-card border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 text-sm"
-                        >
-                            <RefreshCw className="w-4 h-4" />
-                            Operational Reset
-                        </button>
+                        {/* Back to Today button (shown when viewing historical date) */}
+                        {!isToday && (
+                            <button
+                                onClick={() => { setSelectedDate(null); setShowCalendar(false); }}
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300"
+                            >
+                                <ChevronLeft className="w-3 h-3" />
+                                Back to Today
+                            </button>
+                        )}
 
-                        {/* Auto-Reset Schedule */}
-                        <button
-                            onClick={() => setShowSchedulePopover(prev => !prev)}
-                            className="px-4 py-2 rounded-lg bg-card border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 text-sm"
-                        >
-                            <Timer className="w-4 h-4" />
-                            Auto-Reset
-                        </button>
+                        {/* Action buttons — only shown for today's live view */}
+                        {isToday && (
+                            <>
+                                {/* Advance to Next Day */}
+                                <button
+                                    onClick={() => {
+                                        setAdvanceDate(getAutoDateLabel(new Date(), resetTime, resetTz));
+                                        setShowAdvanceConfirm(true);
+                                    }}
+                                    className="px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-white transition-colors flex items-center gap-2 text-sm font-medium"
+                                >
+                                    <RotateCcw className="w-4 h-4" />
+                                    Advance to Next Day
+                                </button>
 
-                        {/* Export */}
-                        <button className="px-4 py-2 rounded-lg bg-card border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 text-sm">
-                            <Download className="w-4 h-4" />
-                            <span>Export</span>
-                        </button>
+                                {/* Operational Reset */}
+                                <button
+                                    onClick={() => setShowOpResetConfirm(true)}
+                                    className="px-4 py-2 rounded-lg bg-card border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 text-sm"
+                                >
+                                    <RefreshCw className="w-4 h-4" />
+                                    Operational Reset
+                                </button>
+
+                                {/* Auto-Reset Schedule */}
+                                <button
+                                    onClick={() => setShowSchedulePopover(prev => !prev)}
+                                    className="px-4 py-2 rounded-lg bg-card border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 text-sm"
+                                >
+                                    <Timer className="w-4 h-4" />
+                                    Auto-Reset
+                                </button>
+
+                                {/* Export */}
+                                <button className="px-4 py-2 rounded-lg bg-card border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 text-sm">
+                                    <Download className="w-4 h-4" />
+                                    <span>Export</span>
+                                </button>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>
 
+            {/* Calendar Grid (date picker) */}
+            {showCalendar && (
+                <div className="bg-card border border-border rounded-xl p-4">
+                    <CalendarGrid
+                        year={calYear}
+                        month={calMonth}
+                        dailyEntries={{}}
+                        selectedDate={selectedDate}
+                        onSelectDate={(dateStr) => {
+                            setSelectedDate(dateStr);
+                            setShowCalendar(false);
+                        }}
+                        onPrevMonth={() => {
+                            if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1); }
+                            else setCalMonth(m => m - 1);
+                        }}
+                        onNextMonth={() => {
+                            if (calMonth === 11) { setCalMonth(0); setCalYear(y => y + 1); }
+                            else setCalMonth(m => m + 1);
+                        }}
+                    />
+                </div>
+            )}
+
+            {/* Viewing banner for historical dates */}
+            {!isToday && selectedDate && (
+                <div className="text-sm text-muted-foreground">
+                    Viewing <span className="font-medium text-foreground">{selectedDate}</span>
+                </div>
+            )}
+
+            {/* Historical placeholder */}
+            {!isToday && (
+                <div className="bg-card border border-border rounded-xl p-8 text-center">
+                    <p className="text-muted-foreground text-sm">Historical data not yet available.</p>
+                    <p className="text-xs text-muted-foreground/60 mt-1">TODO: In a future task, wire up getNightLogs from the adapter.</p>
+                </div>
+            )}
+
             {/* Getting Started Checklist */}
-            <GettingStartedChecklist />
+            {isToday && <GettingStartedChecklist />}
 
             {/* KPI Cards - Design */}
-            <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+            {isToday && <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
                 <KpiCard
                     label="Live Occupancy"
                     value={liveOccupancy}
@@ -896,10 +986,10 @@ export default function DashboardPage() {
                     iconColor="text-red-500"
                     valueColor="text-red-400"
                 />
-            </div>
+            </div>}
 
             {/* Age Distribution + Live Event Log - Design */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {isToday && <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Age Distribution */}
                 <div className="lg:col-span-2 bg-card border border-border rounded-xl p-6">
                     <div className="flex items-center gap-3 mb-6">
@@ -954,28 +1044,28 @@ export default function DashboardPage() {
                         ))}
                     </div>
                 </div>
-            </div>
+            </div>}
 
             {/* Gender Breakdown */}
-            <GenderBreakdown events={todayEvents} />
+            {isToday && <GenderBreakdown events={todayEvents} />}
 
             {/* Hourly Traffic + Occupancy Over Time */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {isToday && <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <HourlyTraffic data={hourlyData} colors={chartColors} />
                 <OccupancyOverTime data={occupancyData} peak={peakOccupancyValue} colors={chartColors} />
-            </div>
+            </div>}
 
             {/* Peak Times Heatmap */}
-            <PeakTimesHeatmap data={heatmapData} loading={heatmapLoading} />
+            {isToday && <PeakTimesHeatmap data={heatmapData} loading={heatmapLoading} />}
 
             {/* Location Distribution + Venue Contribution */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {isToday && <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <LocationDistribution data={locationData} colors={chartColors} />
                 <VenueContribution data={venueContribData} colors={chartColors} />
-            </div>
+            </div>}
 
             {/* Traffic Flow + Operational Workflow */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {isToday && <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <TrafficFlow
                     totalEntries={totalEntries}
                     totalScans={totalScans}
@@ -988,13 +1078,13 @@ export default function DashboardPage() {
                     netAdjusted={netAdjusted}
                 />
                 <OperationalWorkflow />
-            </div>
+            </div>}
 
             {/* Live Venues */}
-            <LiveVenues data={liveVenuesData} onViewAll={() => router.push('/areas')} />
+            {isToday && <LiveVenues data={liveVenuesData} onViewAll={() => router.push('/areas')} />}
 
             {/* Auto-Reset Schedule Popover */}
-            {showSchedulePopover && (
+            {isToday && showSchedulePopover && (
                 <div className="bg-card border border-border rounded-xl p-4 shadow-lg">
                     <h4 className="text-sm font-bold text-foreground mb-3">Auto-Reset Schedule</h4>
                     <div className="space-y-3">
