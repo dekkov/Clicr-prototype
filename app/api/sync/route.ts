@@ -403,46 +403,12 @@ export async function POST(request: Request) {
                         return NextResponse.json({ error: rpcError.message || 'Failed to record event', details: rpcError }, { status: 500 });
                     }
                 } else {
-                    // Venue-level counter: no area RPC available, insert event directly
-                    const eventVenueId = (event as any).venue_id;
-                    const eventBizId = event.business_id || await getBusinessId();
-                    const { error: insertError } = await supabaseAdmin
-                        .from('occupancy_events')
-                        .insert({
-                            business_id: eventBizId,
-                            venue_id: eventVenueId,
-                            area_id: null,
-                            delta: event.delta,
-                            flow_type: event.delta > 0 ? 'IN' : 'OUT',
-                            event_type: rpcParams.p_source === 'scan' ? 'SCAN' : 'TAP',
-                            source: rpcParams.p_source,
-                            device_id: rpcParams.p_device_id || null,
-                            gender: rpcParams.p_gender || null,
-                            idempotency_key: rpcParams.p_idempotency_key || null,
-                            user_id: userId,
-                        });
-
-                    if (insertError) {
-                        console.error('[sync] RECORD_EVENT insert error:', insertError.message);
-                        return NextResponse.json({ error: insertError.message || 'Failed to record event' }, { status: 500 });
-                    }
-
-                    // Update venue current_occupancy directly
-                    if (eventVenueId) {
-                        // Note: This read-modify-write is non-atomic. Under concurrent taps from
-                        // multiple devices on the same venue counter, taps may be silently lost.
-                        // Fix: add a venue-level apply_occupancy_delta RPC (future migration).
-                        const { data: venueRow } = await supabaseAdmin
-                            .from('venues')
-                            .select('current_occupancy')
-                            .eq('id', eventVenueId)
-                            .single();
-
-                        const newOcc = Math.max(0, (venueRow?.current_occupancy || 0) + event.delta);
-                        await supabaseAdmin
-                            .from('venues')
-                            .update({ current_occupancy: newOcc })
-                            .eq('id', eventVenueId);
+                    // Venue-level counter: use apply_occupancy_delta RPC (atomic FOR UPDATE lock)
+                    rpcParams.p_venue_id = (event as any).venue_id;
+                    const { error: rpcError } = await supabaseAdmin.rpc('apply_occupancy_delta', rpcParams);
+                    if (rpcError) {
+                        console.error('[sync] RECORD_EVENT venue RPC error:', rpcError.message);
+                        return NextResponse.json({ error: rpcError.message || 'Failed to record event' }, { status: 500 });
                     }
                 }
                 break;

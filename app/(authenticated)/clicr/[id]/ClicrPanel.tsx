@@ -195,16 +195,24 @@ export default function ClicrPanel({
     const venueAreas = (areas || []).filter(a => a.venue_id === venueId);
     const venue = currentVenue;
 
-    const scopeKey = (!isVenueCounter && venue?.business_id && venueId && clicr?.area_id)
-        ? `area:${venue.business_id}:${venueId}:${clicr.area_id}`
+    const scopeKey = venue?.business_id && venueId
+        ? isVenueCounter
+            ? `venue:${venue.business_id}:${venueId}`
+            : clicr?.area_id
+                ? `area:${venue.business_id}:${venueId}:${clicr.area_id}`
+                : null
         : null;
     const areaStats = scopeKey ? (areaTraffic || {})[scopeKey] : null;
     const globalIn = areaStats?.total_in ?? 0;
     const globalOut = areaStats?.total_out ?? 0;
 
     useEffect(() => {
-        if (isVenueCounter || !venueId || !venue?.business_id || !clicr?.area_id) return;
-        refreshTrafficStats?.(venueId, clicr.area_id);
+        if (!venueId || !venue?.business_id) return;
+        if (isVenueCounter) {
+            refreshTrafficStats?.(venueId);
+        } else if (clicr?.area_id) {
+            refreshTrafficStats?.(venueId, clicr.area_id);
+        }
     }, [isVenueCounter, venueId, venue?.business_id, clicr?.area_id, events]);
 
     // Capacity

@@ -221,9 +221,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             if (res.ok) {
                 const data = await res.json();
 
-                // Avoid overwriting optimistic state if a write started while we were fetching
-                if (isWritingRef.current) {
-                    console.log("Skipping sync update due to active write (Pre-setState)");
+                // Avoid overwriting optimistic state if a write or reset started while we were fetching
+                if (isWritingRef.current || isResettingRef.current) {
+                    console.log("Skipping sync update due to active write/reset (Pre-setState)");
                     return;
                 }
 
@@ -649,9 +649,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 }
             }
 
+            isResettingRef.current = false;
             await refreshState();
             return { success: true, nightLog };
         } catch (error) {
+            isResettingRef.current = false;
             await refreshState();
             return { success: false, error: 'Network error — please try again' };
         } finally {

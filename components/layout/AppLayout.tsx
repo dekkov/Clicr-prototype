@@ -120,7 +120,7 @@ function VenueSelector() {
                 <ChevronDown className={cn("w-4 h-4 text-muted-foreground shrink-0 transition-transform", open && "rotate-180")} />
             </button>
             {open && (
-                <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-card border border-border rounded-lg shadow-xl overflow-hidden">
+                <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-border rounded-lg shadow-xl overflow-hidden">
                     {venues.map(venue => {
                         const isSelected = venue.id === activeVenueId;
                         return (
@@ -222,7 +222,7 @@ function BusinessSelector() {
             </button>
 
             {open && canToggle && (
-                <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-card border border-border rounded-lg shadow-xl overflow-hidden">
+                <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-border rounded-lg shadow-xl overflow-hidden">
                     {businesses.map(biz => {
                         const isSelected = activeBusiness?.id === biz.id;
                         return (

@@ -50,6 +50,34 @@ export async function POST(request: Request) {
             }
         } catch { /* best-effort — fall through with client-provided business_id */ }
 
+        // Venue-direct query (venue counter with no area): only events where area_id IS NULL.
+        // The generic RPC includes all events for the venue (area + venue-direct) which over-counts.
+        if (venue_id && !area_id) {
+            let q = supabaseAdmin
+                .from('occupancy_events')
+                .select('flow_type, delta')
+                .eq('business_id', resolvedBusinessId)
+                .eq('venue_id', venue_id)
+                .is('area_id', null)
+                .neq('event_type', 'RESET')
+                .gte('created_at', start)
+                .lte('created_at', end);
+
+            const { data: rows, error: qErr } = await q;
+            if (qErr) throw new Error(qErr.message);
+
+            const totalIn = (rows ?? []).filter(r => r.flow_type === 'IN').reduce((s, r) => s + Math.abs(r.delta), 0);
+            const totalOut = (rows ?? []).filter(r => r.flow_type === 'OUT').reduce((s, r) => s + Math.abs(r.delta), 0);
+            return NextResponse.json({
+                total_in: totalIn,
+                total_out: totalOut,
+                net_delta: totalIn - totalOut,
+                event_count: (rows ?? []).length,
+                period: { start, end },
+                source: 'venue_direct'
+            });
+        }
+
         const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('get_traffic_totals', {
             p_business_id: resolvedBusinessId,
             p_venue_id: venue_id || null,

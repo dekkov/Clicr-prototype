@@ -622,10 +622,6 @@ export default function DashboardPage() {
         [venues]
     );
 
-    const peakOccupancy = useMemo(() => {
-        // We don't have historical peak in current data model — derive from current as best proxy
-        return liveOccupancy;
-    }, [liveOccupancy]);
 
     const totalEntries = useMemo(
         () => todayEvents.filter((e) => e.delta > 0).reduce((sum, e) => sum + e.delta, 0),
@@ -894,13 +890,65 @@ export default function DashboardPage() {
                                 </button>
 
                                 {/* Auto-Reset Schedule */}
-                                <button
-                                    onClick={() => setShowSchedulePopover(prev => !prev)}
-                                    className="px-4 py-2 rounded-lg bg-card border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 text-sm"
-                                >
-                                    <Timer className="w-4 h-4" />
-                                    Auto-Reset
-                                </button>
+                                <div className="relative">
+                                    <button
+                                        onClick={() => setShowSchedulePopover(prev => !prev)}
+                                        className="px-4 py-2 rounded-lg bg-card border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 text-sm"
+                                    >
+                                        <Timer className="w-4 h-4" />
+                                        Auto-Reset
+                                    </button>
+                                    {showSchedulePopover && (
+                                        <div className="absolute right-0 top-full mt-2 z-50 w-72 bg-white dark:bg-gray-900 border border-border rounded-xl p-4 shadow-xl">
+                                            <h4 className="text-sm font-bold text-foreground mb-3">Auto-Reset Schedule</h4>
+                                            <div className="space-y-3">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-sm text-muted-foreground">Enabled</span>
+                                                    <button
+                                                        onClick={() => {
+                                                            const newRule = activeBusiness?.settings?.reset_rule === 'SCHEDULED' ? 'MANUAL' : 'SCHEDULED';
+                                                            updateBusiness({ settings: { ...activeBusiness!.settings, reset_rule: newRule } });
+                                                        }}
+                                                        className={cn(
+                                                            "relative w-11 h-6 rounded-full transition-colors",
+                                                            activeBusiness?.settings?.reset_rule === 'SCHEDULED' ? "bg-primary" : "bg-muted"
+                                                        )}
+                                                    >
+                                                        <span className={cn(
+                                                            "absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform",
+                                                            activeBusiness?.settings?.reset_rule === 'SCHEDULED' && "translate-x-5"
+                                                        )} />
+                                                    </button>
+                                                </div>
+                                                {activeBusiness?.settings?.reset_rule === 'SCHEDULED' && (
+                                                    <>
+                                                        <div>
+                                                            <label className="text-xs text-muted-foreground mb-1 block">Time</label>
+                                                            <input
+                                                                type="time"
+                                                                value={activeBusiness.settings.reset_time || '05:00'}
+                                                                onChange={(e) => updateBusiness({ settings: { ...activeBusiness.settings, reset_time: e.target.value } })}
+                                                                className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-foreground text-sm"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-xs text-muted-foreground mb-1 block">Timezone</label>
+                                                            <select
+                                                                value={activeBusiness.settings.reset_timezone || activeBusiness.timezone || 'UTC'}
+                                                                onChange={(e) => updateBusiness({ settings: { ...activeBusiness.settings, reset_timezone: e.target.value } })}
+                                                                className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-foreground text-sm"
+                                                            >
+                                                                {['America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'America/Phoenix', 'Pacific/Honolulu', 'America/Anchorage', 'Europe/London', 'Europe/Paris', 'Asia/Tokyo', 'Australia/Sydney', 'UTC'].map(tz => (
+                                                                    <option key={tz} value={tz}>{tz.replace(/_/g, ' ')}</option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
 
                                 {/* Export */}
                                 <button className="px-4 py-2 rounded-lg bg-card border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 text-sm">
@@ -961,7 +1009,7 @@ export default function DashboardPage() {
                 <KpiCard
                     label="Live Occupancy"
                     value={liveOccupancy}
-                    detail={`Peak: ${peakOccupancy}`}
+                    detail={`Peak: ${peakOccupancyValue}`}
                     icon={Users}
                 />
                 <KpiCard
@@ -1086,59 +1134,7 @@ export default function DashboardPage() {
             {/* Live Venues */}
             {isToday && <LiveVenues data={liveVenuesData} onViewAll={() => router.push('/areas')} />}
 
-            {/* Auto-Reset Schedule Popover */}
-            {isToday && showSchedulePopover && (
-                <div className="bg-card border border-border rounded-xl p-4 shadow-lg">
-                    <h4 className="text-sm font-bold text-foreground mb-3">Auto-Reset Schedule</h4>
-                    <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">Enabled</span>
-                            <button
-                                onClick={() => {
-                                    const newRule = activeBusiness?.settings?.reset_rule === 'SCHEDULED' ? 'MANUAL' : 'SCHEDULED';
-                                    updateBusiness({ settings: { ...activeBusiness!.settings, reset_rule: newRule } });
-                                }}
-                                className={cn(
-                                    "relative w-11 h-6 rounded-full transition-colors",
-                                    activeBusiness?.settings?.reset_rule === 'SCHEDULED' ? "bg-primary" : "bg-muted"
-                                )}
-                            >
-                                <span className={cn(
-                                    "absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform",
-                                    activeBusiness?.settings?.reset_rule === 'SCHEDULED' && "translate-x-5"
-                                )} />
-                            </button>
-                        </div>
-                        {activeBusiness?.settings?.reset_rule === 'SCHEDULED' && (
-                            <>
-                                <div>
-                                    <label className="text-xs text-muted-foreground mb-1 block">Time</label>
-                                    <input
-                                        type="time"
-                                        value={activeBusiness.settings.reset_time || '05:00'}
-                                        onChange={(e) => updateBusiness({ settings: { ...activeBusiness.settings, reset_time: e.target.value } })}
-                                        className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-foreground text-sm"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs text-muted-foreground mb-1 block">Timezone</label>
-                                    <select
-                                        value={activeBusiness.settings.reset_timezone || activeBusiness.timezone || 'UTC'}
-                                        onChange={(e) => updateBusiness({ settings: { ...activeBusiness.settings, reset_timezone: e.target.value } })}
-                                        className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-foreground text-sm"
-                                    >
-                                        {['America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'America/Phoenix', 'Pacific/Honolulu', 'America/Anchorage', 'Europe/London', 'Europe/Paris', 'Asia/Tokyo', 'Australia/Sydney', 'UTC'].map(tz => (
-                                            <option key={tz} value={tz}>{tz.replace(/_/g, ' ')}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* Advance to Next Day Modal */}
+{/* Advance to Next Day Modal */}
             <ConfirmModal
                 open={showAdvanceConfirm}
                 title="Advance to Next Day"
