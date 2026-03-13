@@ -9,7 +9,6 @@ export async function resolvePostAuthRoute(userId: string): Promise<string> {
 
         if (error) {
             console.error('[resolvePostAuthRoute] Query error:', error);
-            // Don't redirect to onboarding on DB errors — default to dashboard
             return '/dashboard';
         }
 

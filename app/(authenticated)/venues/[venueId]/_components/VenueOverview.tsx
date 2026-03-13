@@ -11,7 +11,8 @@ import {
     Settings,
     LogIn,
     LogOut,
-    RotateCcw
+    RotateCcw,
+    Tag
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { KpiCard } from '@/components/ui/KpiCard';
@@ -25,7 +26,9 @@ export default function VenueOverview({ venueId, setActiveTab }: { venueId: stri
     // Filtered Data
     const venueAreas = useMemo(() => areas.filter(a => a.venue_id === venueId), [areas, venueId]);
     const areaIds = useMemo(() => venueAreas.map(a => a.id), [venueAreas]);
-    const venueClicrs = useMemo(() => clicrs.filter(c => c.area_id && areaIds.includes(c.area_id)), [clicrs, areaIds]);
+    const venueClicrs = useMemo(() => clicrs.filter(c =>
+        (c.area_id && areaIds.includes(c.area_id)) || (c.is_venue_counter && c.venue_id === venueId)
+    ), [clicrs, areaIds, venueId]);
 
     // Live Stats (Source of truth: Venue Counter)
     const currentOccupancy = venue?.current_occupancy ?? 0;
@@ -52,6 +55,29 @@ export default function VenueOverview({ venueId, setActiveTab }: { venueId: stri
         const netEntries = Math.max(0, trafficStats.ins - total);
         return { total, netEntries };
     }, [turnarounds, venueId, trafficStats.ins]);
+
+    // Counter Label Breakdown — scoped to venue counters only
+    const venueCounterClicrs = useMemo(() => venueClicrs.filter(c => c.is_venue_counter), [venueClicrs]);
+    const venueCounterIds = useMemo(() => new Set(venueCounterClicrs.map(c => c.id)), [venueCounterClicrs]);
+
+    const labelBreakdown = useMemo(() => {
+        // Build label name map from venue counter clicrs only
+        const labelMap = new Map<string, string>();
+        venueCounterClicrs.forEach(c => (c.counter_labels ?? []).forEach(l => labelMap.set(l.id, l.label)));
+
+        // Only include events from venue counter devices (no area_id, matching device)
+        const vcEvents = events.filter(e => e.venue_id === venueId && !e.area_id && venueCounterIds.has(e.clicr_id));
+        // Aggregate by label NAME (same name from different devices = combined)
+        const counts: Record<string, { in: number; out: number }> = {};
+        vcEvents.forEach(e => {
+            const name = (e.counter_label_id && labelMap.get(e.counter_label_id)) || 'Unlabeled';
+            if (!counts[name]) counts[name] = { in: 0, out: 0 };
+            if (e.delta > 0) counts[name].in += e.delta;
+            else counts[name].out += Math.abs(e.delta);
+        });
+        return Object.entries(counts)
+            .sort(([, a], [, b]) => (b.in + b.out) - (a.in + a.out));
+    }, [events, venueId, venueCounterClicrs, venueCounterIds]);
 
     // Chart Data (Last 6 Hours) - Occupancy over time
     const chartData = useMemo(() => {
@@ -234,6 +260,40 @@ export default function VenueOverview({ venueId, setActiveTab }: { venueId: stri
                             {venueAreas.length === 0 && <p className="text-muted-foreground/60 text-xs italic">No areas configured.</p>}
                         </div>
                     </div>
+
+                    {/* Counter Label Breakdown */}
+                    {labelBreakdown.length > 0 && (
+                        <div className="bg-card border border-border rounded-2xl p-6">
+                            <div className="flex items-center gap-2 mb-4">
+                                <Tag className="w-4 h-4 text-muted-foreground" />
+                                <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Counter Labels</h3>
+                            </div>
+                            <div className="space-y-3">
+                                {labelBreakdown.map(([name, counts], i) => {
+                                    const total = counts.in + counts.out;
+                                    const totalAll = labelBreakdown.reduce((s, [, c]) => s + c.in + c.out, 0);
+                                    const pct = totalAll > 0 ? Math.round((total / totalAll) * 100) : 0;
+                                    const colors = ['bg-emerald-500', 'bg-blue-500', 'bg-amber-500', 'bg-purple-500', 'bg-pink-500', 'bg-cyan-500'];
+                                    return (
+                                        <div key={name}>
+                                            <div className="flex justify-between items-center mb-1.5">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={cn("w-2.5 h-2.5 rounded-full", colors[i % colors.length])} />
+                                                    <span className="text-sm font-medium text-foreground">{name}</span>
+                                                </div>
+                                                <span className="text-xs text-muted-foreground">{pct}%</span>
+                                            </div>
+                                            <div className="flex items-center gap-4 pl-[18px] text-xs text-muted-foreground">
+                                                <span className="text-emerald-400">+{counts.in} in</span>
+                                                <span className="text-red-400">-{counts.out} out</span>
+                                                <span className="text-foreground/60">= {counts.in - counts.out} net</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

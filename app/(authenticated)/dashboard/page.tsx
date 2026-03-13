@@ -545,6 +545,7 @@ export default function DashboardPage() {
         bans,
         turnarounds,
         isLoading,
+        hasSynced,
         updateBusiness,
     } = useApp();
 
@@ -582,23 +583,17 @@ export default function DashboardPage() {
         }
     }, [isLoading, currentUser?.role, router]);
 
-    // Auto-redirect if no businesses exist after load
-    // Use a ref to track initial load and a timeout to avoid race conditions
-    // where businesses haven't populated yet when isLoading flips to false
+    // Auto-redirect if no businesses exist after successful sync.
+    // Only redirect when hasSynced is true (sync API returned 200 with data).
+    // This prevents false redirects when the session isn't ready yet (401).
     const hasCheckedBusinesses = useRef(false);
     useEffect(() => {
-        if (isLoading || hasCheckedBusinesses.current) return;
+        if (!hasSynced || hasCheckedBusinesses.current) return;
         if (businesses.length === 0) {
-            // Delay to allow a second sync cycle to populate businesses
-            const timer = setTimeout(() => {
-                if (businesses.length === 0) {
-                    hasCheckedBusinesses.current = true;
-                    router.push('/onboarding/setup');
-                }
-            }, 1500);
-            return () => clearTimeout(timer);
+            hasCheckedBusinesses.current = true;
+            router.push('/onboarding/setup');
         }
-    }, [isLoading, businesses.length, router]);
+    }, [hasSynced, businesses.length, router]);
 
     // --- Derived metrics (memoized) ---
     const [todayStart, setTodayStart] = useState(() => getTodayStart());

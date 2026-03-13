@@ -61,15 +61,25 @@ export default function VenuesPage() {
             relevantDevices.filter(d => d.status === 'ACTIVE').length +
             venueClicrs.filter(c => c.active).length;
 
-        // Traffic totals from areaTraffic store
+        // Traffic totals from venue counter clicrs (not area counters)
         let totalIn = 0;
         let totalOut = 0;
-        for (const area of venueAreas) {
-            const scopeKey = `area:${activeBusiness!.id}:${area.venue_id}:${area.id}`;
-            const traffic = areaTraffic?.[scopeKey];
+        const vcClicrs = clicrs.filter(c => c.is_venue_counter && c.venue_id === venueId);
+        for (const vc of vcClicrs) {
+            const deviceKey = `device:${activeBusiness!.id}:${vc.id}`;
+            const traffic = areaTraffic?.[deviceKey];
             if (traffic) {
                 totalIn += traffic.total_in || 0;
                 totalOut += traffic.total_out || 0;
+            }
+        }
+        // Fallback: if no per-device data yet, try venue-level key
+        if (totalIn === 0 && totalOut === 0) {
+            const venueKey = `venue:${activeBusiness!.id}:${venueId}`;
+            const traffic = areaTraffic?.[venueKey];
+            if (traffic) {
+                totalIn = traffic.total_in || 0;
+                totalOut = traffic.total_out || 0;
             }
         }
 

@@ -728,7 +728,8 @@ export default function BusinessSetupWizard({ onComplete }: Props) {
                             <ArrowLeft className="w-4 h-4" /> Back
                         </button>
                         <button type="button" onClick={() => setStep('INVITE')} className="flex-1 py-3 bg-primary hover:bg-primary/90 text-foreground font-bold rounded-xl transition-all">
-                            {createdClicrs.length > 0 ? 'Next: Invite Team' : 'Set up later'}
+                            {(createdClicrs.length > 0 || venueCounters.length > 1 || venueCounters.some(vc => vc.name !== 'Venue Counter' || vc.labels.length !== 1 || vc.labels[0]?.label !== 'General'))
+                                ? 'Next: Invite Team' : 'Set up later'}
                         </button>
                     </div>
                 </div>

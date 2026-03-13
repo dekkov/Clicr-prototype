@@ -46,6 +46,7 @@ export type AppState = {
         activeShiftId: string | null;
         activeShiftAreaId: string | null;
     isLoading: boolean;
+    hasSynced: boolean; // true after first successful sync response
     teamMemberCount: number;
 };
 
@@ -137,6 +138,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         activeShiftAreaId: null,
 
         isLoading: true,
+        hasSynced: false,
         teamMemberCount: 0,
     });
 
@@ -304,7 +306,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                         activeBusiness: nextActive,
                         business: nextActive,
                         activeVenueId: nextActiveVenueId,
-                        isLoading: false
+                        isLoading: false,
+                        hasSynced: true,
                     };
                 });
             } else {
