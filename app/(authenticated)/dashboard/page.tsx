@@ -113,6 +113,99 @@ const GenderBreakdown = ({ scanEvents }: { scanEvents: IDScanEvent[] }) => {
     );
 };
 
+const STATE_PALETTE = ['bg-indigo-500', 'bg-teal-500', 'bg-orange-500', 'bg-rose-500', 'bg-sky-500'];
+
+const StateBreakdown = ({ scanEvents }: { scanEvents: IDScanEvent[] }) => {
+    const accepted = scanEvents.filter(s => s.scan_result === 'ACCEPTED' && (s.issuing_state || s.state));
+    const total = accepted.length;
+
+    const counts: Record<string, number> = {};
+    accepted.forEach(s => {
+        const st = (s.issuing_state || s.state || '').toUpperCase();
+        if (st) counts[st] = (counts[st] || 0) + 1;
+    });
+
+    const sorted = Object.entries(counts).sort(([, a], [, b]) => b - a);
+    const top5 = sorted.slice(0, 5);
+    const otherCount = sorted.slice(5).reduce((sum, [, c]) => sum + c, 0);
+    if (otherCount > 0) top5.push(['Other', otherCount]);
+
+    return (
+        <div className="bg-card border border-border rounded-xl p-6">
+            <div className="flex items-center gap-2 mb-1">
+                <MapPin className="w-4 h-4 text-muted-foreground" />
+                <span className="text-lg">ID State</span>
+            </div>
+            <p className="text-xs text-gray-500 mb-4">Where patrons' IDs are from tonight</p>
+            {total === 0 ? (
+                <p className="text-xs text-muted-foreground/60 italic">No scan data yet.</p>
+            ) : (
+                <>
+                    <div className="flex h-4 rounded-full overflow-hidden mb-3">
+                        {top5.map(([name, count], i) => (
+                            <div key={name} className={`${STATE_PALETTE[i % STATE_PALETTE.length]} transition-all`} style={{ width: `${(count / total) * 100}%` }} />
+                        ))}
+                    </div>
+                    <div className="flex items-center gap-6 text-sm flex-wrap">
+                        {top5.map(([name, count], i) => (
+                            <span key={name} className="flex items-center gap-1.5">
+                                <span className={`w-2.5 h-2.5 rounded-full ${STATE_PALETTE[i % STATE_PALETTE.length]} inline-block`} />
+                                {name} <span className="text-foreground ml-1">{Math.round((count / total) * 100)}%</span>
+                            </span>
+                        ))}
+                    </div>
+                </>
+            )}
+        </div>
+    );
+};
+
+const CityBreakdown = ({ scanEvents }: { scanEvents: IDScanEvent[] }) => {
+    const accepted = scanEvents.filter(s => s.scan_result === 'ACCEPTED' && s.city);
+    const counts: Record<string, number> = {};
+    accepted.forEach(s => {
+        const raw = (s.city || '').trim();
+        if (!raw) return;
+        // Title case: "SPRINGFIELD" → "Springfield"
+        const city = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+        counts[city] = (counts[city] || 0) + 1;
+    });
+
+    const sorted = Object.entries(counts).sort(([, a], [, b]) => b - a);
+    const top5 = sorted.slice(0, 5);
+    const otherCount = sorted.slice(5).reduce((sum, [, c]) => sum + c, 0);
+    if (otherCount > 0) top5.push(['Other', otherCount]);
+    const maxCount = top5.length > 0 ? top5[0][1] as number : 0;
+
+    return (
+        <div className="bg-card border border-border rounded-xl p-6">
+            <div className="flex items-center gap-2 mb-1">
+                <MapPin className="w-4 h-4 text-muted-foreground" />
+                <span className="text-lg">City</span>
+            </div>
+            <p className="text-xs text-gray-500 mb-4">Top cities from accepted scans tonight</p>
+            {top5.length === 0 ? (
+                <p className="text-xs text-muted-foreground/60 italic">No scan data yet.</p>
+            ) : (
+                <div className="space-y-3">
+                    {top5.map(([city, count]) => (
+                        <div key={city} className="flex items-center gap-4">
+                            <div className="w-20 text-sm text-muted-foreground truncate">{city}</div>
+                            <div className="flex-1 h-8 bg-muted rounded-lg overflow-hidden">
+                                <div
+                                    className="h-full bg-gradient-to-r from-teal-600 to-teal-500 rounded-lg transition-all"
+                                    style={{ width: `${maxCount > 0 ? ((count as number) / maxCount) * 100 : 0}%` }}
+                                />
+                            </div>
+                            <div className="w-10 text-right text-sm">{count}</div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
 const HourlyTraffic = ({ data, colors }: { data: { hour: string; entries: number; exits: number }[]; colors: { grid: string; text: string; tooltipBg: string; tooltipBorder: string } }) => (
     <div className="bg-card border border-border rounded-xl p-6">
         <div className="flex items-center gap-2 mb-1">
@@ -1132,6 +1225,12 @@ export default function DashboardPage() {
 
             {/* Gender Breakdown */}
             {isToday && <GenderBreakdown scanEvents={todayScanEvents} />}
+
+            {/* Location Metrics */}
+            {isToday && <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <StateBreakdown scanEvents={todayScanEvents} />
+                <CityBreakdown scanEvents={todayScanEvents} />
+            </div>}
 
             {/* Hourly Traffic + Occupancy Over Time */}
             {isToday && <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
