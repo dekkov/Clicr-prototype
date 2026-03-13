@@ -396,29 +396,39 @@ export default function ClicrPanel({
                 console.log('[CLICR] API response:', json);
                 if (json.success) {
                     const { status, message, age } = json.data;
-                    const scanEvent: any = {
+                    const scanEvent: Omit<IDScanEvent, 'id' | 'timestamp'> = {
                         venue_id: venueId,
                         scan_result: status,
-                        age,
-                        age_band: age >= 21 ? '21+' : 'Under 21',
-                        sex: 'U',
-                        zip_code: '00000',
-                        uiMessage: message,
-                        timestamp: Date.now(),
+                        age: age || parsed.age || 0,
+                        age_band: (age || parsed.age || 0) >= 21 ? '21+' : 'Under 21',
+                        sex: parsed.sex || 'U',
+                        zip_code: parsed.postalCode || '00000',
+                        first_name: parsed.firstName || undefined,
+                        last_name: parsed.lastName || undefined,
+                        dob: parsed.dateOfBirth || undefined,
+                        id_number: parsed.idNumber || undefined,
+                        issuing_state: parsed.state || undefined,
+                        address_street: parsed.addressStreet || undefined,
+                        city: parsed.city || undefined,
                     };
-                    setLastScan(scanEvent);
+                    recordScan(scanEvent);
+                    setLastScan({ ...scanEvent, id: 'temp', timestamp: Date.now(), uiMessage: message } as any);
                     if (status === 'ACCEPTED') {
                         if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
-                        if (addToCountOnAccept && clicr?.area_id && clicr?.id) {
-                            recordEvent({
-                                venue_id: venueId,
-                                area_id: clicr.area_id,
-                                clicr_id: clicr.id,
-                                delta: 1,
-                                flow_type: 'IN',
-                                event_type: 'SCAN',
-                                idempotency_key: Math.random().toString(36),
-                            });
+                        if (addToCountOnAccept && clicr?.id) {
+                            const aId = isVenueCounter ? null : (clicr.area_id || null);
+                            if (activeLabels.length === 0) {
+                                recordEvent({
+                                    venue_id: venueId,
+                                    area_id: aId,
+                                    clicr_id: clicr.id,
+                                    delta: 1,
+                                    flow_type: 'IN',
+                                    event_type: 'SCAN',
+                                    idempotency_key: Math.random().toString(36),
+                                });
+                            }
+                            // If labels exist, recordEvent is deferred — ScannerResult will call onLabelSelect
                         }
                     } else {
                         if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
@@ -454,18 +464,20 @@ export default function ClicrPanel({
 
         if (result.status === 'ACCEPTED') {
             if (addToCountOnAccept) {
-                if (!clicr?.area_id || !clicr?.id) return;
-                const firstLabel = activeLabels[0];
-                recordEvent({
-                    venue_id: venueId,
-                    area_id: clicr.area_id,
-                    clicr_id: clicr.id,
-                    delta: 1,
-                    flow_type: 'IN',
-                    counter_label_id: firstLabel?.id ?? null,
-                    event_type: 'SCAN',
-                    idempotency_key: Math.random().toString(36),
-                });
+                if (!clicr?.id) return;
+                const aId = isVenueCounter ? null : (clicr.area_id || null);
+                if (activeLabels.length === 0) {
+                    recordEvent({
+                        venue_id: venueId,
+                        area_id: aId,
+                        clicr_id: clicr.id,
+                        delta: 1,
+                        flow_type: 'IN',
+                        event_type: 'SCAN',
+                        idempotency_key: Math.random().toString(36),
+                    });
+                }
+                // If labels exist, recordEvent is deferred — ScannerResult will call onLabelSelect
                 if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
             } else {
                 if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
@@ -497,6 +509,22 @@ export default function ClicrPanel({
             alert("Failed to parse scan data. Please check the input.");
         }
         setManualScanInput('');
+    };
+
+    const handleScanLabelSelect = (labelId: string) => {
+        if (!lastScan || !clicr?.id || !venueId) return;
+        const aId = isVenueCounter ? null : (clicr.area_id || null);
+        recordEvent({
+            venue_id: venueId,
+            area_id: aId,
+            clicr_id: clicr.id,
+            delta: 1,
+            flow_type: 'IN',
+            counter_label_id: labelId,
+            event_type: 'SCAN',
+            idempotency_key: Math.random().toString(36),
+        });
+        setLastScan(null);
     };
 
     const handleSimulateScan = () => {
@@ -956,6 +984,8 @@ export default function ClicrPanel({
                                 exp: 'Valid',
                             }}
                             onScanNext={() => setLastScan(null)}
+                            labels={addToCountOnAccept && lastScan.scan_result === 'ACCEPTED' ? activeLabels : undefined}
+                            onLabelSelect={handleScanLabelSelect}
                         />
                     </motion.div>
                 )}
