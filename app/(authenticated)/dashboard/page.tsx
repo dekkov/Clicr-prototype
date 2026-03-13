@@ -10,7 +10,7 @@ import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/components/providers/theme-provider';
 import { GettingStartedChecklist } from './_components/GettingStartedChecklist';
-import type { CountEvent, Venue, Clicr } from '@/lib/types';
+import type { CountEvent, Venue, Clicr, IDScanEvent } from '@/lib/types';
 import type { HeatmapData } from '@/app/api/reports/heatmap/route';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { useReset } from '@/lib/reset-context';
@@ -66,19 +66,19 @@ const AgeBand = ({ band, count, max }: { band: string; count: number; max: numbe
 
 const LABEL_COLORS = ['bg-emerald-500', 'bg-blue-500', 'bg-amber-500', 'bg-purple-500', 'bg-pink-500', 'bg-cyan-500'];
 
-const CounterLabelBreakdown = ({ events, clicrs }: { events: CountEvent[]; clicrs: Clicr[] }) => {
-    const entries = events.filter(e => e.delta > 0);
-    const total = entries.length;
+const GENDER_COLORS: Record<string, string> = { 'Male': 'bg-blue-500', 'Female': 'bg-pink-500', 'Other': 'bg-amber-500', 'Unknown': 'bg-gray-500' };
 
-    // Build label name map
-    const labelMap = new Map<string, string>();
-    clicrs.forEach(c => (c.counter_labels ?? []).forEach(l => labelMap.set(l.id, l.label)));
+const GenderBreakdown = ({ scanEvents }: { scanEvents: IDScanEvent[] }) => {
+    const accepted = scanEvents.filter(s => s.scan_result === 'ACCEPTED' && s.sex);
+    const total = accepted.length;
 
-    // Count by label
     const counts: Record<string, number> = {};
-    entries.forEach(e => {
-        const name = (e.counter_label_id && labelMap.get(e.counter_label_id)) || 'Unlabeled';
-        counts[name] = (counts[name] || 0) + 1;
+    accepted.forEach(s => {
+        const sex = s.sex?.toUpperCase();
+        const label = sex === 'M' || sex === 'MALE' ? 'Male'
+            : sex === 'F' || sex === 'FEMALE' ? 'Female'
+            : 'Other';
+        counts[label] = (counts[label] || 0) + 1;
     });
 
     const sorted = Object.entries(counts).sort(([, a], [, b]) => b - a);
@@ -87,22 +87,28 @@ const CounterLabelBreakdown = ({ events, clicrs }: { events: CountEvent[]; clicr
         <div className="bg-card border border-border rounded-xl p-6">
             <div className="flex items-center gap-2 mb-1">
                 <Users className="w-4 h-4 text-muted-foreground" />
-                <span className="text-lg">Counter Labels</span>
+                <span className="text-lg">Gender Breakdown</span>
             </div>
-            <p className="text-xs text-gray-500 mb-4">Entry breakdown by counter label tonight</p>
-            <div className="flex h-4 rounded-full overflow-hidden mb-3">
-                {sorted.map(([, count], i) => (
-                    <div key={i} className={`${LABEL_COLORS[i % LABEL_COLORS.length]} transition-all`} style={{ width: `${total > 0 ? (count / total) * 100 : 0}%` }} />
-                ))}
-            </div>
-            <div className="flex items-center gap-6 text-sm flex-wrap">
-                {sorted.map(([name, count], i) => (
-                    <span key={name} className="flex items-center gap-1.5">
-                        <span className={`w-2.5 h-2.5 rounded-full ${LABEL_COLORS[i % LABEL_COLORS.length]} inline-block`} />
-                        {name} <span className="text-foreground ml-1">{total > 0 ? Math.round((count / total) * 100) : 0}%</span>
-                    </span>
-                ))}
-            </div>
+            <p className="text-xs text-gray-500 mb-4">Accepted ID scans by gender tonight</p>
+            {total === 0 ? (
+                <p className="text-xs text-muted-foreground/60 italic">No scan data yet.</p>
+            ) : (
+                <>
+                    <div className="flex h-4 rounded-full overflow-hidden mb-3">
+                        {sorted.map(([name, count]) => (
+                            <div key={name} className={`${GENDER_COLORS[name] || 'bg-gray-500'} transition-all`} style={{ width: `${(count / total) * 100}%` }} />
+                        ))}
+                    </div>
+                    <div className="flex items-center gap-6 text-sm flex-wrap">
+                        {sorted.map(([name, count]) => (
+                            <span key={name} className="flex items-center gap-1.5">
+                                <span className={`w-2.5 h-2.5 rounded-full ${GENDER_COLORS[name] || 'bg-gray-500'} inline-block`} />
+                                {name} <span className="text-foreground ml-1">{Math.round((count / total) * 100)}%</span>
+                            </span>
+                        ))}
+                    </div>
+                </>
+            )}
         </div>
     );
 };
@@ -640,14 +646,20 @@ export default function DashboardPage() {
     );
 
 
-    const totalEntries = useMemo(
-        () => todayEvents.filter((e) => e.delta > 0).reduce((sum, e) => sum + e.delta, 0),
+    // Only count venue counter events (no area_id) for total entries/exits
+    const venueCounterEvents = useMemo(
+        () => todayEvents.filter((e) => !e.area_id),
         [todayEvents]
     );
 
+    const totalEntries = useMemo(
+        () => venueCounterEvents.filter((e) => e.delta > 0).reduce((sum, e) => sum + e.delta, 0),
+        [venueCounterEvents]
+    );
+
     const totalExits = useMemo(
-        () => todayEvents.filter((e) => e.delta < 0).reduce((sum, e) => sum + Math.abs(e.delta), 0),
-        [todayEvents]
+        () => venueCounterEvents.filter((e) => e.delta < 0).reduce((sum, e) => sum + Math.abs(e.delta), 0),
+        [venueCounterEvents]
     );
 
     const totalScans = useMemo(() => todayScanEvents.length, [todayScanEvents]);
@@ -731,11 +743,11 @@ export default function DashboardPage() {
             .slice(0, 5);
     }, [todayEvents]);
 
-    const hourlyData = useMemo(() => buildHourlyData(todayEvents), [todayEvents]);
-    const occupancyData = useMemo(() => buildOccupancyOverTime(todayEvents), [todayEvents]);
+    const hourlyData = useMemo(() => buildHourlyData(venueCounterEvents), [venueCounterEvents]);
+    const occupancyData = useMemo(() => buildOccupancyOverTime(venueCounterEvents), [venueCounterEvents]);
     const peakOccupancyValue = useMemo(
-        () => Math.max(computePeakOccupancy(todayEvents), liveOccupancy),
-        [todayEvents, liveOccupancy]
+        () => Math.max(computePeakOccupancy(venueCounterEvents), liveOccupancy),
+        [venueCounterEvents, liveOccupancy]
     );
 
     const areaMap = useMemo(() => {
@@ -1119,7 +1131,7 @@ export default function DashboardPage() {
             </div>}
 
             {/* Gender Breakdown */}
-            {isToday && <CounterLabelBreakdown events={todayEvents} clicrs={clicrs} />}
+            {isToday && <GenderBreakdown scanEvents={todayScanEvents} />}
 
             {/* Hourly Traffic + Occupancy Over Time */}
             {isToday && <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

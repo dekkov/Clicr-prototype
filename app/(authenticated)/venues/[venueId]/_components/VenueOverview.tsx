@@ -79,20 +79,10 @@ export default function VenueOverview({ venueId, setActiveTab }: { venueId: stri
             .sort(([, a], [, b]) => (b.in + b.out) - (a.in + a.out));
     }, [events, venueId, venueCounterClicrs, venueCounterIds]);
 
-    // Chart Data (Last 6 Hours) - Occupancy over time
+    // Chart Data (Last 6 Hours) - Occupancy from venue counters only
     const chartData = useMemo(() => {
-        if (events.length === 0) {
-            return [
-                { time: '10PM', occupancy: 100 },
-                { time: '11PM', occupancy: 200 },
-                { time: '12AM', occupancy: 300 },
-                { time: '1AM', occupancy: 400 },
-                { time: '2AM', occupancy: 350 },
-                { time: '3AM', occupancy: 150 },
-            ];
-        }
-
-        const sortedEvents = events.filter(e => e.venue_id === venueId).sort((a, b) => a.timestamp - b.timestamp);
+        const vcEvents = events.filter(e => e.venue_id === venueId && !e.area_id && venueCounterIds.has(e.clicr_id));
+        const sortedEvents = [...vcEvents].sort((a, b) => a.timestamp - b.timestamp);
         const now = Date.now();
         const points = [];
 
@@ -119,7 +109,7 @@ export default function VenueOverview({ venueId, setActiveTab }: { venueId: stri
             });
         }
         return points;
-    }, [events, venueId]);
+    }, [events, venueId, venueCounterIds]);
 
 
     if (!venue) return null;
@@ -169,7 +159,7 @@ export default function VenueOverview({ venueId, setActiveTab }: { venueId: stri
             {/* Main Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Chart Section */}
-                <div className="lg:col-span-2 bg-muted/30 border border-border rounded-2xl p-6">
+                <div className="lg:col-span-2 bg-muted/30 border border-border rounded-2xl p-6 self-start">
                     <h3 className="text-lg font-bold text-foreground mb-6">Occupancy Flow</h3>
                     <div className="h-[300px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
@@ -270,18 +260,12 @@ export default function VenueOverview({ venueId, setActiveTab }: { venueId: stri
                             </div>
                             <div className="space-y-3">
                                 {labelBreakdown.map(([name, counts], i) => {
-                                    const total = counts.in + counts.out;
-                                    const totalAll = labelBreakdown.reduce((s, [, c]) => s + c.in + c.out, 0);
-                                    const pct = totalAll > 0 ? Math.round((total / totalAll) * 100) : 0;
                                     const colors = ['bg-emerald-500', 'bg-blue-500', 'bg-amber-500', 'bg-purple-500', 'bg-pink-500', 'bg-cyan-500'];
                                     return (
                                         <div key={name}>
-                                            <div className="flex justify-between items-center mb-1.5">
-                                                <div className="flex items-center gap-2">
-                                                    <span className={cn("w-2.5 h-2.5 rounded-full", colors[i % colors.length])} />
-                                                    <span className="text-sm font-medium text-foreground">{name}</span>
-                                                </div>
-                                                <span className="text-xs text-muted-foreground">{pct}%</span>
+                                            <div className="flex items-center gap-2 mb-1.5">
+                                                <span className={cn("w-2.5 h-2.5 rounded-full", colors[i % colors.length])} />
+                                                <span className="text-sm font-medium text-foreground">{name}</span>
                                             </div>
                                             <div className="flex items-center gap-4 pl-[18px] text-xs text-muted-foreground">
                                                 <span className="text-emerald-400">+{counts.in} in</span>
