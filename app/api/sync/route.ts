@@ -283,7 +283,7 @@ async function buildSyncResponse(
         visibleVenueIds.includes(e.venue_id) && (!latestResetAt || e.timestamp > latestResetAt)
     );
     const filteredScans = hydrated.scanEvents.filter(s =>
-        visibleVenueIds.includes(s.venue_id) && (!latestResetAt || s.timestamp > latestResetAt)
+        visibleVenueIds.includes(s.venue_id)
     );
 
     // Turnarounds — today only, scoped to visible venues
@@ -436,24 +436,28 @@ export async function POST(request: Request) {
                 const scan = payload as IDScanEvent;
                 let scanBizId: string | null = null;
                 if (userId) scanBizId = await getBusinessId();
-                try {
-                    await supabaseAdmin.from('id_scans').insert({
-                        business_id: scanBizId || scan.business_id,
-                        venue_id: scan.venue_id,
-                        scan_result: scan.scan_result,
-                        age: scan.age,
-                        sex: scan.sex,
-                        zip_code: scan.zip_code,
-                        first_name: scan.first_name,
-                        last_name: scan.last_name,
-                        dob: scan.dob,
-                        id_number_last4: scan.id_number_last4,
-                        issuing_state: scan.issuing_state,
-                        city: scan.city,
-                        shift_id: (scan as any).shift_id || null,
-                        identity_token_hash: (scan as any).identity_token_hash || null
-                    });
-                } catch (e) { console.error("[sync] Scan persistence failed:", e instanceof Error ? e.message : "Unknown error"); }
+                const resolvedBizId = scanBizId || scan.business_id;
+                const { error: scanInsertError } = await supabaseAdmin.from('id_scans').insert({
+                    business_id: resolvedBizId,
+                    venue_id: scan.venue_id,
+                    scan_result: scan.scan_result,
+                    age: scan.age,
+                    age_band: scan.age_band,
+                    sex: scan.sex,
+                    zip_code: scan.zip_code,
+                    first_name: scan.first_name,
+                    last_name: scan.last_name,
+                    dob: scan.dob,
+                    id_number_last4: scan.id_number_last4,
+                    issuing_state: scan.issuing_state,
+                    city: scan.city,
+                    shift_id: (scan as any).shift_id || null,
+                    identity_token_hash: (scan as any).identity_token_hash || null
+                });
+                if (scanInsertError) {
+                    console.error('[sync] RECORD_SCAN insert error:', scanInsertError.message, scanInsertError.details);
+                    return NextResponse.json({ error: `Scan insert failed: ${scanInsertError.message}` }, { status: 500 });
+                }
                 break;
             }
 

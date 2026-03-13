@@ -106,17 +106,24 @@ const ConfigModalBody = React.memo(function ConfigModalBody({
 }, (prev, next) => prev.configRef === next.configRef);
 
 // Mock data generator for simulation
+const MOCK_LOCATIONS = [
+    { state: 'CA', city: 'Los Angeles' }, { state: 'CA', city: 'San Francisco' },
+    { state: 'NY', city: 'New York' }, { state: 'TX', city: 'Houston' },
+    { state: 'TX', city: 'Austin' }, { state: 'FL', city: 'Miami' },
+    { state: 'IL', city: 'Chicago' }, { state: 'NV', city: 'Las Vegas' },
+];
 const generateMockID = () => {
     const isUnderage = Math.random() < 0.15;
     const age = isUnderage ? Math.floor(Math.random() * (20 - 16 + 1) + 16) : Math.floor(Math.random() * (65 - 21 + 1) + 21);
     const sex = Math.random() > 0.5 ? 'M' : 'F';
     const zip = Math.floor(Math.random() * 90000 + 10000).toString();
+    const loc = MOCK_LOCATIONS[Math.floor(Math.random() * MOCK_LOCATIONS.length)];
     let age_band = '21-25';
     if (age < 21) age_band = 'Under 21';
     else if (age > 25 && age <= 30) age_band = '26-30';
     else if (age > 30 && age <= 40) age_band = '31-40';
     else if (age > 40) age_band = '41+';
-    return { age, sex, zip, age_band };
+    return { age, sex, zip, age_band, state: loc.state, city: loc.city };
 };
 
 export default function ClicrPanel({
@@ -538,8 +545,8 @@ export default function ClicrPanel({
             age: mock.age,
             isExpired: false,
             idNumber: `SIM${Math.floor(Math.random() * 10000)}`,
-            state: 'CA',
-            addressStreet: null, city: null, eyeColor: null, hairColor: null, height: null, weight: null,
+            state: mock.state,
+            addressStreet: null, city: mock.city, eyeColor: null, hairColor: null, height: null, weight: null,
         };
         processScan(fakeParsed);
     };

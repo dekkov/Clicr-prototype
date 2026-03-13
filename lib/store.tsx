@@ -559,16 +559,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }));
 
         try {
-            const res = await authFetch({ action: 'RECORD_SCAN', payload: newScan }); // Use authFetch
-            // Intentionally not applying API response to state — RECORD_SCAN is hydrated
-            // and its response includes areas.current_occupancy from Supabase, which would
-            // overwrite the optimistic occupancy from concurrent Guest IN clicks (same root
-            // cause as RECORD_EVENT). Polling reconciles server truth.
+            const res = await authFetch({ action: 'RECORD_SCAN', payload: newScan });
             if (!res.ok) {
-                console.error("Failed to record scan (server error)", res.status);
+                const errBody = await res.text().catch(() => '');
+                console.error("[recordScan] Server error", res.status, errBody);
             }
         } catch (error) {
-            console.error("Failed to record scan", error);
+            console.error("[recordScan] Network error", error);
         } finally {
             setTimeout(() => {
                 isWritingRef.current = Math.max(0, isWritingRef.current - 1);
