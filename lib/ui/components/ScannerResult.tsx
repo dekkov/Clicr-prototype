@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { tokens } from '../tokens';
 import { Check, X } from 'lucide-react';
+import type { CounterLabel } from '@/lib/types';
 
 export type ScanStatus = 'ALLOWED' | 'DENIED_UNDERAGE' | 'DENIED_BANNED' | 'DENIED_EXPIRED' | 'PENDING';
 
@@ -16,22 +17,25 @@ interface ScannerResultProps {
         photoUrl?: string;
     };
     onScanNext: () => void;
+    labels?: CounterLabel[];
+    onLabelSelect?: (labelId: string) => void;
 }
 
 const AUTO_DISMISS_MS = 3000;
 
-export function ScannerResult({ status, data, onScanNext }: ScannerResultProps) {
+export function ScannerResult({ status, data, onScanNext, labels, onLabelSelect }: ScannerResultProps) {
     const isAllowed = status === 'ALLOWED';
+    const hasLabels = isAllowed && labels && labels.length > 0 && onLabelSelect;
     const bgColor = isAllowed ? tokens.colors.status.allowed : tokens.colors.status.denied;
 
-    // Auto-dismiss + countdown for ALLOWED
+    // Auto-dismiss + countdown for ALLOWED (only when no labels to pick)
     const [progress, setProgress] = useState(100);
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const onScanNextRef = useRef(onScanNext);
     onScanNextRef.current = onScanNext;
 
     useEffect(() => {
-        if (!isAllowed) return;
+        if (!isAllowed || hasLabels) return;
         const startTime = Date.now();
         intervalRef.current = setInterval(() => {
             const elapsed = Date.now() - startTime;
@@ -43,7 +47,7 @@ export function ScannerResult({ status, data, onScanNext }: ScannerResultProps) 
             }
         }, 30);
         return () => clearInterval(intervalRef.current!);
-    }, [isAllowed]);
+    }, [isAllowed, hasLabels]);
 
     const config = {
         ALLOWED: { icon: Check, label: 'ALLOWED', sub: null },
@@ -131,28 +135,56 @@ export function ScannerResult({ status, data, onScanNext }: ScannerResultProps) 
                     </div>
                 </div>
 
-                {/* Action Button */}
+                {/* Action Area */}
                 <div className="relative">
-                    <button
-                        onClick={onScanNext}
-                        className="w-full bg-[#111827] text-white font-bold text-lg py-4 rounded-xl hover:bg-slate-800 active:scale-[0.98] transition-all shadow-lg overflow-hidden relative"
-                    >
-                        {isAllowed && (
-                            <span
-                                className="absolute inset-y-0 left-0 rounded-xl transition-none"
-                                style={{
-                                    width: `${progress}%`,
-                                    backgroundColor: 'rgba(0,200,83,0.25)',
-                                    transition: 'width 30ms linear',
-                                }}
-                            />
-                        )}
-                        <span className="relative z-10">Scan Next</span>
-                    </button>
-                    {isAllowed && (
-                        <p className="text-center text-xs text-slate-400 mt-2">
-                            Auto-dismissing in {Math.ceil((progress / 100) * (AUTO_DISMISS_MS / 1000))}s
-                        </p>
+                    {hasLabels ? (
+                        <>
+                            <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-3">SELECT CATEGORY</span>
+                            <div className={cn(
+                                "grid gap-3",
+                                labels!.length <= 3 ? "grid-cols-1" : "grid-cols-2",
+                                labels!.length > 6 && "max-h-48 overflow-y-auto"
+                            )}>
+                                {labels!.map((label, i) => {
+                                    const colors = ['#10b981', '#3b82f6', '#f59e0b', '#a855f7', '#ec4899', '#06b6d4'];
+                                    const bg = colors[i % colors.length];
+                                    return (
+                                        <button
+                                            key={label.id}
+                                            onClick={() => onLabelSelect!(label.id)}
+                                            className="w-full text-white font-bold text-lg py-4 rounded-xl active:scale-[0.97] transition-all shadow-lg"
+                                            style={{ backgroundColor: bg }}
+                                        >
+                                            {label.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <button
+                                onClick={onScanNext}
+                                className="w-full bg-[#111827] text-white font-bold text-lg py-4 rounded-xl hover:bg-slate-800 active:scale-[0.98] transition-all shadow-lg overflow-hidden relative"
+                            >
+                                {isAllowed && (
+                                    <span
+                                        className="absolute inset-y-0 left-0 rounded-xl transition-none"
+                                        style={{
+                                            width: `${progress}%`,
+                                            backgroundColor: 'rgba(0,200,83,0.25)',
+                                            transition: 'width 30ms linear',
+                                        }}
+                                    />
+                                )}
+                                <span className="relative z-10">Scan Next</span>
+                            </button>
+                            {isAllowed && (
+                                <p className="text-center text-xs text-slate-400 mt-2">
+                                    Auto-dismissing in {Math.ceil((progress / 100) * (AUTO_DISMISS_MS / 1000))}s
+                                </p>
+                            )}
+                        </>
                     )}
                 </div>
             </div>
