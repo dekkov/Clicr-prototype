@@ -9,7 +9,7 @@ import { canAddVenue } from '@/lib/permissions';
 import type { Role } from '@/lib/types';
 
 export default function VenuesPage() {
-    const { activeBusiness, venues: storeVenues, areas, clicrs, devices, isLoading: storeLoading, areaTraffic, currentUser } = useApp();
+    const { activeBusiness, venues: storeVenues, areas, clicrs, devices, isLoading: storeLoading, events, currentUser } = useApp();
     const showAddVenue = canAddVenue(currentUser?.role as Role | undefined);
     const [allVenues, setAllVenues] = useState<Venue[]>([]);
     const [loadingVenues, setLoadingVenues] = useState(true);
@@ -61,27 +61,10 @@ export default function VenuesPage() {
             relevantDevices.filter(d => d.status === 'ACTIVE').length +
             venueClicrs.filter(c => c.active).length;
 
-        // Traffic totals from venue counter clicrs (not area counters)
-        let totalIn = 0;
-        let totalOut = 0;
-        const vcClicrs = clicrs.filter(c => c.is_venue_counter && c.venue_id === venueId);
-        for (const vc of vcClicrs) {
-            const deviceKey = `device:${activeBusiness!.id}:${vc.id}`;
-            const traffic = areaTraffic?.[deviceKey];
-            if (traffic) {
-                totalIn += traffic.total_in || 0;
-                totalOut += traffic.total_out || 0;
-            }
-        }
-        // Fallback: if no per-device data yet, try venue-level key
-        if (totalIn === 0 && totalOut === 0) {
-            const venueKey = `venue:${activeBusiness!.id}:${venueId}`;
-            const traffic = areaTraffic?.[venueKey];
-            if (traffic) {
-                totalIn = traffic.total_in || 0;
-                totalOut = traffic.total_out || 0;
-            }
-        }
+        // Traffic totals from venue counter events (no area_id = venue-level)
+        const vcEvents = events.filter(e => e.venue_id === venueId && !e.area_id);
+        const totalIn = vcEvents.filter(e => e.delta > 0).reduce((sum, e) => sum + e.delta, 0);
+        const totalOut = vcEvents.filter(e => e.delta < 0).reduce((sum, e) => sum + Math.abs(e.delta), 0);
 
         return { areaCount: venueAreas.length, currentOccupancy, deviceCount, totalIn, totalOut };
     };

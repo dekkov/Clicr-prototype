@@ -132,7 +132,7 @@ export default function ClicrPanel({
         recordEvent, recordScan, recordTurnaround,
         endShift, isLoading, patrons, patronBans, updateClicr, debug, currentUser,
         turnarounds, activeShiftId, activeShiftAreaId,
-        setPollingPaused, areaTraffic, refreshTrafficStats, activeBusiness
+        setPollingPaused, activeBusiness
     } = useApp();
 
     const id = clicrId;
@@ -204,31 +204,20 @@ export default function ClicrPanel({
     const venueAreas = (areas || []).filter(a => a.venue_id === venueId);
     const venue = currentVenue;
 
-    const scopeKey = venue?.business_id && venueId
-        ? isVenueCounter
-            ? `device:${venue.business_id}:${clicr?.id}`
-            : clicr?.area_id
-                ? `area:${venue.business_id}:${venueId}:${clicr.area_id}`
-                : null
-        : null;
-    const areaStats = scopeKey ? (areaTraffic || {})[scopeKey] : null;
-    const globalIn = areaStats?.total_in ?? 0;
-    const globalOut = areaStats?.total_out ?? 0;
+    // Compute traffic directly from events (no flash-of-0, works across tabs)
+    const relevantEvents = (events || []).filter(e =>
+        isVenueCounter
+            ? (e.venue_id === venueId && !e.area_id && e.clicr_id === clicr?.id)
+            : (e.area_id === clicr?.area_id)
+    );
+    const globalIn = relevantEvents.filter(e => e.delta > 0).reduce((sum, e) => sum + e.delta, 0);
+    const globalOut = relevantEvents.filter(e => e.delta < 0).reduce((sum, e) => sum + Math.abs(e.delta), 0);
 
     const turnaroundCount = isVenueCounter
         ? (turnarounds || [])
             .filter(t => t.venue_id === venueId)
             .reduce((s, t) => s + (t.count ?? 1), 0)
         : 0;
-
-    useEffect(() => {
-        if (!venueId || !venue?.business_id) return;
-        if (isVenueCounter) {
-            refreshTrafficStats?.(venueId, undefined, clicr?.id);
-        } else if (clicr?.area_id) {
-            refreshTrafficStats?.(venueId, clicr.area_id);
-        }
-    }, [isVenueCounter, venueId, venue?.business_id, clicr?.area_id, clicr?.id, events]);
 
     // Capacity
     const capacity = isVenueCounter
