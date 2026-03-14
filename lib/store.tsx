@@ -424,6 +424,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     const recordEvent = async (data: Omit<CountEvent, 'id' | 'timestamp' | 'user_id' | 'business_id'>) => {
         if (!state.business) return;
+        if (state.business.settings?.is_paused === true) {
+            console.warn('[recordEvent] Blocked: operations are paused');
+            return;
+        }
         if (!data.area_id && !data.venue_id) {
             console.error('recordEvent: area_id or venue_id is required');
             return;
@@ -543,6 +547,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const recordScan = async (data: Omit<IDScanEvent, 'id' | 'timestamp'>) => {
+        if (state.business?.settings?.is_paused === true) {
+            console.warn('[recordScan] Blocked: operations are paused');
+            return;
+        }
         isWritingRef.current += 1; // Acquire lock slot
 
         const newScan: IDScanEvent = {

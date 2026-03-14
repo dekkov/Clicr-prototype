@@ -4,8 +4,10 @@ import React, { useMemo, useEffect, useState, useRef } from 'react';
 import { useApp } from '@/lib/store';
 import {
     Users, TrendingUp, ScanLine, ShieldBan,
-    Calendar, RefreshCw, Download, MapPin, RotateCcw, Timer, ChevronLeft
+    Calendar, RefreshCw, Download, MapPin, RotateCcw, Timer, ChevronLeft,
+    Pause, Play
 } from 'lucide-react';
+import { canEditVenuesAndAreas } from '@/lib/permissions';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/components/providers/theme-provider';
@@ -676,6 +678,14 @@ export default function DashboardPage() {
     const resetTime = activeBusiness?.settings?.reset_time || '05:00';
     const resetTz = activeBusiness?.settings?.reset_timezone || activeBusiness?.timezone || 'UTC';
 
+    const isPaused = activeBusiness?.settings?.is_paused === true;
+
+    const togglePause = async () => {
+        if (!activeBusiness) return;
+        const newPaused = !isPaused;
+        await updateBusiness({ settings: { ...activeBusiness.settings, is_paused: newPaused } });
+    };
+
     const [showAdvanceConfirm, setShowAdvanceConfirm] = useState(false);
     const [showOpResetConfirm, setShowOpResetConfirm] = useState(false);
     const [showSchedulePopover, setShowSchedulePopover] = useState(false);
@@ -1009,6 +1019,15 @@ export default function DashboardPage() {
 
     return (
         <div className="space-y-8 animate-[fade-in_0.5s_ease-out]">
+            {/* Pause Banner */}
+            {isPaused && (
+                <div className="bg-red-600 text-white px-4 py-3 rounded-lg flex items-center gap-2 mb-4">
+                    <Pause className="w-5 h-5" />
+                    <span className="font-semibold">OPERATIONS PAUSED</span>
+                    <span className="text-red-200">— All counting and scanning suspended</span>
+                </div>
+            )}
+
             {/* Page Header - Design */}
             <div className="mb-8">
                 <div className="flex items-center gap-4 mb-2">
@@ -1045,6 +1064,19 @@ export default function DashboardPage() {
                         {/* Action buttons — only shown for today's live view */}
                         {isToday && (
                             <>
+                                {/* Pause/Resume Toggle — MANAGER+ only */}
+                                {canEditVenuesAndAreas(currentUser.role) && (
+                                    <button
+                                        onClick={togglePause}
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm ${
+                                            isPaused ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-amber-600 hover:bg-amber-700 text-white'
+                                        }`}
+                                    >
+                                        {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+                                        {isPaused ? 'Resume Operations' : 'Pause Operations'}
+                                    </button>
+                                )}
+
                                 {/* Advance to Next Day */}
                                 <button
                                     onClick={() => {

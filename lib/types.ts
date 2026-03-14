@@ -63,6 +63,7 @@ export type Business = {
         ban_permissions?: { manager: boolean; staff: boolean };
         ban_scope_default?: 'VENUE' | 'BUSINESS';
         ban_reason_required?: boolean;
+        is_paused?: boolean;
     };
 };
 
