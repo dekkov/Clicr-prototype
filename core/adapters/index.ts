@@ -32,4 +32,3 @@ export type {
 
 export { getDataClient } from './DataClient';
 export { LocalAdapter } from './LocalAdapter';
-export { SupabaseAdapter } from './SupabaseAdapter';

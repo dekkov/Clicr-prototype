@@ -7,7 +7,7 @@
  * IMPLEMENTATION NOTES:
  * - Auth methods are no-ops (always returns a mock session)
  * - Data is persisted to localStorage in the browser or data/db.json on the server
- * - This adapter is the reference implementation — SupabaseAdapter should match behavior
+ * - This adapter is the reference implementation for demo mode
  *
  * LIMITATIONS:
  * - No real auth (single hardcoded user)

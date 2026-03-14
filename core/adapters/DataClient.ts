@@ -1,7 +1,7 @@
 /**
  * CLICR V4 DataClient Interface
  * ==============================
- * This is the single contract that both LocalAdapter and SupabaseAdapter must implement.
+ * This is the single contract that LocalAdapter must implement.
  * UI components MUST call DataClient methods only — never raw localStorage, fetch, or Supabase directly.
  *
  * Design Principles:
@@ -9,8 +9,10 @@
  * 2. Scope parameters use a consistent { businessId, venueId?, areaId? } pattern.
  * 3. Write operations return the mutated entity or a result object.
  * 4. Read operations never throw on empty results — they return empty arrays or null.
- * 5. Auth methods are stubbed in LocalAdapter; fully implemented in SupabaseAdapter.
+ * 5. Auth methods are stubbed in LocalAdapter.
  */
+
+// Production uses /api/sync server routes. LocalAdapter implements demo mode.
 
 import type { NightLog } from '@/lib/types';
 
@@ -306,7 +308,7 @@ export interface DataClient {
     getDemographics(scope: Scope, window: TimeWindow): Promise<DemographicBreakdown[]>;
     getEventLog(scope: Scope, window: TimeWindow): Promise<EventLogEntry[]>;
 
-    // ── REALTIME (optional, SupabaseAdapter only) ───────────────────────
+    // ── REALTIME (optional) ──────────────────────────────────────────────
     /**
      * Subscribe to realtime occupancy changes for a scope.
      * Returns an unsubscribe function.
@@ -327,18 +329,9 @@ export type AppMode = 'demo' | 'production';
 /**
  * Get the active DataClient based on environment configuration.
  * Set NEXT_PUBLIC_APP_MODE=demo for LocalAdapter (default for prototype).
- * Set NEXT_PUBLIC_APP_MODE=production for SupabaseAdapter.
+ * Production mode uses /api/sync server routes directly.
  */
 export function getDataClient(): DataClient {
-    const mode = (process.env.NEXT_PUBLIC_APP_MODE || 'demo') as AppMode;
-
-    if (mode === 'production') {
-        // Lazy import to avoid bundling Supabase in demo mode
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const { SupabaseAdapter } = require('./SupabaseAdapter');
-        return new SupabaseAdapter();
-    }
-
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { LocalAdapter } = require('./LocalAdapter');
     return new LocalAdapter();
