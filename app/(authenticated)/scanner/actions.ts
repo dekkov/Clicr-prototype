@@ -3,7 +3,8 @@
 import { createClient } from '@/utils/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { parseAAMVA, isExpired, getAge } from '@/lib/scanning/aamva-parser';
-import { buildEnforcementEvent } from '@/lib/ban-utils';
+import { buildEnforcementEvent, validateOverrideInput } from '@/lib/ban-utils';
+import { hasMinRole } from '@/lib/permissions';
 import crypto from 'crypto';
 
 // --- Types ---
@@ -330,6 +331,55 @@ export async function banPatron(scanId: string | null, manualData: any | null, b
         return { success: true };
     } catch (err: any) {
         console.error("Ban Error", err);
+        return { success: false, error: err.message };
+    }
+}
+
+export async function overrideBan(
+    enforcementEventId: string,
+    areaId: string,
+    reason: string,
+    notes: string
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { success: false, error: 'Not authenticated' };
+
+        const { data: member } = await supabaseAdmin
+            .from('business_members')
+            .select('role')
+            .eq('user_id', user.id)
+            .single();
+        if (!member || !hasMinRole(member.role, 'MANAGER')) {
+            return { success: false, error: 'Insufficient permissions' };
+        }
+
+        const validation = validateOverrideInput({ enforcementEventId, areaId, reason, notes });
+        if (!validation.valid) return { success: false, error: validation.error };
+
+        const { error: updateErr } = await supabaseAdmin
+            .from('ban_enforcement_events')
+            .update({
+                result: 'ALLOWED_OVERRIDE',
+                override_reason: reason,
+                notes: notes || null,
+            })
+            .eq('id', enforcementEventId);
+        if (updateErr) return { success: false, error: updateErr.message };
+
+        // Use user client for RPC, consistent with processScan pattern
+        const { error: rpcErr } = await supabase.rpc('apply_occupancy_delta', {
+            p_area_id: areaId,
+            p_delta: 1,
+            p_source: 'scan',
+            p_device_id: null,
+        });
+        if (rpcErr) return { success: false, error: rpcErr.message };
+
+        return { success: true };
+    } catch (err: any) {
+        console.error("[Override Ban] Error:", err);
         return { success: false, error: err.message };
     }
 }
