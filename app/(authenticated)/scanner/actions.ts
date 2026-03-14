@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { parseAAMVA, isExpired, getAge } from '@/lib/scanning/aamva-parser';
+import { buildEnforcementEvent } from '@/lib/ban-utils';
 import crypto from 'crypto';
 
 // --- Types ---
@@ -24,6 +25,8 @@ export type ScanResult = {
         notes?: string;
         period: string; // "Permanent" or date
     };
+    enforcementEventId?: string;
+    areaId?: string;
 };
 
 export type ScanPayload = {
@@ -109,7 +112,26 @@ export async function processScan(payload: ScanPayload): Promise<{ success: bool
             }
         }
 
-        // 5. Determine Outcome
+        // 5. Log enforcement event if a ban was found
+        let enforcementEventId: string | undefined;
+        if (activeBan) {
+            const enfEvent = buildEnforcementEvent({
+                banId: activeBan.ban_id,
+                venueId: payload.venueId,
+                deviceId: payload.deviceId ?? null,
+                userId: user.id,
+                firstName: parsed.firstName,
+                lastName: parsed.lastName,
+            });
+            const { data: insertedEnf } = await supabaseAdmin
+                .from('ban_enforcement_events')
+                .insert(enfEvent)
+                .select('id')
+                .single();
+            enforcementEventId = insertedEnf?.id;
+        }
+
+        // 6. Determine Outcome
         let outcome: 'ACCEPTED' | 'DENIED' = 'ACCEPTED';
         let reason: any = undefined;
 
@@ -127,7 +149,7 @@ export async function processScan(payload: ScanPayload): Promise<{ success: bool
             reason = 'EXPIRED';
         }
 
-        // 6. Log Scan (id_scans with identity_token_hash for spec compliance)
+        // 7. Log Scan (id_scans with identity_token_hash for spec compliance)
         await supabaseAdmin.from('id_scans').insert({
             business_id: businessId,
             venue_id: payload.venueId,
@@ -146,7 +168,7 @@ export async function processScan(payload: ScanPayload): Promise<{ success: bool
             identity_token_hash: identityHash
         });
 
-        // 8. Auto-Increment Occupancy (If Accepted and Area specified)
+        // 8. Auto-Increment Occupancy (if Accepted and Area specified)
         if (outcome === 'ACCEPTED') {
             const autoAdd = true; // TODO: Fetch from settings
             if (autoAdd && payload.areaId) {
@@ -181,10 +203,12 @@ export async function processScan(payload: ScanPayload): Promise<{ success: bool
                     issuingState: parsed.issuingState
                 },
                 banDetails: activeBan ? {
-                    reason: activeBan.reason_code || 'Unspecified',
+                    reason: activeBan.reason || 'Unspecified',
                     notes: activeBan.notes,
                     period: activeBan.end_at ? `Until ${new Date(activeBan.end_at).toLocaleDateString()}` : 'Permanent'
-                } : undefined
+                } : undefined,
+                enforcementEventId,
+                areaId: payload.areaId,
             }
         };
 
