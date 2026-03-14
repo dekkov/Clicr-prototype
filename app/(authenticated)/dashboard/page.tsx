@@ -10,8 +10,9 @@ import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/components/providers/theme-provider';
 import { GettingStartedChecklist } from './_components/GettingStartedChecklist';
-import type { CountEvent, Venue, Clicr, IDScanEvent } from '@/lib/types';
+import type { CountEvent, Venue, Clicr, IDScanEvent, NightLog } from '@/lib/types';
 import type { HeatmapData } from '@/app/api/reports/heatmap/route';
+import { computeTrend } from '@/lib/trend-utils';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { useReset } from '@/lib/reset-context';
 import { getAutoDateLabel, getBusinessDayStart } from '@/lib/business-day';
@@ -32,6 +33,8 @@ const KpiCard = ({
     iconColor,
     valueColor,
     detailColor,
+    trend,
+    trendValue,
 }: {
     label: string;
     value: string | number;
@@ -40,13 +43,26 @@ const KpiCard = ({
     iconColor?: string;
     valueColor?: string;
     detailColor?: string;
+    trend?: 'up' | 'down' | 'neutral';
+    trendValue?: string;
 }) => (
     <div className="bg-card border border-border rounded-xl p-6">
         <div className="flex items-center justify-between mb-4">
             <div className="text-xs text-foreground/60 uppercase tracking-wide">{label}</div>
             <Icon className={cn("w-5 h-5", iconColor ?? "text-gray-500")} />
         </div>
-        <div className={cn("text-4xl mb-2", valueColor ?? "text-foreground")}>{value}</div>
+        <div className="flex items-baseline mb-2">
+            <div className={cn("text-4xl", valueColor ?? "text-foreground")}>{value}</div>
+            {trendValue && (
+                <span className={`text-xs font-medium ml-2 ${
+                    trend === 'up' ? 'text-green-400' :
+                    trend === 'down' ? 'text-red-400' :
+                    'text-zinc-400'
+                }`}>
+                    {trendValue}
+                </span>
+            )}
+        </div>
         <div className={cn("text-sm", detailColor ?? "text-foreground/60")}>{detail}</div>
     </div>
 );
@@ -664,6 +680,7 @@ export default function DashboardPage() {
     const [showOpResetConfirm, setShowOpResetConfirm] = useState(false);
     const [showSchedulePopover, setShowSchedulePopover] = useState(false);
     const [advanceDate, setAdvanceDate] = useState(() => getAutoDateLabel(new Date(), resetTime, resetTz));
+    const [prevNightLog, setPrevNightLog] = useState<NightLog | null>(null);
 
     // Date picker state
     const [selectedDate, setSelectedDate] = useState<string | null>(null); // null = Today
@@ -706,6 +723,24 @@ export default function DashboardPage() {
         }, msUntilMidnight);
         return () => clearTimeout(timer);
     }, [todayStart]);
+
+    useEffect(() => {
+        if (!activeBusiness?.id) return;
+        const fetchPrevNight = async () => {
+            try {
+                const res = await fetch('/api/sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'GET_NIGHT_LOGS', payload: { businessId: activeBusiness.id } }),
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                const logs: NightLog[] = data.nightLogs || [];
+                if (logs.length > 0) setPrevNightLog(logs[0]);
+            } catch { /* trends just won't show */ }
+        };
+        fetchPrevNight();
+    }, [activeBusiness?.id]);
 
     // Dashboard metrics only use venue counter events (area_id is null/empty).
     // Area counter taps track area-level flow only and don't contribute to dashboard metrics.
@@ -907,6 +942,26 @@ export default function DashboardPage() {
             return { venue, occupancy, capacity, pctFull, venueEntries, venueExits, areaCount };
         });
     }, [venues, areas, todayEvents]);
+
+    // --- Trend computations vs. previous night ---
+    const entryTrend = computeTrend(totalEntries, prevNightLog?.total_in ?? null);
+    const peakTrend = computeTrend(peakOccupancyValue, prevNightLog?.peak_occupancy ?? null);
+    const scanTrend = computeTrend(totalScans, prevNightLog?.scans_total ?? null);
+
+    // Denial Rate — percentage point delta (not percentage change)
+    const currentDenialRate = totalScans > 0 ? (deniedCount / totalScans) * 100 : 0;
+    const prevDenialRate = prevNightLog && prevNightLog.scans_total > 0
+        ? ((prevNightLog.scans_denied ?? 0) / prevNightLog.scans_total) * 100
+        : null;
+    const denialTrend = prevDenialRate !== null
+        ? (() => {
+            const diff = Math.round((currentDenialRate - prevDenialRate) * 10) / 10;
+            if (diff === 0) return { trend: 'neutral' as const, value: '—' };
+            return diff > 0
+                ? { trend: 'up' as const, value: `↑${diff}pp` }
+                : { trend: 'down' as const, value: `↓${Math.abs(diff)}pp` };
+        })()
+        : null;
 
     // --- Render: No businesses (new user / redirecting to onboarding) ---
     if (!isLoading && businesses.length === 0) {
@@ -1133,6 +1188,8 @@ export default function DashboardPage() {
                     value={liveOccupancy}
                     detail={`Peak: ${peakOccupancyValue}`}
                     icon={Users}
+                    trend={peakTrend?.trend}
+                    trendValue={peakTrend?.value}
                 />
                 <KpiCard
                     label="Total Entries"
@@ -1142,6 +1199,8 @@ export default function DashboardPage() {
                     iconColor="text-emerald-500"
                     valueColor="text-emerald-400"
                     detailColor="text-red-400"
+                    trend={entryTrend?.trend}
+                    trendValue={entryTrend?.value}
                 />
                 <KpiCard
                     label="Scans Processed"
@@ -1150,6 +1209,8 @@ export default function DashboardPage() {
                     icon={ScanLine}
                     iconColor="text-purple-500"
                     valueColor="text-purple-400"
+                    trend={scanTrend?.trend}
+                    trendValue={scanTrend?.value}
                 />
                 <KpiCard
                     label="Banned Hits"
@@ -1158,6 +1219,8 @@ export default function DashboardPage() {
                     icon={ShieldBan}
                     iconColor="text-red-500"
                     valueColor="text-red-400"
+                    trend={denialTrend?.trend}
+                    trendValue={denialTrend?.value}
                 />
             </div>}
 
