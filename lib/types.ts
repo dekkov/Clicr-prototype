@@ -114,6 +114,9 @@ export type Area = {
     created_at: string;
     updated_at: string;
 
+    // Capacity enforcement
+    capacity_enforcement_mode?: CapacityEnforcementMode;
+
     // Shift management
     shift_mode?: ShiftMode;
     auto_reset_time?: string;      // e.g. '09:00'
