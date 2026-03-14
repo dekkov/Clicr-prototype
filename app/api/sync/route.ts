@@ -406,6 +406,19 @@ export async function POST(request: Request) {
                     return NextResponse.json({ error: 'area_id or venue_id is required for RECORD_EVENT' }, { status: 400 });
                 }
 
+                // Check if operations are paused
+                const { data: bizCheck } = await supabaseAdmin
+                  .from('businesses')
+                  .select('settings')
+                  .eq('id', payload.business_id)
+                  .single();
+                if (bizCheck?.settings?.is_paused === true) {
+                  return NextResponse.json(
+                    { error: 'Operations are paused. Counting suspended.' },
+                    { status: 423 }
+                  );
+                }
+
                 const deviceId = (event as any).clicr_id;
                 const rpcParams: Record<string, unknown> = {
                     p_delta: event.delta,
@@ -667,14 +680,18 @@ export async function POST(request: Request) {
             }
 
             case 'GET_NIGHT_LOGS': {
-                const { businessId } = payload;
-                const { data: nightLogs, error } = await supabaseAdmin
+                const { businessId, venueId } = payload;
+                let query = supabaseAdmin
                     .from('night_logs')
                     .select('*')
                     .eq('business_id', businessId)
                     .is('area_id', null)
                     .order('business_date', { ascending: false })
                     .limit(1);
+                if (venueId) {
+                    query = query.eq('venue_id', venueId);
+                }
+                const { data: nightLogs, error } = await query;
                 if (error) return NextResponse.json({ error: error.message }, { status: 500 });
                 return NextResponse.json({ nightLogs: nightLogs || [] });
             }

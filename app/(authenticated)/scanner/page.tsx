@@ -225,6 +225,7 @@ export default function ScannerPage() {
                             result.reason === 'BANNED' ? 'DENIED_BANNED' :
                             result.reason === 'UNDERAGE' ? 'DENIED_UNDERAGE' :
                             result.reason === 'EXPIRED' ? 'DENIED_EXPIRED' :
+                            result.reason === 'OPERATION_PAUSED' ? 'DENIED_PAUSED' :
                             'DENIED_UNDERAGE'
                         }
                         data={{

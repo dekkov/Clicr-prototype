@@ -13,7 +13,7 @@ import crypto from 'crypto';
 
 export type ScanResult = {
     outcome: 'ACCEPTED' | 'DENIED';
-    reason?: 'UNDERAGE' | 'EXPIRED' | 'BANNED' | 'INVALID_FORMAT' | 'VERIFICATION_FAILED' | 'AREA_AT_CAPACITY' | 'AREA_AT_CAPACITY_OVERRIDE_REQUIRED';
+    reason?: 'UNDERAGE' | 'EXPIRED' | 'BANNED' | 'INVALID_FORMAT' | 'VERIFICATION_FAILED' | 'AREA_AT_CAPACITY' | 'AREA_AT_CAPACITY_OVERRIDE_REQUIRED' | 'OPERATION_PAUSED';
     data: {
         firstName: string | null;
         lastName: string | null;
@@ -70,7 +70,21 @@ export async function processScan(payload: ScanPayload): Promise<{ success: bool
 
         // 1b. Pause Check
         if (shouldBlockForPause(settings)) {
-            return { success: false, error: 'Scanning is currently paused.' };
+            await supabaseAdmin.from('id_scans').insert({
+                business_id: businessId,
+                venue_id: payload.venueId,
+                area_id: payload.areaId || null,
+                scan_result: 'DENIED',
+                deny_reason: 'OPERATION_PAUSED',
+            });
+            return {
+                success: true,
+                result: {
+                    outcome: 'DENIED' as const,
+                    reason: 'OPERATION_PAUSED' as const,
+                    data: { firstName: null, lastName: null, age: null, gender: null, dob: null, expirationDate: null, issuingState: null },
+                },
+            };
         }
 
         // 2. Parse

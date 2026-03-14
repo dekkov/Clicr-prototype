@@ -652,6 +652,7 @@ export default function DashboardPage() {
     const { resolvedTheme } = useTheme();
     const {
         activeBusiness,
+        activeVenueId,
         businesses,
         areas,
         venues,
@@ -741,7 +742,7 @@ export default function DashboardPage() {
                 const res = await fetch('/api/sync', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'GET_NIGHT_LOGS', payload: { businessId: activeBusiness.id } }),
+                    body: JSON.stringify({ action: 'GET_NIGHT_LOGS', payload: { businessId: activeBusiness.id, venueId: activeVenueId } }),
                 });
                 if (!res.ok) return;
                 const data = await res.json();
