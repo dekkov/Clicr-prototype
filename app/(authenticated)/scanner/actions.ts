@@ -91,8 +91,7 @@ export async function processScan(payload: ScanPayload): Promise<{ success: bool
         let parsed = parseAAMVA(payload.raw);
 
         // Basic Validation
-        console.log('[processScan] parsed fields:', { idNumber: parsed.idNumber, state: parsed.state, dob: parsed.dateOfBirth });
-        if (!parsed.idNumber || !parsed.state || !parsed.dateOfBirth) {
+        if (!parsed.idNumber || !parsed.issuingState || !parsed.dob) {
             // Fallback: Try simpler barcode parse or return error
             // For now, strict AAMVA
             return {
@@ -105,7 +104,7 @@ export async function processScan(payload: ScanPayload): Promise<{ success: bool
         }
 
         // 3. Compute Hash
-        const identityHash = generateIdentityHash(parsed.state, parsed.idNumber, parsed.dateOfBirth);
+        const identityHash = generateIdentityHash(parsed.issuingState, parsed.idNumber, parsed.dob);
 
         // 4. Check Bans — identity matching via hashed ID + region (banned_persons + patron_bans)
         let hasBusinessBan = false;
@@ -158,7 +157,7 @@ export async function processScan(payload: ScanPayload): Promise<{ success: bool
         let outcome: 'ACCEPTED' | 'DENIED' = 'ACCEPTED';
         let reason: any = undefined;
 
-        const age = getAge(parsed.dateOfBirth);
+        const age = getAge(parsed.dob);
         const expired = isExpired(parsed.expirationDate);
 
         if (hasBusinessBan || hasVenueBan) {
@@ -181,13 +180,13 @@ export async function processScan(payload: ScanPayload): Promise<{ success: bool
             scan_result: outcome,
             deny_reason: reason,
             age,
-            sex: parsed.sex || 'U',
+            sex: parsed.gender || 'U',
             zip_code: parsed.postalCode || '',
             first_name: parsed.firstName,
             last_name: parsed.lastName,
-            dob: parsed.dateOfBirth,
+            dob: parsed.dob,
             id_number_last4: parsed.idNumber ? parsed.idNumber.slice(-4) : null,
-            issuing_state: parsed.state,
+            issuing_state: parsed.issuingState,
             identity_token_hash: identityHash
         });
 
@@ -215,10 +214,10 @@ export async function processScan(payload: ScanPayload): Promise<{ success: bool
                                 firstName: parsed.firstName,
                                 lastName: parsed.lastName,
                                 age,
-                                gender: parsed.sex,
-                                dob: parsed.dateOfBirth,
+                                gender: parsed.gender,
+                                dob: parsed.dob,
                                 expirationDate: parsed.expirationDate,
-                                issuingState: parsed.state,
+                                issuingState: parsed.issuingState,
                             },
                         },
                     };
@@ -254,10 +253,10 @@ export async function processScan(payload: ScanPayload): Promise<{ success: bool
                     firstName: parsed.firstName,
                     lastName: parsed.lastName,
                     age,
-                    gender: parsed.sex,
-                    dob: parsed.dateOfBirth,
+                    gender: parsed.gender,
+                    dob: parsed.dob,
                     expirationDate: parsed.expirationDate,
-                    issuingState: parsed.state
+                    issuingState: parsed.issuingState
                 },
                 banDetails: activeBan ? {
                     reason: activeBan.reason || 'Unspecified',
@@ -306,16 +305,21 @@ export async function banPatron(scanId: string | null, manualData: any | null, b
             issuingState = scan.issuing_state || '';
 
         } else if (manualData) {
-            const { data: member } = await supabase.from('business_members').select('business_id').eq('user_id', user.id).single();
-            if (!member) return { success: false, error: 'No business' };
-            businessId = member.business_id;
+            if (banDetails.businessId) {
+                businessId = banDetails.businessId;
+            } else {
+                const { data: member } = await supabaseAdmin.from('business_members').select('business_id').eq('user_id', user.id).limit(1).single();
+                if (!member) return { success: false, error: 'No business' };
+                businessId = member.business_id;
+            }
 
-            const { state, idNumber, dob: manualDob, identityTokenHash, firstName: mFirstName, lastName: mLastName } = manualData;
+            const { state, idNumber, dob: manualDob, identityTokenHash, firstName: mFirstName, lastName: mLastName, idNumberLast4: mIdLast4 } = manualData;
             if (!state || !manualDob) return { success: false, error: 'Missing ID details' };
 
             if (identityTokenHash) {
                 // Pre-computed hash from guest directory (no full ID number needed)
                 identityHash = identityTokenHash;
+                if (mIdLast4) idNumberLast4 = mIdLast4;
             } else if (idNumber) {
                 identityHash = generateIdentityHash(state, idNumber, manualDob);
                 idNumberLast4 = idNumber.slice(-4);
@@ -343,7 +347,7 @@ export async function banPatron(scanId: string | null, manualData: any | null, b
                 .eq('business_id', businessId)
                 .eq('identity_token_hash', identityHash)
                 .limit(1)
-                .single();
+                .maybeSingle();
 
             if (existing) {
                 personId = existing.id;

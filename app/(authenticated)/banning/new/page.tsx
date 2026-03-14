@@ -3,12 +3,14 @@
 import React, { useState } from 'react';
 import { banPatron } from '@/app/(authenticated)/scanner/actions';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useApp } from '@/lib/store';
 import { ArrowLeft, Save, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 
 export default function NewBanPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const { activeBusiness } = useApp();
     const [submitting, setSubmitting] = useState(false);
 
     // Pre-fill from query params (from guest directory ban button)
@@ -41,19 +43,26 @@ export default function NewBanPage() {
         const dobFormatted = dob.replace(/-/g, ''); // YYYYMMDD
 
         const manualData = prefillTokenHash
-            ? { state, idNumber: idNumber || undefined, dob: dobFormatted, identityTokenHash: prefillTokenHash, firstName: prefillFname, lastName: prefillLname, idNumberLast4: prefillLast4 || undefined }
+            ? { state, idNumber: idNumber || null, dob: dobFormatted, identityTokenHash: prefillTokenHash, firstName: prefillFname, lastName: prefillLname, idNumberLast4: prefillLast4 || null }
             : { state, idNumber, dob: dobFormatted };
 
-        const res = await banPatron(null, manualData, {
-            reason,
-            scope,
-            notes,
-            duration: 'PERMANENT'
-        });
+        let res;
+        try {
+            res = await banPatron(null, manualData, {
+                reason,
+                scope,
+                notes,
+                duration: 'PERMANENT',
+                businessId: activeBusiness?.id,
+            });
+        } catch (err: any) {
+            alert('Error: ' + err.message);
+            setSubmitting(false);
+            return;
+        }
 
         if (res.success) {
             router.push('/banning');
-            router.refresh();
         } else {
             alert('Error: ' + res.error);
             setSubmitting(false);
