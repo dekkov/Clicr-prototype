@@ -12,6 +12,7 @@ export default function NewBanPage() {
     const searchParams = useSearchParams();
     const { activeBusiness } = useApp();
     const [submitting, setSubmitting] = useState(false);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     // Pre-fill from query params (from guest directory ban button)
     const prefillFname = searchParams.get('fname') || '';
@@ -39,6 +40,7 @@ export default function NewBanPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setSubmitting(true);
+        setErrorMsg(null);
 
         const dobFormatted = dob.replace(/-/g, ''); // YYYYMMDD
 
@@ -56,7 +58,7 @@ export default function NewBanPage() {
                 businessId: activeBusiness?.id,
             });
         } catch (err: any) {
-            alert('Error: ' + err.message);
+            setErrorMsg(err.message);
             setSubmitting(false);
             return;
         }
@@ -64,7 +66,7 @@ export default function NewBanPage() {
         if (res.success) {
             router.push('/banning');
         } else {
-            alert('Error: ' + res.error);
+            setErrorMsg(res.error ?? 'Something went wrong.');
             setSubmitting(false);
         }
     };
@@ -163,6 +165,13 @@ export default function NewBanPage() {
                         </p>
                     </div>
                 </section>
+
+                {errorMsg && (
+                    <div className="flex items-start gap-3 bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+                        <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                        <p className="text-sm text-red-400 font-medium">{errorMsg}</p>
+                    </div>
+                )}
 
                 <div className="flex justify-end gap-4">
                     <Link href="/banning" className="px-6 py-3 rounded-xl font-bold text-muted-foreground hover:text-foreground transition-colors">
