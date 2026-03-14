@@ -209,6 +209,14 @@ export function ScannerResult({ status, data, onScanNext, labels, onLabelSelect,
 
             {/* Bottom Card */}
             <div className="bg-white absolute bottom-0 left-0 right-0 rounded-t-[32px] p-8 pb-12 shadow-[0_-10px_40px_rgba(0,0,0,0.2)] animate-in slide-in-from-bottom duration-500">
+                {/* Denial reason badge */}
+                {!isAllowed && !overrideApproved && config.sub && (
+                    <div className="mb-5 inline-flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-2">
+                        <X className="w-4 h-4 text-red-500 stroke-[3]" />
+                        <span className="text-sm font-black text-red-600 uppercase tracking-wide">{config.sub}</span>
+                    </div>
+                )}
+
                 {/* Header Row: Name + Age */}
                 <div className="flex justify-between items-start mb-6">
                     <div>
