@@ -16,6 +16,8 @@ interface ScannerResultProps {
         age: number;
         dob: string; // YYYY-MM-DD
         exp: string; // YYYY-MM-DD
+        idLast4?: string; // Last 4 of DL/ID number
+        state?: string; // Issuing state
         photoUrl?: string;
     };
     onScanNext: () => void;
@@ -125,7 +127,7 @@ export function ScannerResult({ status, data, onScanNext, labels, onLabelSelect,
                             <span className="text-2xl font-bold text-slate-900 leading-none">{data.age}</span>
                         </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-8 mb-8 pb-8 border-b border-slate-100">
+                    <div className="grid grid-cols-3 gap-6 mb-8 pb-8 border-b border-slate-100">
                         <div>
                             <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">DOB</span>
                             <p className="text-lg font-mono font-medium text-slate-800 tracking-tight">{data.dob}</p>
@@ -133,6 +135,12 @@ export function ScannerResult({ status, data, onScanNext, labels, onLabelSelect,
                         <div>
                             <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">EXP</span>
                             <p className="text-lg font-mono font-medium text-slate-800 tracking-tight">{data.exp}</p>
+                        </div>
+                        <div>
+                            <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">ID / DL</span>
+                            <p className="text-lg font-mono font-medium text-slate-800 tracking-tight">
+                                {data.idLast4 ? `••${data.idLast4}` : '—'}
+                            </p>
                         </div>
                     </div>
                     <button
@@ -213,8 +221,8 @@ export function ScannerResult({ status, data, onScanNext, labels, onLabelSelect,
                     </div>
                 </div>
 
-                {/* Grid: DOB + EXP */}
-                <div className="grid grid-cols-2 gap-8 mb-8 pb-8 border-b border-slate-100">
+                {/* Grid: DOB + EXP + ID */}
+                <div className="grid grid-cols-3 gap-6 mb-8 pb-8 border-b border-slate-100">
                     <div>
                         <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">DOB</span>
                         <p className="text-lg font-mono font-medium text-slate-800 tracking-tight">{data.dob}</p>
@@ -222,6 +230,12 @@ export function ScannerResult({ status, data, onScanNext, labels, onLabelSelect,
                     <div>
                         <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">EXP</span>
                         <p className="text-lg font-mono font-medium text-slate-800 tracking-tight">{data.exp}</p>
+                    </div>
+                    <div>
+                        <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">ID / DL</span>
+                        <p className="text-lg font-mono font-medium text-slate-800 tracking-tight">
+                            {data.idLast4 ? `••${data.idLast4}` : '—'}{data.state ? ` ${data.state}` : ''}
+                        </p>
                     </div>
                 </div>
 

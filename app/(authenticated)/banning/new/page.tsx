@@ -2,18 +2,32 @@
 
 import React, { useState } from 'react';
 import { banPatron } from '@/app/(authenticated)/scanner/actions';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Save, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 
 export default function NewBanPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [submitting, setSubmitting] = useState(false);
+
+    // Pre-fill from query params (from guest directory ban button)
+    const prefillFname = searchParams.get('fname') || '';
+    const prefillLname = searchParams.get('lname') || '';
+    const prefillDobRaw = searchParams.get('dob') || ''; // YYYYMMDD
+    const prefillState = searchParams.get('state') || '';
+    const prefillLast4 = searchParams.get('id_last4') || '';
+    const prefillTokenHash = searchParams.get('token_hash') || '';
+
+    // Convert YYYYMMDD to YYYY-MM-DD for date input
+    const prefillDob = prefillDobRaw.length === 8
+        ? `${prefillDobRaw.slice(0, 4)}-${prefillDobRaw.slice(4, 6)}-${prefillDobRaw.slice(6, 8)}`
+        : '';
 
     // Identity Fields
     const [idNumber, setIdNumber] = useState('');
-    const [state, setState] = useState('');
-    const [dob, setDob] = useState(''); // YYYY-MM-DD from input type=date
+    const [state, setState] = useState(prefillState);
+    const [dob, setDob] = useState(prefillDob); // YYYY-MM-DD from input type=date
 
     // Ban Details
     const [reason, setReason] = useState('AGGRESSIVE');
@@ -26,7 +40,11 @@ export default function NewBanPage() {
 
         const dobFormatted = dob.replace(/-/g, ''); // YYYYMMDD
 
-        const res = await banPatron(null, { state, idNumber, dob: dobFormatted }, {
+        const manualData = prefillTokenHash
+            ? { state, idNumber: idNumber || undefined, dob: dobFormatted, identityTokenHash: prefillTokenHash, firstName: prefillFname, lastName: prefillLname, idNumberLast4: prefillLast4 || undefined }
+            : { state, idNumber, dob: dobFormatted };
+
+        const res = await banPatron(null, manualData, {
             reason,
             scope,
             notes,
@@ -49,9 +67,13 @@ export default function NewBanPage() {
             </Link>
 
             <div>
-                <h1 className="text-3xl font-bold text-foreground">Manual Ban Entry</h1>
+                <h1 className="text-3xl font-bold text-foreground">
+                    {prefillFname ? 'Ban Patron' : 'Manual Ban Entry'}
+                </h1>
                 <p className="text-muted-foreground mt-1">
-                    Add a ban by Manually entering ID details. This calculates the hash without scanning.
+                    {prefillFname
+                        ? `Banning ${prefillFname} ${prefillLname} — confirm details and submit.`
+                        : 'Add a ban by manually entering ID details. This calculates the hash without scanning.'}
                 </p>
             </div>
 
@@ -84,9 +106,11 @@ export default function NewBanPage() {
                         </div>
                     </div>
                     <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase text-muted-foreground">ID Number</label>
+                        <label className="text-xs font-bold uppercase text-muted-foreground">
+                            ID / DL Number {prefillTokenHash && <span className="normal-case font-normal text-muted-foreground/60">(optional — identity already known)</span>}
+                        </label>
                         <input
-                            required
+                            required={!prefillTokenHash}
                             type="text"
                             placeholder="D1234567"
                             value={idNumber} onChange={e => setIdNumber(e.target.value)}

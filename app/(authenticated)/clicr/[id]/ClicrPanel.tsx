@@ -299,20 +299,26 @@ export default function ClicrPanel({
         return () => inputEl?.removeEventListener('blur', handleBlur);
     }, [showBulkModal, showConfigModal, bluetoothActive]);
 
-    // Hardware scan debounce
+    // Hardware scan debounce — 600ms to allow full PDF417 transmission
     useEffect(() => {
         if (!scannerInput) return;
         const timeout = setTimeout(() => {
-            if (scannerInput.length > 10) {
+            if (scannerInput.length > 50) {
                 try {
                     const parsed = parseAAMVA(scannerInput);
                     if (parsed.firstName || parsed.idNumber || parsed.city) {
-                        processScan(parsed);
+                        processScan(parsed, scannerInput);
                         setScannerInput('');
+                    } else {
+                        setScannerInput(''); // Discard unreadable partial scan
                     }
-                } catch { }
+                } catch {
+                    setScannerInput(''); // Discard unparseable data
+                }
+            } else if (scannerInput.length > 10) {
+                setScannerInput(''); // Too short for AAMVA — partial read, discard
             }
-        }, 300);
+        }, 600);
         return () => clearTimeout(timeout);
     }, [scannerInput]);
 
@@ -435,7 +441,8 @@ export default function ClicrPanel({
                         address_street: parsed.addressStreet || undefined,
                         city: parsed.city || undefined,
                     };
-                    recordScan(scanEvent);
+                    // Don't call recordScan — /api/verify-id already inserted the scan record.
+                    // Just update local state for the UI.
                     setLastScan({ ...scanEvent, id: 'temp', timestamp: Date.now(), uiMessage: message } as any);
                     if (status === 'ACCEPTED') {
                         if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
@@ -1006,6 +1013,8 @@ export default function ClicrPanel({
                                 age: lastScan.age || 0,
                                 dob: lastScan.dob || 'Unknown',
                                 exp: 'Valid',
+                                idLast4: lastScan.id_number ? lastScan.id_number.slice(-4) : (lastScan.id_number_last4 || undefined),
+                                state: lastScan.issuing_state || undefined,
                             }}
                             onScanNext={() => setLastScan(null)}
                             labels={addToCountOnAccept && lastScan.scan_result === 'ACCEPTED' ? activeLabels : undefined}

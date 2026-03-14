@@ -91,7 +91,8 @@ export async function processScan(payload: ScanPayload): Promise<{ success: bool
         let parsed = parseAAMVA(payload.raw);
 
         // Basic Validation
-        if (!parsed.idNumber || !parsed.issuingState || !parsed.dob) {
+        console.log('[processScan] parsed fields:', { idNumber: parsed.idNumber, state: parsed.state, dob: parsed.dateOfBirth });
+        if (!parsed.idNumber || !parsed.state || !parsed.dateOfBirth) {
             // Fallback: Try simpler barcode parse or return error
             // For now, strict AAMVA
             return {
@@ -104,7 +105,7 @@ export async function processScan(payload: ScanPayload): Promise<{ success: bool
         }
 
         // 3. Compute Hash
-        const identityHash = generateIdentityHash(parsed.issuingState, parsed.idNumber, parsed.dob);
+        const identityHash = generateIdentityHash(parsed.state, parsed.idNumber, parsed.dateOfBirth);
 
         // 4. Check Bans — identity matching via hashed ID + region (banned_persons + patron_bans)
         let hasBusinessBan = false;
@@ -157,7 +158,7 @@ export async function processScan(payload: ScanPayload): Promise<{ success: bool
         let outcome: 'ACCEPTED' | 'DENIED' = 'ACCEPTED';
         let reason: any = undefined;
 
-        const age = getAge(parsed.dob);
+        const age = getAge(parsed.dateOfBirth);
         const expired = isExpired(parsed.expirationDate);
 
         if (hasBusinessBan || hasVenueBan) {
@@ -180,13 +181,13 @@ export async function processScan(payload: ScanPayload): Promise<{ success: bool
             scan_result: outcome,
             deny_reason: reason,
             age,
-            sex: parsed.gender || 'U',
+            sex: parsed.sex || 'U',
             zip_code: parsed.postalCode || '',
             first_name: parsed.firstName,
             last_name: parsed.lastName,
-            dob: parsed.dob,
+            dob: parsed.dateOfBirth,
             id_number_last4: parsed.idNumber ? parsed.idNumber.slice(-4) : null,
-            issuing_state: parsed.issuingState,
+            issuing_state: parsed.state,
             identity_token_hash: identityHash
         });
 
@@ -214,10 +215,10 @@ export async function processScan(payload: ScanPayload): Promise<{ success: bool
                                 firstName: parsed.firstName,
                                 lastName: parsed.lastName,
                                 age,
-                                gender: parsed.gender,
-                                dob: parsed.dob,
+                                gender: parsed.sex,
+                                dob: parsed.dateOfBirth,
                                 expirationDate: parsed.expirationDate,
-                                issuingState: parsed.issuingState,
+                                issuingState: parsed.state,
                             },
                         },
                     };
@@ -253,10 +254,10 @@ export async function processScan(payload: ScanPayload): Promise<{ success: bool
                     firstName: parsed.firstName,
                     lastName: parsed.lastName,
                     age,
-                    gender: parsed.gender,
-                    dob: parsed.dob,
+                    gender: parsed.sex,
+                    dob: parsed.dateOfBirth,
                     expirationDate: parsed.expirationDate,
-                    issuingState: parsed.issuingState
+                    issuingState: parsed.state
                 },
                 banDetails: activeBan ? {
                     reason: activeBan.reason || 'Unspecified',
@@ -309,12 +310,23 @@ export async function banPatron(scanId: string | null, manualData: any | null, b
             if (!member) return { success: false, error: 'No business' };
             businessId = member.business_id;
 
-            const { state, idNumber, dob: manualDob } = manualData;
-            if (!state || !idNumber || !manualDob) return { success: false, error: 'Missing ID details' };
+            const { state, idNumber, dob: manualDob, identityTokenHash, firstName: mFirstName, lastName: mLastName } = manualData;
+            if (!state || !manualDob) return { success: false, error: 'Missing ID details' };
 
-            identityHash = generateIdentityHash(state, idNumber, manualDob);
+            if (identityTokenHash) {
+                // Pre-computed hash from guest directory (no full ID number needed)
+                identityHash = identityTokenHash;
+            } else if (idNumber) {
+                identityHash = generateIdentityHash(state, idNumber, manualDob);
+                idNumberLast4 = idNumber.slice(-4);
+            } else {
+                return { success: false, error: 'Either ID number or identity hash required' };
+            }
+
+            if (mFirstName) firstName = mFirstName;
+            if (mLastName) lastName = mLastName;
             dob = manualDob.replace(/[^0-9]/g, '').substring(0, 8);
-            idNumberLast4 = idNumber.slice(-4);
+            if (idNumber) idNumberLast4 = idNumber.slice(-4);
             issuingState = state;
         } else {
             return { success: false, error: 'Either scanId or manualData required' };

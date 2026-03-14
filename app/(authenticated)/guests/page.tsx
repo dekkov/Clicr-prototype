@@ -110,8 +110,10 @@ export default function GuestDirectoryPage() {
                                                 <td className="p-4 text-foreground/80">
                                                     {scan.age}
                                                 </td>
-                                                <td className="p-4 text-foreground/80">
-                                                    ••••{scan.id_number_last4} — {state}
+                                                <td className="p-4 text-foreground/80 font-mono">
+                                                    {scan.id_number_last4
+                                                        ? `••••${scan.id_number_last4} — ${state}`
+                                                        : state || '—'}
                                                 </td>
                                                 <td className="p-4">
                                                     <Badge className={

@@ -4,10 +4,22 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useApp } from '@/lib/store';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Search, Shield } from 'lucide-react';
 
 export default function BanningPage() {
+    const router = useRouter();
+    const searchParams = useSearchParams();
     const { activeBusiness, isLoading: storeLoading } = useApp();
+
+    // Redirect mode=create to /banning/new with params forwarded
+    useEffect(() => {
+        if (searchParams.get('mode') === 'create') {
+            const newParams = new URLSearchParams(searchParams.toString());
+            newParams.delete('mode');
+            router.replace(`/banning/new?${newParams.toString()}`);
+        }
+    }, [searchParams, router]);
     const [bans, setBans] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState('');

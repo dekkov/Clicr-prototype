@@ -41,6 +41,9 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, error: 'Failed to parse ID data' }, { status: 400 });
         }
 
+        console.log('[verify-id] raw scan_data length:', scan_data?.length, 'first 80 chars:', scan_data?.substring(0, 80));
+        console.log('[verify-id] parsed fields:', { idNumber: parsed.idNumber, state: parsed.state, dob: parsed.dateOfBirth, firstName: parsed.firstName });
+
         const now = new Date();
         const age = parsed.age || 0;
         const isExpired = parsed.isExpired;
