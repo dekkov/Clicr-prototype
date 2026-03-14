@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -10,11 +10,28 @@ import { Search, ShieldAlert, FileText, Download, Ban, ShieldOff } from 'lucide-
 import { useApp } from '@/lib/store';
 import { filterGuests } from '@/lib/guest-utils';
 import { ComplianceEngine } from '@/lib/compliance';
+import { createClient } from '@/utils/supabase/client';
 
 export default function GuestDirectoryPage() {
-    const { scanEvents, patrons, patronBans } = useApp();
+    const { scanEvents, activeBusiness } = useApp();
     const [searchTerm, setSearchTerm] = useState('');
     const [stateFilter, setStateFilter] = useState('ALL');
+    const [bannedHashes, setBannedHashes] = useState<Set<string>>(new Set());
+
+    useEffect(() => {
+        if (!activeBusiness) return;
+        const supabase = createClient();
+        supabase
+            .from('banned_persons')
+            .select('identity_token_hash, patron_bans!inner(status)')
+            .eq('business_id', activeBusiness.id)
+            .eq('patron_bans.status', 'ACTIVE')
+            .then(({ data }) => {
+                if (data) {
+                    setBannedHashes(new Set(data.map((r: any) => r.identity_token_hash).filter(Boolean)));
+                }
+            });
+    }, [activeBusiness?.id]);
 
     const filteredScans = filterGuests(scanEvents, searchTerm, stateFilter);
 
@@ -144,34 +161,23 @@ export default function GuestDirectoryPage() {
                                                     </div>
                                                 </td>
                                                 <td className="p-4">
-                                                    {!isRestricted && (() => {
-                                                        const matchedPerson = patrons.find(p =>
-                                                            p.id_number_last4 === scan.id_number_last4 &&
-                                                            p.issuing_state_or_country === scan.issuing_state
-                                                        );
-                                                        const activeBan = matchedPerson
-                                                            ? patronBans.find(b => b.banned_person_id === matchedPerson.id && b.status === 'ACTIVE')
-                                                            : null;
-
-                                                        if (activeBan) {
-                                                            return (
-                                                                <Link href="/banning">
-                                                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-amber-400 hover:text-amber-300 hover:bg-amber-500/10" title="Revoke Ban">
-                                                                        <ShieldOff className="h-4 w-4" />
-                                                                        <span className="sr-only">Revoke Ban</span>
-                                                                    </Button>
-                                                                </Link>
-                                                            );
-                                                        }
-                                                        return (
+                                                    {!isRestricted && (
+                                                        scan.identity_token_hash && bannedHashes.has(scan.identity_token_hash) ? (
+                                                            <Link href="/banning">
+                                                                <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-amber-400 hover:text-amber-300 hover:bg-amber-500/10" title="Revoke Ban">
+                                                                    <ShieldOff className="h-4 w-4" />
+                                                                    <span className="sr-only">Revoke Ban</span>
+                                                                </Button>
+                                                            </Link>
+                                                        ) : (
                                                             <Link href={banLink}>
                                                                 <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-400 hover:text-red-300 hover:bg-red-500/10" title="Ban Patron">
                                                                     <Ban className="h-4 w-4" />
                                                                     <span className="sr-only">Ban Patron</span>
                                                                 </Button>
                                                             </Link>
-                                                        );
-                                                    })()}
+                                                        )
+                                                    )}
                                                 </td>
                                             </tr>
                                         );
