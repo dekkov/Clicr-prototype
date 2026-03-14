@@ -377,6 +377,17 @@ export async function banPatron(scanId: string | null, manualData: any | null, b
             personId = inserted!.id;
         }
 
+        // Prevent duplicate active bans for the same person
+        const { data: existingBan } = await supabaseAdmin
+            .from('patron_bans')
+            .select('id')
+            .eq('banned_person_id', personId)
+            .eq('business_id', businessId)
+            .eq('status', 'ACTIVE')
+            .limit(1)
+            .maybeSingle();
+        if (existingBan) return { success: false, error: 'An active ban already exists for this person.' };
+
         const { data: banRow, error: banErr } = await supabaseAdmin.from('patron_bans').insert({
             banned_person_id: personId,
             business_id: businessId,
