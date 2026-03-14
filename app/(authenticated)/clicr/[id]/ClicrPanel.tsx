@@ -14,6 +14,7 @@ import type { IDScanEvent, CounterLabel } from '@/lib/types';
 import { parseAAMVA } from '@/lib/aamva';
 import { evaluateScan } from '@/lib/scan-service';
 import { getVenueCapacityRules } from '@/lib/capacity';
+import { checkAreaCapacity } from '@/lib/capacity-utils';
 import { ScannerResult } from '@/lib/ui/components/ScannerResult';
 import { useAreaShift } from '@/lib/useAreaShift';
 import { CameraScanner, BluetoothScanner, NFCScanner } from '@/components/scanner';
@@ -351,6 +352,22 @@ export default function ClicrPanel({
             }
             if (capMode === 'WARN_ONLY') {
                 if (navigator.vibrate) navigator.vibrate([50, 50, 50, 50]);
+            }
+        }
+        if (!isVenueCounter && currentArea) {
+            const areaCheck = checkAreaCapacity(
+                currentArea.current_occupancy ?? 0,
+                currentArea.capacity_max ?? currentArea.default_capacity ?? 0,
+                currentArea.capacity_enforcement_mode
+            );
+            if (!areaCheck.allowed) {
+                if (areaCheck.overrideAvailable) {
+                    if (!window.confirm('AREA CAPACITY REACHED. Authorize override?')) return;
+                } else {
+                    alert('AREA CAPACITY REACHED — Entry blocked');
+                    navigator.vibrate?.([200, 100, 200]);
+                    return;
+                }
             }
         }
         if (navigator.vibrate) navigator.vibrate(50);

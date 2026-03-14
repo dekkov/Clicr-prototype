@@ -5,13 +5,15 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { parseAAMVA, isExpired, getAge } from '@/lib/scanning/aamva-parser';
 import { buildEnforcementEvent, validateOverrideInput } from '@/lib/ban-utils';
 import { hasMinRole } from '@/lib/permissions';
+import { checkAreaCapacity } from '@/lib/capacity-utils';
+import { shouldBlockForPause } from '@/lib/pause-utils';
 import crypto from 'crypto';
 
 // --- Types ---
 
 export type ScanResult = {
     outcome: 'ACCEPTED' | 'DENIED';
-    reason?: 'UNDERAGE' | 'EXPIRED' | 'BANNED' | 'INVALID_FORMAT' | 'VERIFICATION_FAILED';
+    reason?: 'UNDERAGE' | 'EXPIRED' | 'BANNED' | 'INVALID_FORMAT' | 'VERIFICATION_FAILED' | 'AREA_AT_CAPACITY' | 'AREA_AT_CAPACITY_OVERRIDE_REQUIRED';
     data: {
         firstName: string | null;
         lastName: string | null;
@@ -65,6 +67,11 @@ export async function processScan(payload: ScanPayload): Promise<{ success: bool
         const businessId = member.business_id;
         const settings = (member.business as any)?.settings || {};
         const ageThreshold = settings.age_threshold || 21;
+
+        // 1b. Pause Check
+        if (shouldBlockForPause(settings)) {
+            return { success: false, error: 'Scanning is currently paused.' };
+        }
 
         // 2. Parse
         let parsed = parseAAMVA(payload.raw);
@@ -170,6 +177,40 @@ export async function processScan(payload: ScanPayload): Promise<{ success: bool
         });
 
         // 8. Auto-Increment Occupancy (if Accepted and Area specified)
+        if (outcome === 'ACCEPTED' && payload.areaId) {
+            const { data: areaData } = await supabaseAdmin
+                .from('areas')
+                .select('capacity_max, current_occupancy, capacity_enforcement_mode')
+                .eq('id', payload.areaId)
+                .single();
+
+            if (areaData) {
+                const capCheck = checkAreaCapacity(
+                    areaData.current_occupancy ?? 0,
+                    areaData.capacity_max ?? 0,
+                    areaData.capacity_enforcement_mode
+                );
+                if (!capCheck.allowed) {
+                    return {
+                        success: true,
+                        result: {
+                            outcome: 'DENIED' as const,
+                            reason: capCheck.overrideAvailable ? 'AREA_AT_CAPACITY_OVERRIDE_REQUIRED' as const : 'AREA_AT_CAPACITY' as const,
+                            data: {
+                                firstName: parsed.firstName,
+                                lastName: parsed.lastName,
+                                age,
+                                gender: parsed.gender,
+                                dob: parsed.dob,
+                                expirationDate: parsed.expirationDate,
+                                issuingState: parsed.issuingState,
+                            },
+                        },
+                    };
+                }
+            }
+        }
+
         if (outcome === 'ACCEPTED') {
             const autoAdd = true; // TODO: Fetch from settings
             if (autoAdd && payload.areaId) {

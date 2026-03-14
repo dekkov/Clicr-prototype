@@ -3,6 +3,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import type { Clicr, Area, Venue } from '@/lib/types';
+import { checkAreaCapacity } from '@/lib/capacity-utils';
 
 type BoardTileProps = {
     clicr: Clicr;
@@ -49,6 +50,22 @@ export function BoardTile({ clicr, area, venue, label, onTap }: BoardTileProps) 
     const activeLabels = (clicr.counter_labels ?? []).filter(l => !l.deleted_at).sort((a, b) => a.position - b.position);
 
     const handleTap = (delta: number, counterLabelId: string) => {
+        if (delta > 0 && area) {
+            const check = checkAreaCapacity(
+                area.current_occupancy ?? 0,
+                area.capacity_max ?? area.default_capacity ?? 0,
+                area.capacity_enforcement_mode
+            );
+            if (!check.allowed) {
+                if (check.overrideAvailable) {
+                    if (!confirm('AREA CAPACITY REACHED. Authorize override?')) return;
+                } else {
+                    alert('AREA CAPACITY REACHED — Entry blocked');
+                    navigator.vibrate?.([200, 100, 200]);
+                    return;
+                }
+            }
+        }
         if (navigator.vibrate) navigator.vibrate(50);
         onTap(clicr.id, delta, counterLabelId);
     };

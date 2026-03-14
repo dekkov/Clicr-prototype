@@ -47,6 +47,8 @@ async function hydrateData(data: DBData): Promise<DBData> {
                 business_id: a.business_id,
                 name: a.name,
                 default_capacity: a.capacity_max,
+                capacity_max: a.capacity_max,
+                capacity_enforcement_mode: a.capacity_enforcement_mode || 'WARN_ONLY',
                 parent_area_id: a.parent_area_id,
                 current_occupancy: a.current_occupancy ?? 0,
                 last_reset_at: a.last_reset_at || undefined,
@@ -589,6 +591,7 @@ export async function POST(request: Request) {
                 await supabaseAdmin.from('areas').update({
                     name: areaPayload.name,
                     capacity_max: areaPayload.default_capacity ?? areaPayload.capacity_max,
+                    capacity_enforcement_mode: areaPayload.capacity_enforcement_mode ?? null,
                     area_type: areaPayload.area_type,
                     counting_mode: areaPayload.counting_mode,
                     shift_mode: areaPayload.shift_mode ?? 'MANUAL',
