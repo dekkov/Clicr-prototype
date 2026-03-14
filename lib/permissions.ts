@@ -17,8 +17,8 @@ export function hasMinRole(userRole: Role | undefined, minRole: Role): boolean {
 
 export function getVisibleNavItems(role: Role | undefined, allItems: NavItemDef[]): NavItemDef[] {
     if (!role) return [];
-    if (role === 'ANALYST') return allItems.filter(i => i.label === 'Reports');
-    if (role === 'STAFF') return allItems.filter(i => ['Areas', 'Clicrs'].includes(i.label));
+    if (role === 'ANALYST') return allItems.filter(i => ['Reports', 'Guests'].includes(i.label));
+    if (role === 'STAFF') return allItems.filter(i => ['Areas', 'Clicrs', 'Guests'].includes(i.label));
     if (role === 'MANAGER') return allItems.filter(i => i.label !== 'Settings');
     return allItems;
 }
@@ -69,6 +69,7 @@ export function canAccessRoute(role: Role | undefined, pathname: string): boolea
     if (pathname.startsWith('/areas')) return ['STAFF', 'MANAGER', 'ADMIN', 'OWNER'].includes(role);
     if (pathname.startsWith('/clicr')) return ['STAFF', 'MANAGER', 'ADMIN', 'OWNER'].includes(role);
     if (pathname.startsWith('/banning')) return ['MANAGER', 'ADMIN', 'OWNER'].includes(role);
+    if (pathname.startsWith('/guests')) return true; // All roles can view guest directory
     if (pathname.startsWith('/reports')) return ['ANALYST', 'MANAGER', 'ADMIN', 'OWNER'].includes(role);
     if (pathname.startsWith('/settings')) return ['ADMIN', 'OWNER'].includes(role);
     return true; // Unknown routes allow
