@@ -16,19 +16,26 @@ export default function GuestDirectoryPage() {
     const { scanEvents, activeBusiness } = useApp();
     const [searchTerm, setSearchTerm] = useState('');
     const [stateFilter, setStateFilter] = useState('ALL');
-    const [bannedHashes, setBannedHashes] = useState<Set<string>>(new Set());
+    // Map of identity_token_hash -> active ban ID
+    const [bannedHashToBanId, setBannedHashToBanId] = useState<Map<string, string>>(new Map());
 
     useEffect(() => {
         if (!activeBusiness) return;
         const supabase = createClient();
         supabase
             .from('banned_persons')
-            .select('identity_token_hash, patron_bans!inner(status)')
+            .select('identity_token_hash, patron_bans!inner(id, status)')
             .eq('business_id', activeBusiness.id)
             .eq('patron_bans.status', 'ACTIVE')
             .then(({ data }) => {
                 if (data) {
-                    setBannedHashes(new Set(data.map((r: any) => r.identity_token_hash).filter(Boolean)));
+                    const map = new Map<string, string>();
+                    for (const r of data as any[]) {
+                        if (r.identity_token_hash && r.patron_bans?.[0]?.id) {
+                            map.set(r.identity_token_hash, r.patron_bans[0].id);
+                        }
+                    }
+                    setBannedHashToBanId(map);
                 }
             });
     }, [activeBusiness?.id]);
@@ -161,9 +168,12 @@ export default function GuestDirectoryPage() {
                                                     </div>
                                                 </td>
                                                 <td className="p-4">
-                                                    {!isRestricted && (
-                                                        scan.identity_token_hash && bannedHashes.has(scan.identity_token_hash) ? (
-                                                            <Link href="/banning">
+                                                    {!isRestricted && (() => {
+                                                        const banId = scan.identity_token_hash
+                                                            ? bannedHashToBanId.get(scan.identity_token_hash)
+                                                            : undefined;
+                                                        return banId ? (
+                                                            <Link href={`/banning/revoke/${banId}`}>
                                                                 <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-amber-400 hover:text-amber-300 hover:bg-amber-500/10" title="Revoke Ban">
                                                                     <ShieldOff className="h-4 w-4" />
                                                                     <span className="sr-only">Revoke Ban</span>
@@ -176,8 +186,8 @@ export default function GuestDirectoryPage() {
                                                                     <span className="sr-only">Ban Patron</span>
                                                                 </Button>
                                                             </Link>
-                                                        )
-                                                    )}
+                                                        );
+                                                    })()}
                                                 </td>
                                             </tr>
                                         );

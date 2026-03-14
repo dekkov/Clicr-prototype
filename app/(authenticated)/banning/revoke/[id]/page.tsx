@@ -6,7 +6,8 @@ import { ArrowLeft, ShieldOff, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { revokeBan, getBanById } from '../../actions';
 
-export default function RevokeBanPage({ params }: { params: { id: string } }) {
+export default function RevokeBanPage({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = React.use(params);
     const router = useRouter();
     const [ban, setBan] = useState<any>(null);
     const [reason, setReason] = useState('Manually revoked');
@@ -14,8 +15,8 @@ export default function RevokeBanPage({ params }: { params: { id: string } }) {
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     useEffect(() => {
-        getBanById(params.id).then(setBan);
-    }, [params.id]);
+        getBanById(id).then(setBan);
+    }, [id]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -24,7 +25,7 @@ export default function RevokeBanPage({ params }: { params: { id: string } }) {
 
         let res;
         try {
-            res = await revokeBan(params.id, reason);
+            res = await revokeBan(id, reason);
         } catch (err: any) {
             setErrorMsg(err.message);
             setSubmitting(false);
