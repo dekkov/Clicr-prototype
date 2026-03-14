@@ -1002,12 +1002,13 @@ export default function ClicrPanel({
                         className="fixed inset-0 z-50"
                     >
                         <ScannerResult
-                            status={
-                                lastScan.scan_result === 'ACCEPTED' ? 'ALLOWED' :
-                                    (lastScan as any).uiMessage?.includes('BANNED') ? 'DENIED_BANNED' :
-                                        (lastScan as any).uiMessage?.includes('EXPIRED') ? 'DENIED_EXPIRED' :
-                                            'DENIED_UNDERAGE'
-                            }
+                            status={(() => {
+                                if (lastScan.scan_result === 'ACCEPTED') return 'ALLOWED';
+                                const msg: string = ((lastScan as any).uiMessage ?? '').toLowerCase();
+                                if (msg.includes('ban')) return 'DENIED_BANNED';
+                                if (msg.includes('expir')) return 'DENIED_EXPIRED';
+                                return 'DENIED_UNDERAGE';
+                            })()}
                             data={{
                                 name: `${lastScan.first_name || 'GUEST'} ${lastScan.last_name || ''}`,
                                 age: lastScan.age || 0,
