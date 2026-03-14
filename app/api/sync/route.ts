@@ -663,6 +663,19 @@ export async function POST(request: Request) {
                 break;
             }
 
+            case 'GET_NIGHT_LOGS': {
+                const { businessId } = payload;
+                const { data: nightLogs, error } = await supabaseAdmin
+                    .from('night_logs')
+                    .select('*')
+                    .eq('business_id', businessId)
+                    .is('area_id', null)
+                    .order('business_date', { ascending: false })
+                    .limit(1);
+                if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+                return NextResponse.json({ nightLogs: nightLogs || [] });
+            }
+
             case 'POLL': {
                 const businessId = await getBusinessId();
                 if (!businessId) {
