@@ -8,9 +8,10 @@ import { cn } from '@/lib/utils';
 import { CameraScanner, BluetoothScanner, NFCScanner } from '@/components/scanner';
 import { useScanMode } from '@/lib/scanner/use-scan-mode';
 import type { ScanMode } from '@/lib/scanner/use-scan-mode';
+import { ScannerResult } from '@/lib/ui/components/ScannerResult';
 
 export default function ScannerPage() {
-    const { venues, areas, business } = useApp();
+    const { venues, areas, business, currentUser } = useApp();
     const [venueId, setVenueId] = useState<string>('');
     const [areaId, setAreaId] = useState<string>('');
 
@@ -164,56 +165,8 @@ export default function ScannerPage() {
                         onError={setError}
                     />
 
-                    {/* Result Display */}
-                    {result ? (
-                        <div className={cn(
-                            "rounded-3xl p-8 border-4 shadow-2xl animate-in zoom-in-95 duration-200",
-                            result.outcome === 'ACCEPTED' ? "bg-green-600 border-green-400" : "bg-red-600 border-red-400"
-                        )}>
-                            <div className="flex justify-center mb-6">
-                                {result.outcome === 'ACCEPTED' ? <CheckCircle className="w-32 h-32 text-white" /> : <XCircle className="w-32 h-32 text-white" />}
-                            </div>
-                            <h1 className="text-6xl font-black uppercase tracking-tighter mb-4">{result.outcome}</h1>
-
-                            {result.reason && (
-                                <div className="bg-background/20 rounded-xl p-4 mb-6">
-                                    <p className="text-2xl font-bold uppercase">{result.reason.replace('_', ' ')}</p>
-                                    {result.banDetails && (
-                                        <div className="mt-2 text-sm opacity-90 p-2 bg-background/40 rounded">
-                                            <p className="font-bold">{result.banDetails.reason}</p>
-                                            <p className="italic">{result.banDetails.notes}</p>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            <div className="grid grid-cols-2 gap-4 text-left bg-background/10 rounded-xl p-4">
-                                <div>
-                                    <div className="text-xs uppercase opacity-75">Age</div>
-                                    <div className="text-3xl font-mono font-bold">{result.data.age || 'N/A'}</div>
-                                </div>
-                                <div>
-                                    <div className="text-xs uppercase opacity-75">Gender</div>
-                                    <div className="text-3xl font-mono font-bold">{result.data.gender || '-'}</div>
-                                </div>
-                                <div className="col-span-2">
-                                    <div className="text-xs uppercase opacity-75">Name</div>
-                                    <div className="text-xl font-bold truncate">{result.data.firstName} {result.data.lastName}</div>
-                                </div>
-                            </div>
-
-                            {result.reason !== 'BANNED' && result.outcome === 'DENIED' && (
-                                <button
-                                    onClick={() => setIsBanModalOpen(true)}
-                                    className="mt-6 w-full py-4 bg-card rounded-xl font-bold text-foreground hover:bg-muted transition-colors flex items-center justify-center gap-2"
-                                >
-                                    <UserX className="w-5 h-5" /> Ban Patron
-                                </button>
-                            )}
-
-                            <div className="mt-4 text-xs opacity-50">Scan next ID to continue...</div>
-                        </div>
-                    ) : (
+                    {/* Ready to Scan placeholder */}
+                    {!result && (
                         <div className="flex flex-col items-center justify-center text-muted-foreground py-20 border-4 border-dashed border-border rounded-3xl bg-muted/20">
                             <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-6 animate-pulse">
                                 <Search className="w-10 h-10 text-muted-foreground" />
@@ -262,6 +215,39 @@ export default function ScannerPage() {
                     )}
                 </div>
             </div>
+
+            {/* ScannerResult full-screen overlay */}
+            {result && (
+                <div className="fixed inset-0 z-40">
+                    <ScannerResult
+                        status={
+                            result.outcome === 'ACCEPTED' ? 'ALLOWED' :
+                            result.reason === 'BANNED' ? 'DENIED_BANNED' :
+                            result.reason === 'UNDERAGE' ? 'DENIED_UNDERAGE' :
+                            result.reason === 'EXPIRED' ? 'DENIED_EXPIRED' :
+                            'DENIED_UNDERAGE'
+                        }
+                        data={{
+                            name: `${result.data.firstName || 'GUEST'} ${result.data.lastName || ''}`.trim(),
+                            age: result.data.age ?? 0,
+                            dob: result.data.dob ?? 'Unknown',
+                            exp: result.data.expirationDate ?? 'Unknown',
+                        }}
+                        onScanNext={() => setResult(null)}
+                        enforcementEventId={result.enforcementEventId}
+                        areaId={result.areaId}
+                        userRole={currentUser?.role}
+                        onOverride={async (enfId, aId, reason, notes) => {
+                            const { overrideBan } = await import('@/app/(authenticated)/scanner/actions');
+                            const res = await overrideBan(enfId, aId, reason, notes);
+                            if (!res.success) {
+                                console.error('[Override Ban] Failed:', res.error);
+                                throw new Error(res.error || 'Override failed');
+                            }
+                        }}
+                    />
+                </div>
+            )}
 
             {/* Ban Modal */}
             {isBanModalOpen && (
