@@ -1,53 +1,22 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import React, { useState } from 'react';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { Search, ShieldAlert, FileText, Download, Ban } from 'lucide-react';
-import { IDScanEvent } from '@/lib/types';
+import { useApp } from '@/lib/store';
+import { filterGuests } from '@/lib/guest-utils';
 import { ComplianceEngine } from '@/lib/compliance';
 
-// Real data fetch hook
-function useGuests() {
-    const [scans, setScans] = useState<IDScanEvent[]>([]);
-
-    // In a real app with venue selection, we'd pass venueId here.
-    // For now, we fetch all (or filtered by server default)
-    useEffect(() => {
-        const fetchScans = async () => {
-            // ... existing data fetching logic remains same but ensuring we have it right
-            const { getRecentScansAction } = await import('@/app/actions/scan');
-            const data = await getRecentScansAction();
-            setScans(data);
-        };
-        fetchScans();
-
-        // Optional: Poll for updates every 30s
-        const interval = setInterval(fetchScans, 30000);
-        return () => clearInterval(interval);
-    }, []);
-
-    return scans;
-}
-
 export default function GuestDirectoryPage() {
-    const allScans = useGuests();
+    const { scanEvents } = useApp();
     const [searchTerm, setSearchTerm] = useState('');
     const [stateFilter, setStateFilter] = useState('ALL');
 
-    const filteredScans = allScans.filter(scan => {
-        const matchesSearch =
-            (scan.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) || '') ||
-            (scan.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) || '') ||
-            (scan.id_number_last4?.includes(searchTerm));
-
-        const matchesState = stateFilter === 'ALL' || scan.issuing_state === stateFilter;
-
-        return matchesSearch && matchesState;
-    });
+    const filteredScans = filterGuests(scanEvents, searchTerm, stateFilter);
 
     return (
         <div className="space-y-6">
@@ -94,12 +63,12 @@ export default function GuestDirectoryPage() {
                         <table className="w-full text-sm text-left">
                             <thead className="bg-background text-muted-foreground font-medium">
                                 <tr>
-                                    <th className="p-4">Time</th>
                                     <th className="p-4">Name</th>
-                                    <th className="p-4">Age / ID</th>
-                                    <th className="p-4">State</th>
+                                    <th className="p-4">Age</th>
+                                    <th className="p-4">Last 4 + State</th>
                                     <th className="p-4">Result</th>
                                     <th className="p-4">Compliance Status</th>
+                                    <th className="p-4">Time</th>
                                     <th className="p-4">Actions</th>
                                 </tr>
                             </thead>
@@ -118,22 +87,19 @@ export default function GuestDirectoryPage() {
                                         const complianceReason = ComplianceEngine.getRestrictionReason(state);
 
                                         // Construct ban URL
-                                        const params = new URLSearchParams();
-                                        if (scan.first_name) params.set('fname', scan.first_name);
-                                        if (scan.last_name) params.set('lname', scan.last_name);
-                                        if (scan.dob) params.set('dob', scan.dob || '');
-                                        if (scan.id_number_last4) params.set('id_last4', scan.id_number_last4);
-
-                                        const banLink = `/banning?mode=create&${params.toString()}`;
+                                        const params = new URLSearchParams({
+                                            mode: 'create',
+                                            fname: scan.first_name || '',
+                                            lname: scan.last_name || '',
+                                            dob: scan.dob || '',
+                                            id_last4: scan.id_number_last4 || '',
+                                            state: scan.issuing_state || '',
+                                        });
+                                        if (scan.identity_token_hash) params.set('token_hash', scan.identity_token_hash);
+                                        const banLink = `/banning?${params.toString()}`;
 
                                         return (
                                             <tr key={scan.id} className="hover:bg-muted/50 transition-colors">
-                                                <td className="p-4 text-foreground/80">
-                                                    {new Date(scan.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                    <div className="text-xs text-muted-foreground">
-                                                        {new Date(scan.timestamp).toLocaleDateString()}
-                                                    </div>
-                                                </td>
                                                 <td className="p-4 font-medium text-foreground">
                                                     {isRestricted ? (
                                                         <span className="italic text-muted-foreground/60">Redacted</span>
@@ -142,17 +108,16 @@ export default function GuestDirectoryPage() {
                                                     )}
                                                 </td>
                                                 <td className="p-4 text-foreground/80">
-                                                    {scan.age} <span className="text-muted-foreground mx-1">•</span> ···{scan.id_number_last4}
+                                                    {scan.age}
                                                 </td>
-                                                <td className="p-4">
-                                                    <Badge variant="outline" className="bg-background text-muted-foreground border-border">
-                                                        {state}
-                                                    </Badge>
+                                                <td className="p-4 text-foreground/80">
+                                                    ••••{scan.id_number_last4} — {state}
                                                 </td>
                                                 <td className="p-4">
                                                     <Badge className={
-                                                        scan.scan_result === 'DENIED' ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' :
-                                                            'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
+                                                        scan.scan_result === 'DENIED'
+                                                            ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                                                            : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
                                                     }>
                                                         {scan.scan_result}
                                                     </Badge>
@@ -169,6 +134,12 @@ export default function GuestDirectoryPage() {
                                                             Full Record
                                                         </div>
                                                     )}
+                                                </td>
+                                                <td className="p-4 text-foreground/80">
+                                                    {new Date(scan.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    <div className="text-xs text-muted-foreground">
+                                                        {new Date(scan.timestamp).toLocaleDateString()}
+                                                    </div>
                                                 </td>
                                                 <td className="p-4">
                                                     {!isRestricted && (

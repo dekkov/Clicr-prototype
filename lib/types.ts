@@ -253,6 +253,7 @@ export type IDScanEvent = {
     weight?: string;
     id_number?: string;
     shift_id?: string;
+    identity_token_hash?: string;
 };
 
 // --- PATRON BANNING SYSTEM TYPES ---
