@@ -26,7 +26,9 @@ import Link from 'next/link';
 import { CalendarGrid } from '@/components/reports/CalendarGrid';
 import { MonthStatsBar } from '@/components/reports/MonthStatsBar';
 import { DayDetailPanel } from '@/components/reports/DayDetailPanel';
-import { computeDailyEntries, computeMonthStats, computeMonthlyTrend } from '@/lib/calendarUtils';
+import { DayComparisonPanel } from '@/components/reports/DayComparisonPanel';
+import { computeDailyEntries, computeMonthStats, computeMonthlyTrend, computeHourlyOccupancy } from '@/lib/calendarUtils';
+import { computeComparisonStats } from '@/lib/comparison-utils';
 
 // --- TYPES ---
 type DateRange = {
@@ -102,6 +104,10 @@ export default function VenueReportingDashboard() {
     const [calYear, setCalYear] = useState(() => new Date().getFullYear());
     const [calMonth, setCalMonth] = useState(() => new Date().getMonth()); // 0-indexed
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
+
+    // Comparison mode state
+    const [isComparing, setIsComparing] = useState(false);
+    const [comparisonDate, setComparisonDate] = useState<string | null>(null);
 
     // Fetch all venue events for calYear (covers calendar + analytics date ranges)
     useEffect(() => {
@@ -252,16 +258,64 @@ export default function VenueReportingDashboard() {
 
     const calMonthLabel = format(new Date(calYear, calMonth, 1), 'MMMM').toUpperCase();
 
+    const handleClearComparison = () => {
+        setIsComparing(false);
+        setComparisonDate(null);
+    };
+
+    const comparisonPanel = useMemo(() => {
+        if (!selectedDate || !comparisonDate) return null;
+        const vid = venueId as string;
+
+        const filterByDay = (items: any[], dateStr: string) => {
+            const noon = new Date(dateStr + 'T12:00:00');
+            const start = startOfDay(noon).getTime();
+            const end = endOfDay(noon).getTime();
+            return items.filter((e: any) => e.timestamp >= start && e.timestamp <= end && e.venue_id === vid);
+        };
+
+        const dayAEvents = filterByDay(venueEvents, selectedDate);
+        const dayBEvents = filterByDay(venueEvents, comparisonDate);
+        const dayAScans = filterByDay(venueScans, selectedDate);
+        const dayBScans = filterByDay(venueScans, comparisonDate);
+
+        const dayAHourlyRaw = computeHourlyOccupancy(venueEvents, vid, selectedDate);
+        const dayBHourlyRaw = computeHourlyOccupancy(venueEvents, vid, comparisonDate);
+        const dayAHourly = dayAHourlyRaw.map((d, i) => ({ hour: i, occupancy: d.occupancy }));
+        const dayBHourly = dayBHourlyRaw.map((d, i) => ({ hour: i, occupancy: d.occupancy }));
+
+        const stats = computeComparisonStats(
+            { events: dayAEvents, scans: dayAScans },
+            { events: dayBEvents, scans: dayBScans }
+        );
+
+        return (
+            <DayComparisonPanel
+                dayALabel={selectedDate}
+                dayBLabel={comparisonDate}
+                dayAHourly={dayAHourly}
+                dayBHourly={dayBHourly}
+                stats={stats}
+                onClear={handleClearComparison}
+            />
+        );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedDate, comparisonDate, venueEvents, venueScans, venueId]);
+
     const handlePrevMonth = () => {
         if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1); }
         else setCalMonth(m => m - 1);
         setSelectedDate(null);
+        setIsComparing(false);
+        setComparisonDate(null);
     };
 
     const handleNextMonth = () => {
         if (calMonth === 11) { setCalMonth(0); setCalYear(y => y + 1); }
         else setCalMonth(m => m + 1);
         setSelectedDate(null);
+        setIsComparing(false);
+        setComparisonDate(null);
     };
 
     // --- EXPORT ---
@@ -375,11 +429,42 @@ export default function VenueReportingDashboard() {
                         month={calMonth}
                         dailyEntries={dailyEntries}
                         selectedDate={selectedDate}
-                        onSelectDate={setSelectedDate}
+                        onSelectDate={(date) => {
+                            setSelectedDate(date);
+                            setIsComparing(false);
+                            setComparisonDate(null);
+                        }}
                         onPrevMonth={handlePrevMonth}
                         onNextMonth={handleNextMonth}
+                        isComparing={isComparing}
+                        comparisonDate={comparisonDate}
+                        onComparisonSelect={(date) => setComparisonDate(date)}
                     />
-                    {selectedDate && (
+                    {selectedDate && !isComparing && !comparisonDate && (
+                        <div className="flex justify-end">
+                            <button
+                                onClick={() => setIsComparing(true)}
+                                className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold transition-colors shadow-lg shadow-purple-500/20"
+                            >
+                                Compare to Another Day
+                            </button>
+                        </div>
+                    )}
+                    {isComparing && !comparisonDate && (
+                        <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-purple-900/30 border border-purple-500/30">
+                            <p className="text-sm text-purple-300 font-medium">
+                                Select a second day on the calendar to compare with <span className="font-bold text-purple-200">{selectedDate}</span>
+                            </p>
+                            <button
+                                onClick={handleClearComparison}
+                                className="text-xs text-zinc-400 hover:text-white border border-zinc-700 hover:border-zinc-500 px-3 py-1.5 rounded-lg transition-colors"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    )}
+                    {selectedDate && comparisonDate && comparisonPanel}
+                    {selectedDate && !comparisonDate && !isComparing && (
                         <DayDetailPanel
                             dateStr={selectedDate}
                             events={venueEvents}

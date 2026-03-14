@@ -16,6 +16,9 @@ type Props = {
   onPrevMonth: () => void;
   onNextMonth: () => void;
   selectAllPast?: boolean; // when true, all past dates are selectable regardless of data
+  isComparing?: boolean;
+  comparisonDate?: string | null;
+  onComparisonSelect?: (dateStr: string) => void;
 };
 
 const DOW = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
@@ -29,6 +32,9 @@ export function CalendarGrid({
   onPrevMonth,
   onNextMonth,
   selectAllPast = false,
+  isComparing = false,
+  comparisonDate = null,
+  onComparisonSelect,
 }: Props) {
   const grid = buildCalendarGrid(year, month);
   const monthLabel = format(new Date(year, month, 1), 'MMMM yyyy').toUpperCase();
@@ -80,22 +86,33 @@ export function CalendarGrid({
           const throughput = dailyEntries[dateStr] ?? 0;
           const hasData = throughput > 0;
           const isSelected = selectedDate === dateStr;
+          const isComparisonSelected = comparisonDate === dateStr;
           const isToday = dateStr === today;
           const isFuture = dateStr > today;
           const isLastInRow = (idx + 1) % 7 === 0;
           const isSelectable = hasData || (selectAllPast && !isFuture && !isToday);
 
+          const handleClick = () => {
+            if (!isSelectable) return;
+            if (isComparing && onComparisonSelect) {
+              onComparisonSelect(dateStr);
+            } else {
+              onSelectDate(dateStr);
+            }
+          };
+
           return (
             <button
               key={dateStr}
-              onClick={() => isSelectable && onSelectDate(dateStr)}
+              onClick={handleClick}
               disabled={!isSelectable}
               className={cn(
                 'min-h-[80px] p-3 flex flex-col items-start border-r border-b border-white/5 transition-all text-left group',
                 isLastInRow && 'border-r-0',
                 isSelectable && 'hover:bg-white/5 cursor-pointer',
                 !isSelectable && 'cursor-default opacity-50',
-                isSelected && 'bg-violet-100 dark:bg-violet-900/40 border-violet-200 dark:border-violet-500/50 hover:bg-violet-900/50'
+                isSelected && !isComparisonSelected && 'bg-violet-100 dark:bg-violet-900/40 border-violet-200 dark:border-violet-500/50 hover:bg-violet-900/50',
+                isComparisonSelected && 'bg-purple-100 dark:bg-purple-900/40 border-2 border-purple-400 dark:border-purple-400 hover:bg-purple-900/50'
               )}
               aria-label={`${dateStr}: ${hasData ? throughput + ' entries' : 'no data'}`}
             >
@@ -104,7 +121,8 @@ export function CalendarGrid({
                 className={cn(
                   'text-xs font-semibold',
                   isToday ? 'text-violet-400' : 'text-muted-foreground',
-                  isSelected && 'text-violet-300'
+                  isSelected && 'text-violet-300',
+                  isComparisonSelected && 'text-purple-300'
                 )}
               >
                 {date.getDate()}
