@@ -3,6 +3,7 @@ import { CountEvent, IDScanEvent, User, Clicr, Area, Venue, CounterLabel } from 
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createInitialDBData, type DBData } from '@/lib/sync-data';
 import { getAuthenticatedUser } from '@/lib/api-auth';
+import { rateLimit } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -370,6 +371,9 @@ export async function GET(request: Request) {
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    if (!rateLimit(`sync-read:${user.id}`, 30, 60_000)) {
+        return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+    }
 
     const url = new URL(request.url);
     const requestedBusinessId = url.searchParams.get('businessId');
@@ -383,6 +387,9 @@ export async function POST(request: Request) {
     const user = await getAuthenticatedUser();
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (!rateLimit(`sync-write:${user.id}`, 120, 60_000)) {
+        return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
     }
 
     const body = await request.json();

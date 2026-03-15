@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/api-auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { rateLimit } from "@/lib/rate-limit";
 
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const MAX_SIZE = 2 * 1024 * 1024; // 2MB
@@ -11,6 +12,9 @@ export async function POST(request: Request) {
         const user = await getAuthenticatedUser();
         if (!user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+        if (!rateLimit(`upload:${user.id}`, 5, 60_000)) {
+            return NextResponse.json({ error: "Too many requests" }, { status: 429 });
         }
 
         const formData = await request.formData();

@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getAuthenticatedUser } from '@/lib/api-auth';
+import { rateLimit } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
     const user = await getAuthenticatedUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!rateLimit(`venue-events:${user.id}`, 20, 60_000)) {
+        return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+    }
 
     const { searchParams } = new URL(req.url);
     const venueId = searchParams.get('venueId');

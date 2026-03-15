@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getAuthenticatedUser } from '@/lib/api-auth';
+import { rateLimit } from '@/lib/rate-limit';
 
 export async function POST(request: Request) {
     try {
         const user = await getAuthenticatedUser();
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        if (!rateLimit(`traffic:${user.id}`, 30, 60_000)) {
+            return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
         }
 
         const { business_id, venue_id, area_id, device_id, start_ts, end_ts } = await request.json();

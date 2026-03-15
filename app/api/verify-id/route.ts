@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { parseAAMVA } from '@/lib/aamva';
 import { generateIdentityHash } from '@/lib/identity-hash';
 import { getAuthenticatedUser } from '@/lib/api-auth';
+import { rateLimit } from '@/lib/rate-limit';
 
 interface ScanRequest {
     scan_data: string;
@@ -16,6 +17,9 @@ export async function POST(request: Request) {
         const user = await getAuthenticatedUser();
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        if (!rateLimit(`verify:${user.id}`, 30, 60_000)) {
+            return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
         }
 
         const { scan_data, business_id, venue_id, area_id } = await request.json();
