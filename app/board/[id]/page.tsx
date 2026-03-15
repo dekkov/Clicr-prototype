@@ -67,7 +67,7 @@ export default function BoardDisplayPage({ params }: { params: Promise<{ id: str
         };
 
         poll();
-        const interval = setInterval(poll, 2000);
+        const interval = setInterval(poll, 5000);
         return () => clearInterval(interval);
     }, [boardView]);
 

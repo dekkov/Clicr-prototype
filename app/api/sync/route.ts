@@ -724,19 +724,6 @@ export async function POST(request: Request) {
                 return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
         }
 
-        if (userId && userEmail) {
-            const { data: postMembership } = await supabaseAdmin
-                .from('business_members')
-                .select('business_id')
-                .eq('user_id', userId)
-                .limit(1)
-                .single();
-
-            const requestedBusinessId = postMembership?.business_id ?? null;
-            const response = await buildSyncResponse(userId, userEmail, requestedBusinessId, null);
-            return NextResponse.json(response);
-        }
-
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error("[sync] API error:", error instanceof Error ? error.message : "Unknown error");
