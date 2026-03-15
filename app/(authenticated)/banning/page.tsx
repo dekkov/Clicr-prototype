@@ -4,10 +4,22 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useApp } from '@/lib/store';
 import Link from 'next/link';
-import { Search, Shield } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Search, Shield, ShieldOff } from 'lucide-react';
 
 export default function BanningPage() {
+    const router = useRouter();
+    const searchParams = useSearchParams();
     const { activeBusiness, isLoading: storeLoading } = useApp();
+
+    // Redirect mode=create to /banning/new with params forwarded
+    useEffect(() => {
+        if (searchParams.get('mode') === 'create') {
+            const newParams = new URLSearchParams(searchParams.toString());
+            newParams.delete('mode');
+            router.replace(`/banning/new?${newParams.toString()}`);
+        }
+    }, [searchParams, router]);
     const [bans, setBans] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState('');
@@ -188,12 +200,12 @@ export default function BanningPage() {
                         </div>
 
                         {ban.status === 'ACTIVE' && (
-                            <button
-                                onClick={() => handleRevoke(ban.id)}
-                                className="flex-shrink-0 text-xs font-bold text-muted-foreground hover:text-foreground border border-border hover:bg-muted px-3 py-1.5 rounded-lg transition-colors"
+                            <Link
+                                href={`/banning/revoke/${ban.id}`}
+                                className="flex-shrink-0 flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-amber-400 border border-border hover:border-amber-500/40 hover:bg-amber-500/10 px-3 py-1.5 rounded-lg transition-colors"
                             >
-                                Revoke
-                            </button>
+                                <ShieldOff className="w-3.5 h-3.5" /> Revoke
+                            </Link>
                         )}
                     </div>
                 ))}

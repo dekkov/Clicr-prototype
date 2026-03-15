@@ -20,14 +20,16 @@ export function BluetoothScanner({ active, onScan, paused = false }: BluetoothSc
         if (!active || paused) return;
         // Focus immediately, then maintain focus
         textareaRef.current?.focus();
-        const interval = setInterval(() => textareaRef.current?.focus(), 800);
+        const interval = setInterval(() => textareaRef.current?.focus(), 400);
         return () => clearInterval(interval);
     }, [active, paused]);
 
-    // Debounced scan handler — fires after 300ms of no new input
+    // Debounced scan handler — fires after 600ms of no new input
     // PDF417 data contains embedded \n and \r between fields, so we can't
     // trigger on Enter. Instead we accumulate all input and process after
     // the scanner finishes sending.
+    // 600ms gives Bluetooth HID scanners enough time to transmit the full
+    // PDF417 payload (~300-500 chars). 300ms caused partial reads.
     const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const value = e.target.value;
         if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -38,7 +40,7 @@ export function BluetoothScanner({ active, onScan, paused = false }: BluetoothSc
             }
             // Clear the textarea for the next scan
             if (textareaRef.current) textareaRef.current.value = '';
-        }, 300);
+        }, 600);
     }, []);
 
     // Cleanup debounce on unmount

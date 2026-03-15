@@ -20,6 +20,7 @@ import {
     Check,
     Plus,
     Loader2,
+    Users,
 } from 'lucide-react';
 import { useTheme } from '@/components/providers/theme-provider';
 import { cn } from '@/lib/utils';
@@ -32,12 +33,13 @@ import { useAutoReset } from '@/lib/useAutoReset';
 import { ResetOverlay } from '@/components/ui/ResetOverlay';
 import { DaySummaryCard } from '@/components/ui/DaySummaryCard';
 
-const NAV_ITEMS: NavItemDef[] = [
+export const NAV_ITEMS: NavItemDef[] = [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { label: 'Venues',    href: '/venues',    icon: MapPin },
     { label: 'Areas',     href: '/areas',     icon: Layers },
     { label: 'Clicrs',    href: '/clicr',     icon: Sparkles },
     { label: 'Bans',      href: '/banning',   icon: Ban },
+    { label: 'Guests',    href: '/guests',    icon: Users },
     { label: 'Reports',   href: '/reports',   icon: BarChart3 },
     { label: 'Settings',  href: '/settings',  icon: Settings },
 ];

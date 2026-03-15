@@ -47,6 +47,8 @@ async function hydrateData(data: DBData): Promise<DBData> {
                 business_id: a.business_id,
                 name: a.name,
                 default_capacity: a.capacity_max,
+                capacity_max: a.capacity_max,
+                capacity_enforcement_mode: a.capacity_enforcement_mode || 'WARN_ONLY',
                 parent_area_id: a.parent_area_id,
                 current_occupancy: a.current_occupancy ?? 0,
                 last_reset_at: a.last_reset_at || undefined,
@@ -404,6 +406,19 @@ export async function POST(request: Request) {
                     return NextResponse.json({ error: 'area_id or venue_id is required for RECORD_EVENT' }, { status: 400 });
                 }
 
+                // Check if operations are paused
+                const { data: bizCheck } = await supabaseAdmin
+                  .from('businesses')
+                  .select('settings')
+                  .eq('id', payload.business_id)
+                  .single();
+                if (bizCheck?.settings?.is_paused === true) {
+                  return NextResponse.json(
+                    { error: 'Operations are paused. Counting suspended.' },
+                    { status: 423 }
+                  );
+                }
+
                 const deviceId = (event as any).clicr_id;
                 const rpcParams: Record<string, unknown> = {
                     p_delta: event.delta,
@@ -589,6 +604,7 @@ export async function POST(request: Request) {
                 await supabaseAdmin.from('areas').update({
                     name: areaPayload.name,
                     capacity_max: areaPayload.default_capacity ?? areaPayload.capacity_max,
+                    capacity_enforcement_mode: areaPayload.capacity_enforcement_mode ?? null,
                     area_type: areaPayload.area_type,
                     counting_mode: areaPayload.counting_mode,
                     shift_mode: areaPayload.shift_mode ?? 'MANUAL',
@@ -661,6 +677,23 @@ export async function POST(request: Request) {
                     await supabaseAdmin.from('businesses').update(updateFields).eq('id', businessId);
                 }
                 break;
+            }
+
+            case 'GET_NIGHT_LOGS': {
+                const { businessId, venueId } = payload;
+                let query = supabaseAdmin
+                    .from('night_logs')
+                    .select('*')
+                    .eq('business_id', businessId)
+                    .is('area_id', null)
+                    .order('business_date', { ascending: false })
+                    .limit(1);
+                if (venueId) {
+                    query = query.eq('venue_id', venueId);
+                }
+                const { data: nightLogs, error } = await query;
+                if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+                return NextResponse.json({ nightLogs: nightLogs || [] });
             }
 
             case 'POLL': {

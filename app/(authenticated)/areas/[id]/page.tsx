@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Clicr } from '@/lib/types';
+import type { CapacityEnforcementMode } from '@/lib/types';
 import Link from 'next/link';
 
 export default function AreaDetailPage() {
@@ -44,6 +45,7 @@ export default function AreaDetailPage() {
     // Edit Form State
     const [editName, setEditName] = useState('');
     const [editCap, setEditCap] = useState(0);
+    const [editEnforcementMode, setEditEnforcementMode] = useState<CapacityEnforcementMode>('WARN_ONLY');
 
     // Add Clicr Form State
     const [newClicrName, setNewClicrName] = useState('');
@@ -55,6 +57,7 @@ export default function AreaDetailPage() {
         if (area) {
             setEditName(area.name);
             setEditCap(area.capacity_limit || 0);
+            setEditEnforcementMode(area.capacity_enforcement_mode || 'WARN_ONLY');
         }
     }, [area]);
 
@@ -67,7 +70,9 @@ export default function AreaDetailPage() {
         const success = await updateArea({
             ...area,
             name: editName,
-            capacity_limit: editCap > 0 ? editCap : undefined
+            capacity_limit: editCap > 0 ? editCap : undefined,
+            capacity_max: editCap > 0 ? editCap : undefined,
+            capacity_enforcement_mode: editEnforcementMode,
         });
         if (success) {
             setIsEditingArea(false);
@@ -170,6 +175,15 @@ export default function AreaDetailPage() {
                                 className="bg-muted text-lg font-mono text-foreground outline-none w-[80px] p-1 rounded"
                                 placeholder="Cap"
                             />
+                            <select
+                                value={editEnforcementMode}
+                                onChange={(e) => setEditEnforcementMode(e.target.value as CapacityEnforcementMode)}
+                                className="bg-muted text-sm text-foreground outline-none p-1 rounded border border-border"
+                            >
+                                <option value="WARN_ONLY">Warn Only</option>
+                                <option value="HARD_STOP">Hard Stop (Block Entry)</option>
+                                <option value="MANAGER_OVERRIDE">Manager Override Required</option>
+                            </select>
                             <button onClick={handleSaveArea} className="p-2 bg-emerald-600 rounded-lg text-white hover:bg-emerald-500"><Save className="w-5 h-5" /></button>
                             <button onClick={() => setIsEditingArea(false)} className="p-2 bg-muted rounded-lg text-foreground/80 hover:bg-muted"><X className="w-5 h-5" /></button>
                         </div>

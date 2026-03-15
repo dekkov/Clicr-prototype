@@ -2,18 +2,35 @@
 
 import React, { useState } from 'react';
 import { banPatron } from '@/app/(authenticated)/scanner/actions';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useApp } from '@/lib/store';
 import { ArrowLeft, Save, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 
 export default function NewBanPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const { activeBusiness } = useApp();
     const [submitting, setSubmitting] = useState(false);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+    // Pre-fill from query params (from guest directory ban button)
+    const prefillFname = searchParams.get('fname') || '';
+    const prefillLname = searchParams.get('lname') || '';
+    const prefillDobRaw = searchParams.get('dob') || ''; // YYYYMMDD
+    const prefillState = searchParams.get('state') || '';
+    const prefillLast4 = searchParams.get('id_last4') || '';
+    const prefillTokenHash = searchParams.get('token_hash') || '';
+
+    // Convert YYYYMMDD to YYYY-MM-DD for date input
+    const prefillDob = prefillDobRaw.length === 8
+        ? `${prefillDobRaw.slice(0, 4)}-${prefillDobRaw.slice(4, 6)}-${prefillDobRaw.slice(6, 8)}`
+        : '';
 
     // Identity Fields
     const [idNumber, setIdNumber] = useState('');
-    const [state, setState] = useState('');
-    const [dob, setDob] = useState(''); // YYYY-MM-DD from input type=date
+    const [state, setState] = useState(prefillState);
+    const [dob, setDob] = useState(prefillDob); // YYYY-MM-DD from input type=date
 
     // Ban Details
     const [reason, setReason] = useState('AGGRESSIVE');
@@ -23,21 +40,33 @@ export default function NewBanPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setSubmitting(true);
+        setErrorMsg(null);
 
         const dobFormatted = dob.replace(/-/g, ''); // YYYYMMDD
 
-        const res = await banPatron(null, { state, idNumber, dob: dobFormatted }, {
-            reason,
-            scope,
-            notes,
-            duration: 'PERMANENT'
-        });
+        const manualData = prefillTokenHash
+            ? { state, idNumber: idNumber || null, dob: dobFormatted, identityTokenHash: prefillTokenHash, firstName: prefillFname, lastName: prefillLname, idNumberLast4: prefillLast4 || null }
+            : { state, idNumber, dob: dobFormatted };
+
+        let res;
+        try {
+            res = await banPatron(null, manualData, {
+                reason,
+                scope,
+                notes,
+                duration: 'PERMANENT',
+                businessId: activeBusiness?.id,
+            });
+        } catch (err: any) {
+            setErrorMsg(err.message);
+            setSubmitting(false);
+            return;
+        }
 
         if (res.success) {
             router.push('/banning');
-            router.refresh();
         } else {
-            alert('Error: ' + res.error);
+            setErrorMsg(res.error ?? 'Something went wrong.');
             setSubmitting(false);
         }
     };
@@ -49,9 +78,13 @@ export default function NewBanPage() {
             </Link>
 
             <div>
-                <h1 className="text-3xl font-bold text-foreground">Manual Ban Entry</h1>
+                <h1 className="text-3xl font-bold text-foreground">
+                    {prefillFname ? 'Ban Patron' : 'Manual Ban Entry'}
+                </h1>
                 <p className="text-muted-foreground mt-1">
-                    Add a ban by Manually entering ID details. This calculates the hash without scanning.
+                    {prefillFname
+                        ? `Banning ${prefillFname} ${prefillLname} — confirm details and submit.`
+                        : 'Add a ban by manually entering ID details. This calculates the hash without scanning.'}
                 </p>
             </div>
 
@@ -84,9 +117,11 @@ export default function NewBanPage() {
                         </div>
                     </div>
                     <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase text-muted-foreground">ID Number</label>
+                        <label className="text-xs font-bold uppercase text-muted-foreground">
+                            ID / DL Number {prefillTokenHash && <span className="normal-case font-normal text-muted-foreground/60">(optional — identity already known)</span>}
+                        </label>
                         <input
-                            required
+                            required={!prefillTokenHash}
                             type="text"
                             placeholder="D1234567"
                             value={idNumber} onChange={e => setIdNumber(e.target.value)}
@@ -130,6 +165,13 @@ export default function NewBanPage() {
                         </p>
                     </div>
                 </section>
+
+                {errorMsg && (
+                    <div className="flex items-start gap-3 bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+                        <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                        <p className="text-sm text-red-400 font-medium">{errorMsg}</p>
+                    </div>
+                )}
 
                 <div className="flex justify-end gap-4">
                     <Link href="/banning" className="px-6 py-3 rounded-xl font-bold text-muted-foreground hover:text-foreground transition-colors">

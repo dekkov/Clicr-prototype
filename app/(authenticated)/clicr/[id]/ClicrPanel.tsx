@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     ArrowLeft, Wifi, WifiOff, ScanLine, XCircle, Zap,
     Settings2, Bug, RotateCcw, Scan,
-    Camera, Bluetooth
+    Camera, Bluetooth, AlertTriangle
 } from 'lucide-react';
 import { useApp } from '@/lib/store';
 import { cn } from '@/lib/utils';
@@ -14,6 +14,7 @@ import type { IDScanEvent, CounterLabel } from '@/lib/types';
 import { parseAAMVA } from '@/lib/aamva';
 import { evaluateScan } from '@/lib/scan-service';
 import { getVenueCapacityRules } from '@/lib/capacity';
+import { checkAreaCapacity } from '@/lib/capacity-utils';
 import { ScannerResult } from '@/lib/ui/components/ScannerResult';
 import { useAreaShift } from '@/lib/useAreaShift';
 import { CameraScanner, BluetoothScanner, NFCScanner } from '@/components/scanner';
@@ -42,6 +43,7 @@ const ConfigModalBody = React.memo(function ConfigModalBody({
     const [classifyMode, setClassifyMode] = useState(() => snap.initialClassifyMode);
     const [labels, setLabels] = useState(() => snap.counterLabels.filter(l => !l.deleted_at));
     const [newLabelName, setNewLabelName] = useState('');
+    const [deletePendingId, setDeletePendingId] = useState<string | null>(null);
     const handleClassifyToggle = () => {
         const newVal = !classifyMode;
         setClassifyMode(newVal);
@@ -54,8 +56,12 @@ const ConfigModalBody = React.memo(function ConfigModalBody({
     };
     const deleteLabel = (id: string) => {
         if (labels.length <= 1) return;
-        if (!window.confirm('Historical data for this label will still be visible in reports, but the counter will be removed from the clicker.')) return;
-        setLabels(prev => prev.filter(l => l.id !== id).map((l, i) => ({ ...l, position: i })));
+        setDeletePendingId(id);
+    };
+    const confirmDeleteLabel = () => {
+        if (!deletePendingId) return;
+        setLabels(prev => prev.filter(l => l.id !== deletePendingId).map((l, i) => ({ ...l, position: i })));
+        setDeletePendingId(null);
     };
     return (
         <>
@@ -97,6 +103,15 @@ const ConfigModalBody = React.memo(function ConfigModalBody({
                     <button type="button" onClick={addLabel} disabled={!newLabelName.trim()} className="px-3 py-2 bg-card rounded-xl text-sm font-medium disabled:opacity-50">Add</button>
                 </div>
             </div>
+            {deletePendingId && (
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 space-y-3">
+                    <p className="text-sm text-amber-300 font-medium">Historical data for this label will still be visible in reports, but the counter will be removed from the clicker.</p>
+                    <div className="flex justify-end gap-2">
+                        <button type="button" onClick={() => setDeletePendingId(null)} className="px-4 py-1.5 rounded-lg text-sm font-bold text-muted-foreground hover:text-foreground">Cancel</button>
+                        <button type="button" onClick={confirmDeleteLabel} className="px-4 py-1.5 bg-red-600 rounded-lg text-sm font-bold text-white hover:bg-red-500">Remove</button>
+                    </div>
+                </div>
+            )}
             <div className="grid grid-cols-2 gap-3 pt-2">
                 <button type="button" onClick={snap.onCancel} className="py-3 rounded-xl text-foreground/60 bg-card border border-border hover:bg-border font-semibold text-sm transition-colors">Cancel</button>
                 <button type="button" onClick={() => snap.onSave(name, labels)} className="py-3 rounded-xl bg-white text-black font-bold text-sm hover:bg-muted shadow-lg transition-all active:scale-95">Save Changes</button>
@@ -182,6 +197,25 @@ export default function ClicrPanel({
     const [showDebug, setShowDebug] = useState(false);
     // const [generatingToken, setGeneratingToken] = useState(false); // Removed: tap page deleted
     const [turnaroundFlash, setTurnaroundFlash] = useState(false);
+    const [flashBanner, setFlashBanner] = useState<{ message: string; type: 'error' | 'warn' | 'info' } | null>(null);
+    const flashBannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [overridePrompt, setOverridePrompt] = useState<{ message: string; onConfirm: () => void } | null>(null);
+
+    const showFlash = (message: string, type: 'error' | 'warn' | 'info' = 'error', duration = 3000) => {
+        if (flashBannerTimer.current) clearTimeout(flashBannerTimer.current);
+        setFlashBanner({ message, type });
+        flashBannerTimer.current = setTimeout(() => setFlashBanner(null), duration);
+    };
+
+    // Listen for flash events from store (e.g. pause enforcement)
+    useEffect(() => {
+        const handler = (e: Event) => {
+            const { message, type } = (e as CustomEvent).detail;
+            showFlash(message, type);
+        };
+        window.addEventListener('clicr:flash', handler);
+        return () => window.removeEventListener('clicr:flash', handler);
+    }, []);
 
     const isModalOpenRef = useRef(false);
     useEffect(() => {
@@ -298,20 +332,26 @@ export default function ClicrPanel({
         return () => inputEl?.removeEventListener('blur', handleBlur);
     }, [showBulkModal, showConfigModal, bluetoothActive]);
 
-    // Hardware scan debounce
+    // Hardware scan debounce — 600ms to allow full PDF417 transmission
     useEffect(() => {
         if (!scannerInput) return;
         const timeout = setTimeout(() => {
-            if (scannerInput.length > 10) {
+            if (scannerInput.length > 50) {
                 try {
                     const parsed = parseAAMVA(scannerInput);
                     if (parsed.firstName || parsed.idNumber || parsed.city) {
-                        processScan(parsed);
+                        processScan(parsed, scannerInput);
                         setScannerInput('');
+                    } else {
+                        setScannerInput(''); // Discard unreadable partial scan
                     }
-                } catch { }
+                } catch {
+                    setScannerInput(''); // Discard unparseable data
+                }
+            } else if (scannerInput.length > 10) {
+                setScannerInput(''); // Too short for AAMVA — partial read, discard
             }
-        }, 300);
+        }, 600);
         return () => clearTimeout(timeout);
     }, [scannerInput]);
 
@@ -337,20 +377,78 @@ export default function ClicrPanel({
     // --- COUNT HANDLERS ---
     const activeLabels: CounterLabel[] = (clicr?.counter_labels ?? []).filter((l: CounterLabel) => !l.deleted_at).sort((a: CounterLabel, b: CounterLabel) => a.position - b.position);
 
+    // Derive whether IN is blocked (HARD_STOP at or over capacity)
+    // Venue-level: block all counters in the venue
+    const _venueCapMax = currentVenue?.total_capacity ?? currentVenue?.default_capacity_total ?? 0;
+    const _venueHardBlocked = _venueCapMax > 0 && currentVenueOccupancy >= _venueCapMax && venue?.capacity_enforcement_mode === 'HARD_STOP';
+    // Area-level: block this area counter only
+    const _areaHardBlocked = !isVenueCounter && capacity != null && capacity > 0 && totalAreaCount >= capacity && currentArea?.capacity_enforcement_mode === 'HARD_STOP';
+    const isHardBlocked = _venueHardBlocked || _areaHardBlocked;
+
     const handleIn = (counterLabelId: string) => {
         if (!clicr || !venueId) return;
         const { maxCapacity, mode: capMode } = getVenueCapacityRules(venue);
         if (maxCapacity > 0 && currentVenueOccupancy >= maxCapacity) {
             if (capMode === 'HARD_STOP') {
-                alert("CAPACITY REACHED: Entry Blocked");
+                showFlash('CAPACITY REACHED — Entry Blocked', 'error');
                 if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
                 return;
             }
             if (capMode === 'MANAGER_OVERRIDE' || capMode === 'HARD_BLOCK' as any) {
-                if (!window.confirm("WARNING: Capacity Reached. Authorize Override?")) return;
+                setOverridePrompt({
+                    message: 'Venue capacity reached. Authorize override?',
+                    onConfirm: () => {
+                        setOverridePrompt(null);
+                        if (navigator.vibrate) navigator.vibrate(50);
+                        recordEvent({
+                            venue_id: venueId,
+                            area_id: clicr.area_id,
+                            clicr_id: clicr.id,
+                            delta: 1,
+                            flow_type: 'IN',
+                            counter_label_id: counterLabelId,
+                            event_type: 'TAP',
+                            idempotency_key: Math.random().toString(36),
+                        });
+                    },
+                });
+                return;
             }
             if (capMode === 'WARN_ONLY') {
                 if (navigator.vibrate) navigator.vibrate([50, 50, 50, 50]);
+            }
+        }
+        if (!isVenueCounter && currentArea) {
+            const areaCheck = checkAreaCapacity(
+                currentArea.current_occupancy ?? 0,
+                currentArea.capacity_max ?? currentArea.default_capacity ?? 0,
+                currentArea.capacity_enforcement_mode
+            );
+            if (!areaCheck.allowed) {
+                if (areaCheck.overrideAvailable) {
+                    setOverridePrompt({
+                        message: 'Area capacity reached. Authorize override?',
+                        onConfirm: () => {
+                            setOverridePrompt(null);
+                            if (navigator.vibrate) navigator.vibrate(50);
+                            recordEvent({
+                                venue_id: venueId,
+                                area_id: clicr.area_id,
+                                clicr_id: clicr.id,
+                                delta: 1,
+                                flow_type: 'IN',
+                                counter_label_id: counterLabelId,
+                                event_type: 'TAP',
+                                idempotency_key: Math.random().toString(36),
+                            });
+                        },
+                    });
+                    return;
+                } else {
+                    showFlash('AREA CAPACITY REACHED — Entry Blocked', 'error');
+                    navigator.vibrate?.([200, 100, 200]);
+                    return;
+                }
             }
         }
         if (navigator.vibrate) navigator.vibrate(50);
@@ -418,7 +516,8 @@ export default function ClicrPanel({
                         address_street: parsed.addressStreet || undefined,
                         city: parsed.city || undefined,
                     };
-                    recordScan(scanEvent);
+                    // Don't call recordScan — /api/verify-id already inserted the scan record.
+                    // Just update local state for the UI.
                     setLastScan({ ...scanEvent, id: 'temp', timestamp: Date.now(), uiMessage: message } as any);
                     if (status === 'ACCEPTED') {
                         if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
@@ -502,7 +601,7 @@ export default function ClicrPanel({
             const parsed = parseAAMVA(scannerInput);
             processScan(parsed, scannerInput);
         } catch {
-            alert("Failed to parse ID. Please try again.");
+            showFlash('Failed to parse ID. Please try again.', 'error');
         }
         setScannerInput('');
     };
@@ -513,7 +612,7 @@ export default function ClicrPanel({
             const parsed = parseAAMVA(manualScanInput);
             processScan(parsed, manualScanInput);
         } catch {
-            alert("Failed to parse scan data. Please check the input.");
+            showFlash('Failed to parse scan data. Please check the input.', 'error');
         }
         setManualScanInput('');
     };
@@ -578,7 +677,7 @@ export default function ClicrPanel({
                 const track = stream.getVideoTracks()[0];
                 const capabilities = track.getCapabilities() as any;
                 if (!capabilities.torch) {
-                    alert("Flashlight not supported on this device.");
+                    showFlash('Flashlight not supported on this device.', 'warn');
                     track.stop();
                     return;
                 }
@@ -587,7 +686,7 @@ export default function ClicrPanel({
                 setTorchOn(true);
             }
         } catch {
-            alert("Could not access flashlight.");
+            showFlash('Could not access flashlight.', 'warn');
             setTorchOn(false);
         }
     };
@@ -626,6 +725,49 @@ export default function ClicrPanel({
                 autoComplete="off"
                 inputMode="none"
             />
+
+            {/* Flash banner (replaces browser alerts) */}
+            {flashBanner && (
+                <div
+                    className={cn(
+                        'fixed top-4 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 rounded-xl font-bold text-sm shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300 max-w-[90vw]',
+                        flashBanner.type === 'error' && 'bg-red-600 text-white',
+                        flashBanner.type === 'warn' && 'bg-amber-500 text-black',
+                        flashBanner.type === 'info' && 'bg-blue-600 text-white',
+                    )}
+                >
+                    <AlertTriangle className="w-5 h-5 shrink-0" />
+                    {flashBanner.message}
+                    <button onClick={() => setFlashBanner(null)} className="ml-2 opacity-70 hover:opacity-100">✕</button>
+                </div>
+            )}
+
+            {/* Override confirmation prompt (replaces window.confirm) */}
+            {overridePrompt && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-card border border-border rounded-2xl p-6 max-w-sm mx-4 space-y-4 shadow-2xl animate-in zoom-in-95 duration-200">
+                        <div className="flex items-start gap-3">
+                            <AlertTriangle className="w-6 h-6 text-amber-400 shrink-0 mt-0.5" />
+                            <p className="text-foreground font-bold">{overridePrompt.message}</p>
+                        </div>
+                        <div className="flex justify-end gap-3">
+                            <button
+                                onClick={() => setOverridePrompt(null)}
+                                className="px-5 py-2.5 rounded-xl font-bold text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={overridePrompt.onConfirm}
+                                className="px-5 py-2.5 bg-amber-600 rounded-xl font-bold text-foreground hover:bg-amber-500 shadow-lg shadow-amber-900/20"
+                            >
+                                Authorize
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
 
             {/* ── TOPBAR ─────────────────────────────────────────── */}
             <header className="flex items-center px-4 pt-6 pb-3 shrink-0">
@@ -837,10 +979,19 @@ export default function ClicrPanel({
                                 <button
                                     key={`in-${label.id}`}
                                     onClick={() => handleIn(label.id)}
-                                    className="relative overflow-hidden bg-gradient-to-br from-green-500 to-green-700 hover:from-green-400 hover:to-green-600 active:scale-[0.97] transition-all rounded-2xl border-2 border-green-400/40 shadow-lg shadow-green-500/20 py-8 flex flex-col items-center justify-center touch-manipulation"
+                                    disabled={isHardBlocked}
+                                    className={cn(
+                                        "relative overflow-hidden transition-all rounded-2xl border-2 py-8 flex flex-col items-center justify-center touch-manipulation",
+                                        isHardBlocked
+                                            ? "bg-zinc-700/50 border-zinc-600/40 opacity-40 cursor-not-allowed"
+                                            : "bg-gradient-to-br from-green-500 to-green-700 hover:from-green-400 hover:to-green-600 active:scale-[0.97] border-green-400/40 shadow-lg shadow-green-500/20"
+                                    )}
                                 >
                                     <span className="text-4xl font-bold text-foreground leading-none drop-shadow">+</span>
                                     <span className="text-foreground font-bold tracking-[0.2em] text-sm mt-1 uppercase">{label.label}</span>
+                                    {isHardBlocked && (
+                                        <span className="absolute inset-x-0 bottom-2 text-center text-[10px] font-black uppercase tracking-widest text-red-400">BLOCKED</span>
+                                    )}
                                 </button>
                             ))}
                             {/* - ROW */}
@@ -870,7 +1021,15 @@ export default function ClicrPanel({
 
                 {/* ── SCAN MODE ────────────────────────────────────── */}
                 {mode === 'scan' && (
-                    <>
+                    <div className="relative">
+                        {isHardBlocked && (
+                            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-2xl bg-background/80 backdrop-blur-sm border-2 border-red-500/40">
+                                <span className="text-4xl">🚫</span>
+                                <p className="text-red-400 font-black text-lg uppercase tracking-widest">Capacity Reached</p>
+                                <p className="text-muted-foreground text-sm">Scanning blocked — venue is full</p>
+                            </div>
+                        )}
+                    <div className={cn("space-y-3", isHardBlocked && "pointer-events-none opacity-40")}>
                         {/* Scan Input Mode Selector */}
                         <div className="flex gap-1.5 bg-card border border-border/60 rounded-2xl p-2">
                             {([
@@ -962,7 +1121,8 @@ export default function ClicrPanel({
                         >
                             Simulate scan
                         </button>
-                    </>
+                    </div>
+                    </div>
                 )}
             </div>
 
@@ -978,17 +1138,20 @@ export default function ClicrPanel({
                         className="fixed inset-0 z-50"
                     >
                         <ScannerResult
-                            status={
-                                lastScan.scan_result === 'ACCEPTED' ? 'ALLOWED' :
-                                    (lastScan as any).uiMessage?.includes('BANNED') ? 'DENIED_BANNED' :
-                                        (lastScan as any).uiMessage?.includes('EXPIRED') ? 'DENIED_EXPIRED' :
-                                            'DENIED_UNDERAGE'
-                            }
+                            status={(() => {
+                                if (lastScan.scan_result === 'ACCEPTED') return 'ALLOWED';
+                                const msg: string = ((lastScan as any).uiMessage ?? '').toLowerCase();
+                                if (msg.includes('ban')) return 'DENIED_BANNED';
+                                if (msg.includes('expir')) return 'DENIED_EXPIRED';
+                                return 'DENIED_UNDERAGE';
+                            })()}
                             data={{
                                 name: `${lastScan.first_name || 'GUEST'} ${lastScan.last_name || ''}`,
                                 age: lastScan.age || 0,
                                 dob: lastScan.dob || 'Unknown',
                                 exp: 'Valid',
+                                idLast4: lastScan.id_number ? lastScan.id_number.slice(-4) : (lastScan.id_number_last4 || undefined),
+                                state: lastScan.issuing_state || undefined,
                             }}
                             onScanNext={() => setLastScan(null)}
                             labels={addToCountOnAccept && lastScan.scan_result === 'ACCEPTED' ? activeLabels : undefined}

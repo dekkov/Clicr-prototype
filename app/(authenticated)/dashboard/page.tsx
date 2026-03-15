@@ -4,14 +4,17 @@ import React, { useMemo, useEffect, useState, useRef } from 'react';
 import { useApp } from '@/lib/store';
 import {
     Users, TrendingUp, ScanLine, ShieldBan,
-    Calendar, RefreshCw, Download, MapPin, RotateCcw, Timer, ChevronLeft
+    Calendar, RefreshCw, Download, MapPin, RotateCcw, Timer, ChevronLeft,
+    Pause, Play
 } from 'lucide-react';
+import { canEditVenuesAndAreas } from '@/lib/permissions';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/components/providers/theme-provider';
 import { GettingStartedChecklist } from './_components/GettingStartedChecklist';
-import type { CountEvent, Venue, Clicr, IDScanEvent } from '@/lib/types';
+import type { CountEvent, Venue, Clicr, IDScanEvent, NightLog } from '@/lib/types';
 import type { HeatmapData } from '@/app/api/reports/heatmap/route';
+import { computeTrend } from '@/lib/trend-utils';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { useReset } from '@/lib/reset-context';
 import { getAutoDateLabel, getBusinessDayStart } from '@/lib/business-day';
@@ -32,6 +35,8 @@ const KpiCard = ({
     iconColor,
     valueColor,
     detailColor,
+    trend,
+    trendValue,
 }: {
     label: string;
     value: string | number;
@@ -40,13 +45,26 @@ const KpiCard = ({
     iconColor?: string;
     valueColor?: string;
     detailColor?: string;
+    trend?: 'up' | 'down' | 'neutral';
+    trendValue?: string;
 }) => (
     <div className="bg-card border border-border rounded-xl p-6">
         <div className="flex items-center justify-between mb-4">
             <div className="text-xs text-foreground/60 uppercase tracking-wide">{label}</div>
             <Icon className={cn("w-5 h-5", iconColor ?? "text-gray-500")} />
         </div>
-        <div className={cn("text-4xl mb-2", valueColor ?? "text-foreground")}>{value}</div>
+        <div className="flex items-baseline mb-2">
+            <div className={cn("text-4xl", valueColor ?? "text-foreground")}>{value}</div>
+            {trendValue && (
+                <span className={`text-xs font-medium ml-2 ${
+                    trend === 'up' ? 'text-green-400' :
+                    trend === 'down' ? 'text-red-400' :
+                    'text-zinc-400'
+                }`}>
+                    {trendValue}
+                </span>
+            )}
+        </div>
         <div className={cn("text-sm", detailColor ?? "text-foreground/60")}>{detail}</div>
     </div>
 );
@@ -387,16 +405,15 @@ const TrafficFlow = ({
     areaDistrib: { name: string; count: number; pct: number }[];
     turnarounds: number; netAdjusted: number;
 }) => {
-    const max = Math.max(totalEntries, 1);
     const funnelRows = [
-        { label: 'Total Entries', value: totalEntries, color: 'bg-indigo-500', textColor: 'text-foreground' },
-        { label: 'IDs Scanned', value: totalScans, color: 'bg-indigo-400', textColor: 'text-foreground' },
-        { label: 'Accepted', value: accepted, color: 'bg-emerald-500', textColor: 'text-emerald-600 dark:text-emerald-300' },
-        { label: 'Denied', value: denied, color: 'bg-orange-500', textColor: 'text-orange-600 dark:text-orange-300' },
-        { label: 'Banned', value: banned, color: 'bg-red-500', textColor: 'text-red-600 dark:text-red-300' },
-        { label: 'Turnarounds', value: turnarounds, color: 'bg-amber-500', textColor: 'text-amber-600 dark:text-amber-300' },
-        { label: 'Net Entries', value: netAdjusted, color: 'bg-teal-500', textColor: 'text-teal-600 dark:text-teal-300' },
-        { label: 'Net Occupancy', value: netOcc, color: 'bg-cyan-500', textColor: 'text-cyan-600 dark:text-cyan-300' },
+        { label: 'Total Entries', value: totalEntries, textColor: 'text-foreground' },
+        { label: 'IDs Scanned', value: totalScans, textColor: 'text-foreground' },
+        { label: 'Accepted', value: accepted, textColor: 'text-emerald-400' },
+        { label: 'Denied', value: denied, textColor: 'text-orange-400' },
+        { label: 'Banned', value: banned, textColor: 'text-red-400' },
+        { label: 'Turnarounds', value: turnarounds, textColor: 'text-amber-400' },
+        { label: 'Net Entries', value: netAdjusted, textColor: 'text-teal-400' },
+        { label: 'Net Occupancy', value: netOcc, textColor: 'text-cyan-400' },
     ];
     return (
         <div className="bg-card border border-border rounded-xl p-6">
@@ -404,31 +421,22 @@ const TrafficFlow = ({
             <p className="text-xs text-gray-500 mb-4">Where your traffic is concentrated</p>
 
             <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Processing Funnel</p>
-            <div className="space-y-2 mb-6">
+            <div className="space-y-1.5 mb-6">
                 {funnelRows.map(row => (
-                    <div key={row.label} className="flex items-center gap-3">
-                        <div className="w-28 text-xs text-muted-foreground shrink-0">{row.label}</div>
-                        <div className="flex-1 h-6 bg-muted rounded overflow-hidden">
-                            <div
-                                className={cn('h-full rounded transition-all', row.color)}
-                                style={{ width: `${(row.value / max) * 100}%` }}
-                            />
-                        </div>
-                        <div className={cn('w-8 text-right text-sm font-medium', row.textColor)}>{row.value}</div>
+                    <div key={row.label} className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">{row.label}</span>
+                        <span className={cn('text-sm font-semibold tabular-nums', row.textColor)}>{row.value}</span>
                     </div>
                 ))}
             </div>
 
             <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Area Distribution</p>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
                 {areaDistrib.length === 0 && <p className="text-xs text-gray-600 italic">No entries yet.</p>}
                 {areaDistrib.map(a => (
-                    <div key={a.name} className="flex items-center gap-3">
-                        <div className="w-28 text-xs text-muted-foreground truncate shrink-0">{a.name}</div>
-                        <div className="flex-1 h-5 bg-muted rounded overflow-hidden">
-                            <div className="h-full bg-primary rounded" style={{ width: `${a.pct}%` }} />
-                        </div>
-                        <div className="w-10 text-right text-xs text-muted-foreground">{a.pct}%</div>
+                    <div key={a.name} className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground truncate">{a.name}</span>
+                        <span className="text-sm font-semibold tabular-nums text-foreground">{a.pct}%</span>
                     </div>
                 ))}
             </div>
@@ -634,6 +642,7 @@ export default function DashboardPage() {
     const { resolvedTheme } = useTheme();
     const {
         activeBusiness,
+        activeVenueId,
         businesses,
         areas,
         venues,
@@ -660,10 +669,19 @@ export default function DashboardPage() {
     const resetTime = activeBusiness?.settings?.reset_time || '05:00';
     const resetTz = activeBusiness?.settings?.reset_timezone || activeBusiness?.timezone || 'UTC';
 
+    const isPaused = activeBusiness?.settings?.is_paused === true;
+
+    const togglePause = async () => {
+        if (!activeBusiness) return;
+        const newPaused = !isPaused;
+        await updateBusiness({ settings: { ...activeBusiness.settings, is_paused: newPaused } });
+    };
+
     const [showAdvanceConfirm, setShowAdvanceConfirm] = useState(false);
     const [showOpResetConfirm, setShowOpResetConfirm] = useState(false);
     const [showSchedulePopover, setShowSchedulePopover] = useState(false);
     const [advanceDate, setAdvanceDate] = useState(() => getAutoDateLabel(new Date(), resetTime, resetTz));
+    const [prevNightLog, setPrevNightLog] = useState<NightLog | null>(null);
 
     // Date picker state
     const [selectedDate, setSelectedDate] = useState<string | null>(null); // null = Today
@@ -706,6 +724,24 @@ export default function DashboardPage() {
         }, msUntilMidnight);
         return () => clearTimeout(timer);
     }, [todayStart]);
+
+    useEffect(() => {
+        if (!activeBusiness?.id) return;
+        const fetchPrevNight = async () => {
+            try {
+                const res = await fetch('/api/sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'GET_NIGHT_LOGS', payload: { businessId: activeBusiness.id, venueId: activeVenueId } }),
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                const logs: NightLog[] = data.nightLogs || [];
+                if (logs.length > 0) setPrevNightLog(logs[0]);
+            } catch { /* trends just won't show */ }
+        };
+        fetchPrevNight();
+    }, [activeBusiness?.id]);
 
     // Dashboard metrics only use venue counter events (area_id is null/empty).
     // Area counter taps track area-level flow only and don't contribute to dashboard metrics.
@@ -908,6 +944,26 @@ export default function DashboardPage() {
         });
     }, [venues, areas, todayEvents]);
 
+    // --- Trend computations vs. previous night ---
+    const entryTrend = computeTrend(totalEntries, prevNightLog?.total_in ?? null);
+    const peakTrend = computeTrend(peakOccupancyValue, prevNightLog?.peak_occupancy ?? null);
+    const scanTrend = computeTrend(totalScans, prevNightLog?.scans_total ?? null);
+
+    // Denial Rate — percentage point delta (not percentage change)
+    const currentDenialRate = totalScans > 0 ? (deniedCount / totalScans) * 100 : 0;
+    const prevDenialRate = prevNightLog && prevNightLog.scans_total > 0
+        ? ((prevNightLog.scans_denied ?? 0) / prevNightLog.scans_total) * 100
+        : null;
+    const denialTrend = prevDenialRate !== null
+        ? (() => {
+            const diff = Math.round((currentDenialRate - prevDenialRate) * 10) / 10;
+            if (diff === 0) return { trend: 'neutral' as const, value: '—' };
+            return diff > 0
+                ? { trend: 'up' as const, value: `↑${diff}pp` }
+                : { trend: 'down' as const, value: `↓${Math.abs(diff)}pp` };
+        })()
+        : null;
+
     // --- Render: No businesses (new user / redirecting to onboarding) ---
     if (!isLoading && businesses.length === 0) {
         return (
@@ -954,6 +1010,15 @@ export default function DashboardPage() {
 
     return (
         <div className="space-y-8 animate-[fade-in_0.5s_ease-out]">
+            {/* Pause Banner */}
+            {isPaused && (
+                <div className="bg-red-600 text-white px-4 py-3 rounded-lg flex items-center gap-2 mb-4">
+                    <Pause className="w-5 h-5" />
+                    <span className="font-semibold">OPERATIONS PAUSED</span>
+                    <span className="text-red-200">— All counting and scanning suspended</span>
+                </div>
+            )}
+
             {/* Page Header - Design */}
             <div className="mb-8">
                 <div className="flex items-center gap-4 mb-2">
@@ -990,6 +1055,19 @@ export default function DashboardPage() {
                         {/* Action buttons — only shown for today's live view */}
                         {isToday && (
                             <>
+                                {/* Pause/Resume Toggle — MANAGER+ only */}
+                                {canEditVenuesAndAreas(currentUser.role) && (
+                                    <button
+                                        onClick={togglePause}
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm ${
+                                            isPaused ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-amber-600 hover:bg-amber-700 text-white'
+                                        }`}
+                                    >
+                                        {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+                                        {isPaused ? 'Resume Operations' : 'Pause Operations'}
+                                    </button>
+                                )}
+
                                 {/* Advance to Next Day */}
                                 <button
                                     onClick={() => {
@@ -1133,6 +1211,8 @@ export default function DashboardPage() {
                     value={liveOccupancy}
                     detail={`Peak: ${peakOccupancyValue}`}
                     icon={Users}
+                    trend={peakTrend?.trend}
+                    trendValue={peakTrend?.value}
                 />
                 <KpiCard
                     label="Total Entries"
@@ -1142,6 +1222,8 @@ export default function DashboardPage() {
                     iconColor="text-emerald-500"
                     valueColor="text-emerald-400"
                     detailColor="text-red-400"
+                    trend={entryTrend?.trend}
+                    trendValue={entryTrend?.value}
                 />
                 <KpiCard
                     label="Scans Processed"
@@ -1150,6 +1232,8 @@ export default function DashboardPage() {
                     icon={ScanLine}
                     iconColor="text-purple-500"
                     valueColor="text-purple-400"
+                    trend={scanTrend?.trend}
+                    trendValue={scanTrend?.value}
                 />
                 <KpiCard
                     label="Banned Hits"
@@ -1158,6 +1242,8 @@ export default function DashboardPage() {
                     icon={ShieldBan}
                     iconColor="text-red-500"
                     valueColor="text-red-400"
+                    trend={denialTrend?.trend}
+                    trendValue={denialTrend?.value}
                 />
             </div>}
 

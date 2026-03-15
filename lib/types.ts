@@ -63,6 +63,7 @@ export type Business = {
         ban_permissions?: { manager: boolean; staff: boolean };
         ban_scope_default?: 'VENUE' | 'BUSINESS';
         ban_reason_required?: boolean;
+        is_paused?: boolean;
     };
 };
 
@@ -113,6 +114,9 @@ export type Area = {
     sort_order?: number;
     created_at: string;
     updated_at: string;
+
+    // Capacity enforcement
+    capacity_enforcement_mode?: CapacityEnforcementMode;
 
     // Shift management
     shift_mode?: ShiftMode;
@@ -253,6 +257,7 @@ export type IDScanEvent = {
     weight?: string;
     id_number?: string;
     shift_id?: string;
+    identity_token_hash?: string;
 };
 
 // --- PATRON BANNING SYSTEM TYPES ---

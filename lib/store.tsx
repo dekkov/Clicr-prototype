@@ -424,6 +424,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     const recordEvent = async (data: Omit<CountEvent, 'id' | 'timestamp' | 'user_id' | 'business_id'>) => {
         if (!state.business) return;
+        if (state.business.settings?.is_paused === true) {
+            window.dispatchEvent(new CustomEvent('clicr:flash', { detail: { message: 'Operations Paused — counting suspended', type: 'warn' } }));
+            return;
+        }
         if (!data.area_id && !data.venue_id) {
             console.error('recordEvent: area_id or venue_id is required');
             return;
@@ -543,6 +547,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const recordScan = async (data: Omit<IDScanEvent, 'id' | 'timestamp'>) => {
+        if (state.business?.settings?.is_paused === true) {
+            window.dispatchEvent(new CustomEvent('clicr:flash', { detail: { message: 'Operations Paused — counting suspended', type: 'warn' } }));
+            return;
+        }
         isWritingRef.current += 1; // Acquire lock slot
 
         const newScan: IDScanEvent = {
@@ -1204,11 +1212,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             const payload = state.activeBusiness?.id
                 ? { ...updates, business_id: state.activeBusiness.id }
                 : updates;
-            const res = await authFetch({ action: 'UPDATE_BUSINESS', payload });
-            if (res.ok) {
-                const updatedDB = await res.json();
-                setState(prev => ({ ...prev, ...updatedDB }));
-            }
+            // Fire-and-forget: optimistic state is already correct, no need to re-apply
+            // the full sync response (which would flash the entire dashboard).
+            await authFetch({ action: 'UPDATE_BUSINESS', payload });
         } catch (error) { console.error("Failed to update business", error); }
     };
 

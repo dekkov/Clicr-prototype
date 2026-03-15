@@ -3,13 +3,17 @@
 import { createClient } from '@/utils/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { parseAAMVA, isExpired, getAge } from '@/lib/scanning/aamva-parser';
+import { buildEnforcementEvent, validateOverrideInput } from '@/lib/ban-utils';
+import { hasMinRole } from '@/lib/permissions';
+import { checkAreaCapacity } from '@/lib/capacity-utils';
+import { shouldBlockForPause } from '@/lib/pause-utils';
 import crypto from 'crypto';
 
 // --- Types ---
 
 export type ScanResult = {
     outcome: 'ACCEPTED' | 'DENIED';
-    reason?: 'UNDERAGE' | 'EXPIRED' | 'BANNED' | 'INVALID_FORMAT' | 'VERIFICATION_FAILED';
+    reason?: 'UNDERAGE' | 'EXPIRED' | 'BANNED' | 'INVALID_FORMAT' | 'VERIFICATION_FAILED' | 'AREA_AT_CAPACITY' | 'AREA_AT_CAPACITY_OVERRIDE_REQUIRED' | 'OPERATION_PAUSED';
     data: {
         firstName: string | null;
         lastName: string | null;
@@ -24,6 +28,8 @@ export type ScanResult = {
         notes?: string;
         period: string; // "Permanent" or date
     };
+    enforcementEventId?: string;
+    areaId?: string;
 };
 
 export type ScanPayload = {
@@ -61,6 +67,25 @@ export async function processScan(payload: ScanPayload): Promise<{ success: bool
         const businessId = member.business_id;
         const settings = (member.business as any)?.settings || {};
         const ageThreshold = settings.age_threshold || 21;
+
+        // 1b. Pause Check
+        if (shouldBlockForPause(settings)) {
+            await supabaseAdmin.from('id_scans').insert({
+                business_id: businessId,
+                venue_id: payload.venueId,
+                area_id: payload.areaId || null,
+                scan_result: 'DENIED',
+                deny_reason: 'OPERATION_PAUSED',
+            });
+            return {
+                success: true,
+                result: {
+                    outcome: 'DENIED' as const,
+                    reason: 'OPERATION_PAUSED' as const,
+                    data: { firstName: null, lastName: null, age: null, gender: null, dob: null, expirationDate: null, issuingState: null },
+                },
+            };
+        }
 
         // 2. Parse
         let parsed = parseAAMVA(payload.raw);
@@ -109,7 +134,26 @@ export async function processScan(payload: ScanPayload): Promise<{ success: bool
             }
         }
 
-        // 5. Determine Outcome
+        // 5. Log enforcement event if a ban was found
+        let enforcementEventId: string | undefined;
+        if (activeBan) {
+            const enfEvent = buildEnforcementEvent({
+                banId: activeBan.ban_id,
+                venueId: payload.venueId,
+                deviceId: payload.deviceId ?? null,
+                userId: user.id,
+                firstName: parsed.firstName,
+                lastName: parsed.lastName,
+            });
+            const { data: insertedEnf } = await supabaseAdmin
+                .from('ban_enforcement_events')
+                .insert(enfEvent)
+                .select('id')
+                .single();
+            enforcementEventId = insertedEnf?.id;
+        }
+
+        // 6. Determine Outcome
         let outcome: 'ACCEPTED' | 'DENIED' = 'ACCEPTED';
         let reason: any = undefined;
 
@@ -127,7 +171,7 @@ export async function processScan(payload: ScanPayload): Promise<{ success: bool
             reason = 'EXPIRED';
         }
 
-        // 6. Log Scan (id_scans with identity_token_hash for spec compliance)
+        // 7. Log Scan (id_scans with identity_token_hash for spec compliance)
         await supabaseAdmin.from('id_scans').insert({
             business_id: businessId,
             venue_id: payload.venueId,
@@ -146,7 +190,41 @@ export async function processScan(payload: ScanPayload): Promise<{ success: bool
             identity_token_hash: identityHash
         });
 
-        // 8. Auto-Increment Occupancy (If Accepted and Area specified)
+        // 8. Auto-Increment Occupancy (if Accepted and Area specified)
+        if (outcome === 'ACCEPTED' && payload.areaId) {
+            const { data: areaData } = await supabaseAdmin
+                .from('areas')
+                .select('capacity_max, current_occupancy, capacity_enforcement_mode')
+                .eq('id', payload.areaId)
+                .single();
+
+            if (areaData) {
+                const capCheck = checkAreaCapacity(
+                    areaData.current_occupancy ?? 0,
+                    areaData.capacity_max ?? 0,
+                    areaData.capacity_enforcement_mode
+                );
+                if (!capCheck.allowed) {
+                    return {
+                        success: true,
+                        result: {
+                            outcome: 'DENIED' as const,
+                            reason: capCheck.overrideAvailable ? 'AREA_AT_CAPACITY_OVERRIDE_REQUIRED' as const : 'AREA_AT_CAPACITY' as const,
+                            data: {
+                                firstName: parsed.firstName,
+                                lastName: parsed.lastName,
+                                age,
+                                gender: parsed.gender,
+                                dob: parsed.dob,
+                                expirationDate: parsed.expirationDate,
+                                issuingState: parsed.issuingState,
+                            },
+                        },
+                    };
+                }
+            }
+        }
+
         if (outcome === 'ACCEPTED') {
             const autoAdd = true; // TODO: Fetch from settings
             if (autoAdd && payload.areaId) {
@@ -181,10 +259,12 @@ export async function processScan(payload: ScanPayload): Promise<{ success: bool
                     issuingState: parsed.issuingState
                 },
                 banDetails: activeBan ? {
-                    reason: activeBan.reason_code || 'Unspecified',
+                    reason: activeBan.reason || 'Unspecified',
                     notes: activeBan.notes,
                     period: activeBan.end_at ? `Until ${new Date(activeBan.end_at).toLocaleDateString()}` : 'Permanent'
-                } : undefined
+                } : undefined,
+                enforcementEventId,
+                areaId: payload.areaId,
             }
         };
 
@@ -225,16 +305,32 @@ export async function banPatron(scanId: string | null, manualData: any | null, b
             issuingState = scan.issuing_state || '';
 
         } else if (manualData) {
-            const { data: member } = await supabase.from('business_members').select('business_id').eq('user_id', user.id).single();
-            if (!member) return { success: false, error: 'No business' };
-            businessId = member.business_id;
+            if (banDetails.businessId) {
+                businessId = banDetails.businessId;
+            } else {
+                const { data: member } = await supabaseAdmin.from('business_members').select('business_id').eq('user_id', user.id).limit(1).single();
+                if (!member) return { success: false, error: 'No business' };
+                businessId = member.business_id;
+            }
 
-            const { state, idNumber, dob: manualDob } = manualData;
-            if (!state || !idNumber || !manualDob) return { success: false, error: 'Missing ID details' };
+            const { state, idNumber, dob: manualDob, identityTokenHash, firstName: mFirstName, lastName: mLastName, idNumberLast4: mIdLast4 } = manualData;
+            if (!state || !manualDob) return { success: false, error: 'Missing ID details' };
 
-            identityHash = generateIdentityHash(state, idNumber, manualDob);
+            if (identityTokenHash) {
+                // Pre-computed hash from guest directory (no full ID number needed)
+                identityHash = identityTokenHash;
+                if (mIdLast4) idNumberLast4 = mIdLast4;
+            } else if (idNumber) {
+                identityHash = generateIdentityHash(state, idNumber, manualDob);
+                idNumberLast4 = idNumber.slice(-4);
+            } else {
+                return { success: false, error: 'Either ID number or identity hash required' };
+            }
+
+            if (mFirstName) firstName = mFirstName;
+            if (mLastName) lastName = mLastName;
             dob = manualDob.replace(/[^0-9]/g, '').substring(0, 8);
-            idNumberLast4 = idNumber.slice(-4);
+            if (idNumber) idNumberLast4 = idNumber.slice(-4);
             issuingState = state;
         } else {
             return { success: false, error: 'Either scanId or manualData required' };
@@ -251,7 +347,7 @@ export async function banPatron(scanId: string | null, manualData: any | null, b
                 .eq('business_id', businessId)
                 .eq('identity_token_hash', identityHash)
                 .limit(1)
-                .single();
+                .maybeSingle();
 
             if (existing) {
                 personId = existing.id;
@@ -281,6 +377,17 @@ export async function banPatron(scanId: string | null, manualData: any | null, b
             personId = inserted!.id;
         }
 
+        // Prevent duplicate active bans for the same person
+        const { data: existingBan } = await supabaseAdmin
+            .from('patron_bans')
+            .select('id')
+            .eq('banned_person_id', personId)
+            .eq('business_id', businessId)
+            .eq('status', 'ACTIVE')
+            .limit(1)
+            .maybeSingle();
+        if (existingBan) return { success: false, error: 'An active ban already exists for this person.' };
+
         const { data: banRow, error: banErr } = await supabaseAdmin.from('patron_bans').insert({
             banned_person_id: personId,
             business_id: businessId,
@@ -306,6 +413,55 @@ export async function banPatron(scanId: string | null, manualData: any | null, b
         return { success: true };
     } catch (err: any) {
         console.error("Ban Error", err);
+        return { success: false, error: err.message };
+    }
+}
+
+export async function overrideBan(
+    enforcementEventId: string,
+    areaId: string,
+    reason: string,
+    notes: string
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { success: false, error: 'Not authenticated' };
+
+        const { data: member } = await supabaseAdmin
+            .from('business_members')
+            .select('role')
+            .eq('user_id', user.id)
+            .single();
+        if (!member || !hasMinRole(member.role, 'MANAGER')) {
+            return { success: false, error: 'Insufficient permissions' };
+        }
+
+        const validation = validateOverrideInput({ enforcementEventId, areaId, reason, notes });
+        if (!validation.valid) return { success: false, error: validation.error };
+
+        const { error: updateErr } = await supabaseAdmin
+            .from('ban_enforcement_events')
+            .update({
+                result: 'ALLOWED_OVERRIDE',
+                override_reason: reason,
+                notes: notes || null,
+            })
+            .eq('id', enforcementEventId);
+        if (updateErr) return { success: false, error: updateErr.message };
+
+        // Use user client for RPC, consistent with processScan pattern
+        const { error: rpcErr } = await supabase.rpc('apply_occupancy_delta', {
+            p_area_id: areaId,
+            p_delta: 1,
+            p_source: 'scan',
+            p_device_id: null,
+        });
+        if (rpcErr) return { success: false, error: rpcErr.message };
+
+        return { success: true };
+    } catch (err: any) {
+        console.error("[Override Ban] Error:", err);
         return { success: false, error: err.message };
     }
 }
