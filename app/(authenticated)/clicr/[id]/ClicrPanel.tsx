@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     ArrowLeft, Wifi, WifiOff, ScanLine, XCircle, Zap,
     Settings2, Bug, RotateCcw, Scan,
-    Camera, Bluetooth
+    Camera, Bluetooth, AlertTriangle
 } from 'lucide-react';
 import { useApp } from '@/lib/store';
 import { cn } from '@/lib/utils';
@@ -43,6 +43,7 @@ const ConfigModalBody = React.memo(function ConfigModalBody({
     const [classifyMode, setClassifyMode] = useState(() => snap.initialClassifyMode);
     const [labels, setLabels] = useState(() => snap.counterLabels.filter(l => !l.deleted_at));
     const [newLabelName, setNewLabelName] = useState('');
+    const [deletePendingId, setDeletePendingId] = useState<string | null>(null);
     const handleClassifyToggle = () => {
         const newVal = !classifyMode;
         setClassifyMode(newVal);
@@ -55,8 +56,12 @@ const ConfigModalBody = React.memo(function ConfigModalBody({
     };
     const deleteLabel = (id: string) => {
         if (labels.length <= 1) return;
-        if (!window.confirm('Historical data for this label will still be visible in reports, but the counter will be removed from the clicker.')) return;
-        setLabels(prev => prev.filter(l => l.id !== id).map((l, i) => ({ ...l, position: i })));
+        setDeletePendingId(id);
+    };
+    const confirmDeleteLabel = () => {
+        if (!deletePendingId) return;
+        setLabels(prev => prev.filter(l => l.id !== deletePendingId).map((l, i) => ({ ...l, position: i })));
+        setDeletePendingId(null);
     };
     return (
         <>
@@ -98,6 +103,15 @@ const ConfigModalBody = React.memo(function ConfigModalBody({
                     <button type="button" onClick={addLabel} disabled={!newLabelName.trim()} className="px-3 py-2 bg-card rounded-xl text-sm font-medium disabled:opacity-50">Add</button>
                 </div>
             </div>
+            {deletePendingId && (
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 space-y-3">
+                    <p className="text-sm text-amber-300 font-medium">Historical data for this label will still be visible in reports, but the counter will be removed from the clicker.</p>
+                    <div className="flex justify-end gap-2">
+                        <button type="button" onClick={() => setDeletePendingId(null)} className="px-4 py-1.5 rounded-lg text-sm font-bold text-muted-foreground hover:text-foreground">Cancel</button>
+                        <button type="button" onClick={confirmDeleteLabel} className="px-4 py-1.5 bg-red-600 rounded-lg text-sm font-bold text-white hover:bg-red-500">Remove</button>
+                    </div>
+                </div>
+            )}
             <div className="grid grid-cols-2 gap-3 pt-2">
                 <button type="button" onClick={snap.onCancel} className="py-3 rounded-xl text-foreground/60 bg-card border border-border hover:bg-border font-semibold text-sm transition-colors">Cancel</button>
                 <button type="button" onClick={() => snap.onSave(name, labels)} className="py-3 rounded-xl bg-white text-black font-bold text-sm hover:bg-muted shadow-lg transition-all active:scale-95">Save Changes</button>
@@ -183,6 +197,25 @@ export default function ClicrPanel({
     const [showDebug, setShowDebug] = useState(false);
     // const [generatingToken, setGeneratingToken] = useState(false); // Removed: tap page deleted
     const [turnaroundFlash, setTurnaroundFlash] = useState(false);
+    const [flashBanner, setFlashBanner] = useState<{ message: string; type: 'error' | 'warn' | 'info' } | null>(null);
+    const flashBannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [overridePrompt, setOverridePrompt] = useState<{ message: string; onConfirm: () => void } | null>(null);
+
+    const showFlash = (message: string, type: 'error' | 'warn' | 'info' = 'error', duration = 3000) => {
+        if (flashBannerTimer.current) clearTimeout(flashBannerTimer.current);
+        setFlashBanner({ message, type });
+        flashBannerTimer.current = setTimeout(() => setFlashBanner(null), duration);
+    };
+
+    // Listen for flash events from store (e.g. pause enforcement)
+    useEffect(() => {
+        const handler = (e: Event) => {
+            const { message, type } = (e as CustomEvent).detail;
+            showFlash(message, type);
+        };
+        window.addEventListener('clicr:flash', handler);
+        return () => window.removeEventListener('clicr:flash', handler);
+    }, []);
 
     const isModalOpenRef = useRef(false);
     useEffect(() => {
@@ -357,12 +390,29 @@ export default function ClicrPanel({
         const { maxCapacity, mode: capMode } = getVenueCapacityRules(venue);
         if (maxCapacity > 0 && currentVenueOccupancy >= maxCapacity) {
             if (capMode === 'HARD_STOP') {
-                alert("CAPACITY REACHED: Entry Blocked");
+                showFlash('CAPACITY REACHED — Entry Blocked', 'error');
                 if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
                 return;
             }
             if (capMode === 'MANAGER_OVERRIDE' || capMode === 'HARD_BLOCK' as any) {
-                if (!window.confirm("WARNING: Capacity Reached. Authorize Override?")) return;
+                setOverridePrompt({
+                    message: 'Venue capacity reached. Authorize override?',
+                    onConfirm: () => {
+                        setOverridePrompt(null);
+                        if (navigator.vibrate) navigator.vibrate(50);
+                        recordEvent({
+                            venue_id: venueId,
+                            area_id: clicr.area_id,
+                            clicr_id: clicr.id,
+                            delta: 1,
+                            flow_type: 'IN',
+                            counter_label_id: counterLabelId,
+                            event_type: 'TAP',
+                            idempotency_key: Math.random().toString(36),
+                        });
+                    },
+                });
+                return;
             }
             if (capMode === 'WARN_ONLY') {
                 if (navigator.vibrate) navigator.vibrate([50, 50, 50, 50]);
@@ -376,9 +426,26 @@ export default function ClicrPanel({
             );
             if (!areaCheck.allowed) {
                 if (areaCheck.overrideAvailable) {
-                    if (!window.confirm('AREA CAPACITY REACHED. Authorize override?')) return;
+                    setOverridePrompt({
+                        message: 'Area capacity reached. Authorize override?',
+                        onConfirm: () => {
+                            setOverridePrompt(null);
+                            if (navigator.vibrate) navigator.vibrate(50);
+                            recordEvent({
+                                venue_id: venueId,
+                                area_id: clicr.area_id,
+                                clicr_id: clicr.id,
+                                delta: 1,
+                                flow_type: 'IN',
+                                counter_label_id: counterLabelId,
+                                event_type: 'TAP',
+                                idempotency_key: Math.random().toString(36),
+                            });
+                        },
+                    });
+                    return;
                 } else {
-                    alert('AREA CAPACITY REACHED — Entry blocked');
+                    showFlash('AREA CAPACITY REACHED — Entry Blocked', 'error');
                     navigator.vibrate?.([200, 100, 200]);
                     return;
                 }
@@ -534,7 +601,7 @@ export default function ClicrPanel({
             const parsed = parseAAMVA(scannerInput);
             processScan(parsed, scannerInput);
         } catch {
-            alert("Failed to parse ID. Please try again.");
+            showFlash('Failed to parse ID. Please try again.', 'error');
         }
         setScannerInput('');
     };
@@ -545,7 +612,7 @@ export default function ClicrPanel({
             const parsed = parseAAMVA(manualScanInput);
             processScan(parsed, manualScanInput);
         } catch {
-            alert("Failed to parse scan data. Please check the input.");
+            showFlash('Failed to parse scan data. Please check the input.', 'error');
         }
         setManualScanInput('');
     };
@@ -610,7 +677,7 @@ export default function ClicrPanel({
                 const track = stream.getVideoTracks()[0];
                 const capabilities = track.getCapabilities() as any;
                 if (!capabilities.torch) {
-                    alert("Flashlight not supported on this device.");
+                    showFlash('Flashlight not supported on this device.', 'warn');
                     track.stop();
                     return;
                 }
@@ -619,7 +686,7 @@ export default function ClicrPanel({
                 setTorchOn(true);
             }
         } catch {
-            alert("Could not access flashlight.");
+            showFlash('Could not access flashlight.', 'warn');
             setTorchOn(false);
         }
     };
@@ -658,6 +725,49 @@ export default function ClicrPanel({
                 autoComplete="off"
                 inputMode="none"
             />
+
+            {/* Flash banner (replaces browser alerts) */}
+            {flashBanner && (
+                <div
+                    className={cn(
+                        'fixed top-4 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 rounded-xl font-bold text-sm shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300 max-w-[90vw]',
+                        flashBanner.type === 'error' && 'bg-red-600 text-white',
+                        flashBanner.type === 'warn' && 'bg-amber-500 text-black',
+                        flashBanner.type === 'info' && 'bg-blue-600 text-white',
+                    )}
+                >
+                    <AlertTriangle className="w-5 h-5 shrink-0" />
+                    {flashBanner.message}
+                    <button onClick={() => setFlashBanner(null)} className="ml-2 opacity-70 hover:opacity-100">✕</button>
+                </div>
+            )}
+
+            {/* Override confirmation prompt (replaces window.confirm) */}
+            {overridePrompt && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-card border border-border rounded-2xl p-6 max-w-sm mx-4 space-y-4 shadow-2xl animate-in zoom-in-95 duration-200">
+                        <div className="flex items-start gap-3">
+                            <AlertTriangle className="w-6 h-6 text-amber-400 shrink-0 mt-0.5" />
+                            <p className="text-foreground font-bold">{overridePrompt.message}</p>
+                        </div>
+                        <div className="flex justify-end gap-3">
+                            <button
+                                onClick={() => setOverridePrompt(null)}
+                                className="px-5 py-2.5 rounded-xl font-bold text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={overridePrompt.onConfirm}
+                                className="px-5 py-2.5 bg-amber-600 rounded-xl font-bold text-foreground hover:bg-amber-500 shadow-lg shadow-amber-900/20"
+                            >
+                                Authorize
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
 
             {/* ── TOPBAR ─────────────────────────────────────────── */}
             <header className="flex items-center px-4 pt-6 pb-3 shrink-0">

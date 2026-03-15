@@ -425,7 +425,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const recordEvent = async (data: Omit<CountEvent, 'id' | 'timestamp' | 'user_id' | 'business_id'>) => {
         if (!state.business) return;
         if (state.business.settings?.is_paused === true) {
-            window.alert?.('Operations Paused — counting suspended');
+            window.dispatchEvent(new CustomEvent('clicr:flash', { detail: { message: 'Operations Paused — counting suspended', type: 'warn' } }));
             return;
         }
         if (!data.area_id && !data.venue_id) {
@@ -548,7 +548,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     const recordScan = async (data: Omit<IDScanEvent, 'id' | 'timestamp'>) => {
         if (state.business?.settings?.is_paused === true) {
-            window.alert?.('Operations Paused — counting suspended');
+            window.dispatchEvent(new CustomEvent('clicr:flash', { detail: { message: 'Operations Paused — counting suspended', type: 'warn' } }));
             return;
         }
         isWritingRef.current += 1; // Acquire lock slot

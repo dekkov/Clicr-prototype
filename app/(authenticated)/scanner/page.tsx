@@ -25,6 +25,15 @@ export default function ScannerPage() {
     const [recentScans, setRecentScans] = useState<any[]>([]);
     const [error, setError] = useState<string | null>(null);
 
+    // Flash banner (replaces browser alerts)
+    const [flashBanner, setFlashBanner] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const flashTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+    const showFlash = (message: string, type: 'success' | 'error', duration = 3000) => {
+        if (flashTimer.current) clearTimeout(flashTimer.current);
+        setFlashBanner({ message, type });
+        flashTimer.current = setTimeout(() => setFlashBanner(null), duration);
+    };
+
     // Ban Modal State
     const [isBanModalOpen, setIsBanModalOpen] = useState(false);
     const [banReason, setBanReason] = useState('AGGRESSIVE');
@@ -88,9 +97,9 @@ export default function ScannerPage() {
         if (res.success) {
             setIsBanModalOpen(false);
             setResult({ ...result, outcome: 'DENIED', reason: 'BANNED' }); // Update UI
-            alert("Patron Banned");
+            showFlash('Patron Banned', 'success');
         } else {
-            alert("Ban failed: " + res.error);
+            showFlash('Ban failed: ' + res.error, 'error');
         }
     };
 
@@ -98,6 +107,17 @@ export default function ScannerPage() {
 
     return (
         <div className="min-h-screen text-foreground flex flex-col md:flex-row -m-6 md:-m-8">
+            {/* Flash banner */}
+            {flashBanner && (
+                <div className={cn(
+                    'fixed top-4 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 rounded-xl font-bold text-sm shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300 max-w-[90vw]',
+                    flashBanner.type === 'error' ? 'bg-red-600 text-white' : 'bg-green-600 text-white',
+                )}>
+                    {flashBanner.type === 'error' ? <AlertTriangle className="w-5 h-5 shrink-0" /> : <CheckCircle className="w-5 h-5 shrink-0" />}
+                    {flashBanner.message}
+                    <button onClick={() => setFlashBanner(null)} className="ml-2 opacity-70 hover:opacity-100">✕</button>
+                </div>
+            )}
             {/* Left Panel: Scanner View */}
             <div className="flex-1 p-6 flex flex-col items-center justify-center relative border-r border-border bg-background">
                 {/* Configuration Bar */}
