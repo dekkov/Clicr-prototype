@@ -222,7 +222,7 @@
 ## 12. Demo Mode vs Production Mode
 
 - [ ] `NEXT_PUBLIC_APP_MODE=demo` → uses LocalAdapter, mock data OK
-- [ ] `NEXT_PUBLIC_APP_MODE=production` → uses SupabaseAdapter, no mock data
+- [ ] `NEXT_PUBLIC_APP_MODE=production` → uses Supabase via API routes, no mock data
 - [ ] Switching modes doesn't break navigation
 - [ ] Demo mode doesn't require Supabase credentials
 

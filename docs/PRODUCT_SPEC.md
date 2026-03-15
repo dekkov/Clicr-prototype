@@ -75,7 +75,7 @@ CLICR is a B2B SaaS platform for real-time occupancy tracking, ID scanning, patr
 ## 3. Key Definitions
 
 ### Occupancy
-The **current number of people inside** an area. Source of truth is `occupancy_snapshots.current_occupancy`, maintained atomically by `apply_occupancy_delta()`. Cannot go below 0.
+The **current number of people inside** an area. Source of truth is `areas.current_occupancy`, maintained atomically by `apply_occupancy_delta()`. Cannot go below 0.
 
 ### Total In / Total Out
 The **gross cumulative count** of all IN and OUT events since the last reset. Computed by summing `occupancy_events` where `created_at >= last_reset_at`.

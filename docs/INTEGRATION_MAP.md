@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document maps **every function in the existing prototype** to its corresponding **DataClient method**. A developer implementing the SupabaseAdapter should use this as a checklist.
+This document maps **every function in the existing prototype** to its corresponding **DataClient method**. Use this as a reference for understanding how store actions map to the adapter interface.
 
 ---
 
@@ -31,7 +31,7 @@ The current data layer lives in `lib/store.tsx` (AppProvider). Here's the exact 
 | `revokeBan(banId, ...)` | `updateBan(banId, { status: 'REMOVED' })` | Simplified |
 | `createPatronBan(person, ban, log)` | `createBan(banPayload)` | Combines person + ban into single call |
 | `updatePatronBan(ban, log)` | `updateBan(banId, patch)` | Audit log auto-generated |
-| `recordBanEnforcement(event)` | N/A (internal to SupabaseAdapter) | Handled inside logScan when ban detected |
+| `recordBanEnforcement(event)` | N/A (internal) | Handled inside logScan when ban detected |
 | `updateBusiness(updates)` | `updateBusiness(businessId, patch)` | Direct mapping |
 | `addCapacityOverride(override)` | N/A (future) | Not in v4 DataClient scope |
 | `addVenueAuditLog(log)` | N/A (auto-generated) | Audit logs created by RPCs |
@@ -40,7 +40,7 @@ The current data layer lives in `lib/store.tsx` (AppProvider). Here's the exact 
 
 ## 2. Server API Route → DataClient Methods
 
-The `/api/sync` route currently handles both reads and writes. Here's how each action maps:
+The `/api/sync` route separates reads (GET) from writes (POST). POST returns lean `{ success: true }` — the store calls `refreshState()` (GET) after successful mutations. Here's how each action maps:
 
 ### GET /api/sync (State Hydration)
 
@@ -111,7 +111,7 @@ const snapshots = await client.getSnapshots({ businessId });
 
 ### Sync API (Supabase-only)
 
-The sync route (`/api/sync`) reads and writes exclusively from Supabase. `lib/db.ts` and `data/db.json` have been removed.
+The sync route (`/api/sync`) reads and writes exclusively from Supabase. GET returns full state via `buildSyncResponse()`. POST dispatches mutations and returns `{ success: true }` — store functions call `refreshState()` (GET) after successful writes. `lib/db.ts` and `data/db.json` have been removed.
 
 ---
 
@@ -178,7 +178,7 @@ The prototype uses `Clicr` type; production uses `Device`. Here's the mapping:
 | `area_id` | `area_id` | Same |
 | `name` | `name` | Same |
 | `flow_mode` | `direction_mode` | `'BIDIRECTIONAL' → 'bidirectional'`, etc. |
-| `current_count` | N/A | Derived from `occupancy_snapshots` |
+| `current_count` | N/A | Derived from `areas.current_occupancy` |
 | `active` | `active` (from `deleted_at IS NULL`) | Soft delete |
 | `button_config` | `button_config` | Same JSONB structure |
 | `command` | `serial_number` | Hardware mapping |
@@ -190,10 +190,9 @@ The prototype uses `Clicr` type; production uses `Device`. Here's the mapping:
 ```
 □ 1. Create a Supabase project at https://supabase.com
 □ 2. Run migrations in order: 001_schema.sql → … → 016_venue_counter_clicr.sql (16 files total)
-□ 3. Enable Realtime on: occupancy_snapshots, occupancy_events, id_scans
+□ 3. Enable Realtime on: areas, occupancy_events, id_scans
 □ 4. Copy .env.example → .env.local, fill in Supabase credentials
-□ 5. Implement SupabaseAdapter.ts (all methods)
-□ 6. Swap NEXT_PUBLIC_APP_MODE=production
+□ 5. Swap NEXT_PUBLIC_APP_MODE=production
 □ 7. Test: create business → create venue → create area → tap counter → check dashboard
 □ 8. Test: reset counts → verify totals restart from 0
 □ 9. Test: scan ID → verify demographics appear in reports

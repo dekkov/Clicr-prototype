@@ -77,20 +77,3 @@ export function createInitialDBData(): DBData {
     };
 }
 
-/** Check if a staff user is banned (fetches from Supabase). Returns false if no staff_bans table exists. */
-export async function isUserBanned(supabaseAdmin: any, userId: string, venueId?: string): Promise<boolean> {
-    try {
-        const { data } = await supabaseAdmin
-            .from('staff_bans')
-            .select('scope_type, scope_venue_ids')
-            .eq('user_id', userId)
-            .eq('status', 'ACTIVE');
-        if (!data || data.length === 0) return false;
-        const bans = data as { scope_type?: string; scope_venue_ids?: string[] }[];
-        if (bans.some(b => b.scope_type === 'BUSINESS')) return true;
-        if (venueId && bans.some(b => b.scope_type === 'VENUE' && (b.scope_venue_ids || []).includes(venueId))) return true;
-        return false;
-    } catch {
-        return false;
-    }
-}

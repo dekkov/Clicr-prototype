@@ -30,27 +30,20 @@ npm run dev
 ```bash
 # 1. Create a Supabase project at https://supabase.com
 
-# 2. Run migrations in order via the Supabase SQL Editor:
-#    migrations/001_schema.sql              → all tables
-#    migrations/002_indexes.sql             → performance indexes
-#    migrations/003_rpcs.sql                → atomic stored procedures
-#    migrations/004_rls.sql                 → row-level security
-#    migrations/005_fix_onboarding_rls.sql  → onboarding RLS fix
-#    migrations/006_user_cascade_deletes.sql→ cascade deletes
-#    migrations/007_fix_report_summary.sql  → report summary RPC fix
-#    migrations/008_role_migration.sql      → roles + board_views table
-#    migrations/009_area_shifts.sql         → area shift mode
-#    migrations/010_member_assignments.sql  → member venue/area assignments
-#    migrations/011_support_tickets.sql     → support tickets table
-#    migrations/012_shifts.sql              → shifts table
-#    migrations/013_identity_hash.sql       → identity token hashing
-#    migrations/014_venue_door_area_type.sql→ VENUE_DOOR area type
-#    migrations/015_heatmap_index.sql       → heatmap performance index
-#    migrations/016_venue_counter_clicr.sql → venue counter clicr support
+# 2. Run migrations via the Supabase SQL Editor:
+#
+#    OPTION A — Fresh install (4 files):
+#      migrations-consolidated/001_schema.sql     → all 19 tables
+#      migrations-consolidated/002_indexes.sql    → all indexes
+#      migrations-consolidated/003_functions.sql  → helpers, triggers, RPCs
+#      migrations-consolidated/004_rls.sql        → row-level security
+#
+#    OPTION B — Incremental (22 files, for existing databases):
+#      migrations/001_schema.sql → ... → migrations/022_cleanup_dead_objects.sql
 
 # 3. Enable Realtime on tables:
 #    Dashboard → Database → Replication → Enable for:
-#    occupancy_snapshots, occupancy_events, id_scans
+#    areas, occupancy_events, id_scans
 
 # 4. Update .env.local
 NEXT_PUBLIC_APP_MODE=production
@@ -58,9 +51,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
-# 5. Implement SupabaseAdapter methods (see docs/INTEGRATION_MAP.md)
-
-# 6. Build and deploy
+# 5. Build and deploy
 npm run build
 ```
 
@@ -101,7 +92,6 @@ clicr-v4/
 │   └── adapters/
 │       ├── DataClient.ts       # Interface contract (read this first)
 │       ├── LocalAdapter.ts     # Demo mode — localStorage (complete)
-│       ├── SupabaseAdapter.ts  # Production mode (stub — implement this)
 │       └── index.ts            # Factory function
 │
 ├── lib/                        # Utilities & services
@@ -117,7 +107,8 @@ clicr-v4/
 │
 ├── supabase/                   # Supabase config & manual SQL helpers
 │
-├── migrations/                 # ★ Supabase DDL (run in order, 001 → 016)
+├── migrations/                 # ★ Supabase DDL — incremental (001 → 022)
+├── migrations-consolidated/    # ★ Supabase DDL — fresh install (4 files)
 │
 ├── docs/                       # ★ Developer documentation
 │   ├── PRODUCT_SPEC.md         # Roles, flows, data model
@@ -136,27 +127,23 @@ clicr-v4/
 
 ### DataClient Pattern
 
-All data access goes through a single `DataClient` interface. Two implementations exist:
+All data access goes through a `DataClient` interface. Demo mode uses `LocalAdapter` (localStorage). Production mode uses API routes (`/api/sync`, `/api/rpc/*`) that call Supabase directly.
 
-| | `LocalAdapter` | `SupabaseAdapter` |
+| | `LocalAdapter` (Demo) | API Routes (Production) |
 |---|---|---|
 | **Mode** | `NEXT_PUBLIC_APP_MODE=demo` | `NEXT_PUBLIC_APP_MODE=production` |
 | **Storage** | localStorage | Supabase (Postgres) |
 | **Auth** | Stubbed (mock user) | Supabase Auth |
-| **Realtime** | Polling | Supabase Channels |
-| **Status** | ✅ Complete | 📝 Stub — implement all methods |
+| **Realtime** | Polling | Supabase Channels + 30s safety-net polling |
+| **Status** | ✅ Complete | ✅ Complete |
 
 ```typescript
+// Demo mode uses the adapter directly:
 import { getDataClient } from '@/core/adapters';
-
-// Automatically selects adapter based on NEXT_PUBLIC_APP_MODE
 const client = getDataClient();
 
-// Same API regardless of backend:
-const result = await client.applyOccupancyDelta({
-    businessId, venueId, areaId,
-    delta: +1, source: 'manual'
-});
+// Production mode uses API routes via AppContext:
+const { recordEvent, resetCounts } = useApp();
 ```
 
 ### Data Model
@@ -168,7 +155,7 @@ Business (tenant)
         └── Clicr (counter device: IN_ONLY | OUT_ONLY | BIDIRECTIONAL)
 ```
 
-Every tap creates an append-only event. Current occupancy is stored in `occupancy_snapshots` but only ever updated atomically via the `apply_occupancy_delta` RPC — never with direct writes.
+Every tap creates an append-only event. Current occupancy is stored directly on `areas.current_occupancy`, updated atomically via the `apply_occupancy_delta` RPC — never with direct writes.
 
 ### Critical RPCs
 
@@ -194,9 +181,11 @@ CREATE POLICY venues_select ON venues FOR SELECT
 |----------|-------------|
 | **[docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md)** | You need to understand what the product does |
 | **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** | You need to understand how the code is structured |
-| **[docs/SUPABASE_IMPLEMENTATION.md](docs/SUPABASE_IMPLEMENTATION.md)** | You're implementing the SupabaseAdapter |
-| **[docs/INTEGRATION_MAP.md](docs/INTEGRATION_MAP.md)** | You need to know which functions to replace |
+| **[docs/CODEBASE_AUDIT.md](docs/CODEBASE_AUDIT.md)** | You want a full feature/robustness/scalability assessment |
+| **[docs/SUPABASE_IMPLEMENTATION.md](docs/SUPABASE_IMPLEMENTATION.md)** | You're working with Supabase tables, RPCs, or RLS |
+| **[docs/INTEGRATION_MAP.md](docs/INTEGRATION_MAP.md)** | You need to know the store-to-DataClient method mapping |
 | **[docs/REPORTING_FORMULAS.md](docs/REPORTING_FORMULAS.md)** | You're working on analytics or charts |
+| **[docs/SECURITY.md](docs/SECURITY.md)** | You need auth, RLS, or API security details |
 | **[docs/QA_CHECKLIST.md](docs/QA_CHECKLIST.md)** | You're testing or reviewing changes |
 
 ---
@@ -208,6 +197,7 @@ npm run dev       # Start development server
 npm run build     # Production build
 npm run start     # Start production server
 npm run lint      # ESLint
+npm test          # Run all tests (184 tests across 25 suites)
 ```
 
 ---

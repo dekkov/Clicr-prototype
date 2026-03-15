@@ -178,7 +178,6 @@ export type Device = {
     serial_number: string;
     status: DeviceStatus;
     last_seen_at?: string | null;
-    firmware_version?: string;
     created_at: string;
     updated_at: string;
     counter_labels: CounterLabel[];

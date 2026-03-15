@@ -11,8 +11,6 @@ export default function RuntimeInspector() {
     const [truthA, setTruthA] = useState<any>(null);
     const [truthB, setTruthB] = useState<any>(null);
     const [truthC, setTruthC] = useState<any>(null);
-    const [deployResult, setDeployResult] = useState<any>(null);
-
     // --- TRUTH CARD LOGIC ---
 
     const loadTruthCardA = async () => {
@@ -80,41 +78,12 @@ export default function RuntimeInspector() {
         });
     };
 
-    const deployFixes = async () => {
-        setDeployResult({ loading: true });
-        try {
-            const res = await fetch('/api/admin/deploy-rpc');
-            const json = await res.json();
-            setDeployResult(json);
-        } catch (e) {
-            setDeployResult({ error: (e as Error).message });
-        }
-    };
-
     return (
         <div className="space-y-8 text-sm text-slate-200">
-            {/* ADMIN CONTROLS */}
-            <div className="bg-slate-950 border border-slate-800 p-4 rounded flex justify-between items-center">
-                <h2 className="text-xl font-bold text-white">🕵️‍♂️ DEBUGGING CONSOLE</h2>
-                <div className="flex gap-2">
-                    <button onClick={deployFixes} className="bg-red-900 border border-red-700 text-red-100 px-3 py-1 rounded hover:bg-red-800">
-                        {deployResult?.loading ? 'Deploying...' : '⚠️ RE-DEPLOY RPC/RLS'}
-                    </button>
-                </div>
+            {/* HEADER */}
+            <div className="bg-slate-950 border border-slate-800 p-4 rounded">
+                <h2 className="text-xl font-bold text-white">DEBUGGING CONSOLE</h2>
             </div>
-
-            {deployResult && (
-                <div className="bg-slate-900 p-4 rounded border border-slate-700 font-mono text-xs">
-                    <div className={deployResult.success ? "text-emerald-400" : "text-red-400"}>
-                        {deployResult.success ? "DEPLOY SUCCESS" : "DEPLOY FAILED: " + deployResult.error}
-                    </div>
-                    {deployResult.manual_sql && (
-                        <div className="mt-2 text-amber-500 select-all whitespace-pre-wrap">
-                            {deployResult.manual_sql}
-                        </div>
-                    )}
-                </div>
-            )}
 
             {/* TRUTH CARD A: DB EVENTS */}
             <section className="bg-slate-950 border border-slate-700 rounded-lg overflow-hidden">
@@ -239,7 +208,7 @@ export default function RuntimeInspector() {
                                     )}
                                 </div>
                                 <div>
-                                    <h4 className="text-indigo-400 font-bold mb-2">Snapshots Table ({truthC.snapshots.count})</h4>
+                                    <h4 className="text-indigo-400 font-bold mb-2">Area Occupancy ({truthC.snapshots.count})</h4>
                                     {truthC.snapshots.error ? (
                                         <div className="text-red-500">{truthC.snapshots.error}</div>
                                     ) : (

@@ -9,7 +9,7 @@
 | 3 | `venues` | Physical locations | ✅ | CRUD |
 | 4 | `areas` | Sub-zones within venues | ✅ | CRUD (soft delete) |
 | 5 | `devices` | Counting hardware / software points | ✅ | CRUD (soft delete) |
-| 6 | `occupancy_snapshots` | Source of truth for current occupancy | ✅ | Via RPC only |
+| ~~6~~ | ~~`occupancy_snapshots`~~ | ~~Removed — occupancy stored on `areas.current_occupancy`~~ | - | - |
 | 7 | `occupancy_events` | Immutable event log | ✅ | **Append only** |
 | 8 | `id_scans` | Immutable scan log (PII) | ✅ | **Append only** |
 | 9 | `banned_persons` | Identity registry for bans | ✅ | CRUD |
@@ -19,7 +19,7 @@
 | 13 | `turnarounds` | Re-entry tracking | ✅ | Append only |
 | 14 | `audit_logs` | System audit trail | ✅ | Append only |
 | 15 | `app_errors` | Client error logging | ✅ | Append only |
-| 16 | `onboarding_progress` | Setup wizard state | ✅ | CRUD |
+| ~~16~~ | ~~`onboarding_progress`~~ | ~~Removed — unused in production~~ | - | - |
 | 17 | `board_views` | Saved board layout configs per area | ✅ | CRUD |
 | 18 | `shifts` | Shift records (start/end, auto-reset) | ✅ | CRUD |
 | 19 | `support_tickets` | In-app support requests | ✅ | CRUD |
@@ -36,8 +36,8 @@ businesses ──1:N──> venues ──1:N──> areas ──1:N──> devic
      │                │               │               │
      └──1:N──> business_members      │               └──1:N──> board_views
      │         (assigned_venue_ids,  │
-     │          assigned_area_ids)   └──1:N──> occupancy_snapshots
-     │                                └──1:N──> shifts
+     │          assigned_area_ids)   │
+     │                               └──1:N──> shifts
      │
      └──1:N──> occupancy_events  (shift_id FK → shifts)
      └──1:N──> id_scans          (shift_id FK → shifts)
@@ -82,7 +82,7 @@ Destructive operations use `has_role_in(business_id, 'ADMIN')`:
 If a user queries a table they don't have access to, Supabase returns an **empty result set** by default (RLS silently filters). To surface permission errors explicitly:
 
 ```typescript
-// In SupabaseAdapter, after any query:
+// In API routes, after any query:
 const { data, error, count } = await supabase.from('venues').select('*', { count: 'exact' });
 if (count === 0 && !error) {
     // Could be empty OR permission denied — check business_members separately
@@ -137,7 +137,7 @@ if (count === 0 && !error) {
 User clicks "Reset All Counts"
     → DataClient.resetCounts({ businessId, venueId? })
         → RPC reset_counts(scope, business_id, venue_id?, area_id?)
-            → UPDATE occupancy_snapshots SET current_occupancy = 0, last_reset_at = NOW()
+            → UPDATE areas SET current_occupancy = 0, last_reset_at = NOW()
             → UPDATE venues SET last_reset_at = NOW()
             → UPDATE areas SET last_reset_at = NOW()
             → INSERT INTO audit_logs (action: 'RESET_COUNTS')
@@ -205,8 +205,8 @@ Initial data structures are in `lib/sync-data.ts` (Supabase-only).
 ```sql
 SELECT id, current_occupancy + p_delta
 INTO v_snapshot_id, v_new_occ
-FROM occupancy_snapshots
-WHERE business_id = ... AND area_id = ...
+FROM areas
+WHERE id = p_area_id
 FOR UPDATE;  -- ← Blocks concurrent transactions
 ```
 
@@ -221,7 +221,7 @@ FOR UPDATE;  -- ← Blocks concurrent transactions
 ### Enable Realtime on Tables
 
 In Supabase Dashboard → Database → Replication:
-- Enable replication for: `occupancy_snapshots`, `occupancy_events`, `id_scans`
+- Enable replication for: `areas`, `occupancy_events`, `id_scans`
 - Do NOT enable for: `audit_logs`, `app_errors` (unnecessary overhead)
 
 ### Channel Architecture
@@ -229,10 +229,10 @@ In Supabase Dashboard → Database → Replication:
 ```
 Client                          Supabase
   │                                │
-  ├── subscribe(snapshots:biz_001) │
+  ├── subscribe(occupancy:biz_001) │
   │   ────────────────────────────►│
-  │                                │  occupancy_snapshots UPDATE
-  │   ◄────────────────────────────┤  { area_id, current_occupancy }
+  │                                │  areas UPDATE
+  │   ◄────────────────────────────┤  { id, current_occupancy }
   │                                │
   ├── subscribe(events:biz_001)    │
   │   ────────────────────────────►│

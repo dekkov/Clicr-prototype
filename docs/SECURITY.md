@@ -119,7 +119,6 @@ has_role_in(p_business_id uuid, p_min_role text) → boolean
 | `areas` | member | member | SUPERVISOR | ADMIN |
 | `devices` | member | member | SUPERVISOR | ADMIN |
 | `occupancy_events` | member | member | — | — |
-| `occupancy_snapshots` | member | member | ADMIN | ADMIN |
 | `id_scans` | member | member | — | — |
 | `app_errors` | member/system | always | — | — |
 

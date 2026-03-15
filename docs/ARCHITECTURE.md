@@ -82,7 +82,7 @@ app/
 │   └── [token]/page.tsx        # Quick-tap view
 │
 ├── api/
-│   ├── sync/route.ts           # GET: hydrate state, POST: mutations
+│   ├── sync/route.ts           # GET: hydrate full state, POST: lean mutations → { success: true }
 │   ├── tap/[token]/route.ts    # POST: tap event (device token auth)
 │   ├── rpc/reset/route.ts      # POST: atomic reset RPC
 │   ├── rpc/traffic/route.ts    # GET: traffic totals
@@ -109,14 +109,15 @@ app/
 The prototype uses a **centralized React Context** (`AppProvider` in `lib/store.tsx`) that:
 
 1. **On mount**: Fetches all data via `GET /api/sync`
-2. **Every 2 seconds**: Polls `/api/sync` for fresh state
-3. **On writes**: Sends `POST /api/sync` with action + payload
-4. **Optimistic updates**: State is updated locally before server confirms
-5. **Realtime**: Subscribes to Supabase `postgres_changes` on `occupancy_snapshots`
+2. **Every 30 seconds**: Safety-net polling via `GET /api/sync` (Channels handle realtime occupancy)
+3. **On writes**: Sends `POST /api/sync` with action + payload → receives lean `{ success: true }`
+4. **Post-mutation refresh**: Store calls `refreshState()` (GET) after successful CRUD writes
+5. **Optimistic updates**: State is updated locally before server confirms
+6. **Realtime**: Subscribes to Supabase `postgres_changes` on `areas` for live occupancy
 
-The `/api/sync` route (`app/api/sync/route.ts`) acts as a data proxy:
-- **GET**: Reads from Supabase, hydrates derived fields
-- **POST**: Dispatches mutations (`RECORD_EVENT`, `RECORD_SCAN`, `RESET_COUNTS`, etc.)
+The `/api/sync` route (`app/api/sync/route.ts`) separates reads from writes:
+- **GET**: Reads from Supabase, hydrates derived fields, returns full state
+- **POST**: Dispatches mutations, returns `{ success: true }` (no `buildSyncResponse()` call)
 
 ### Data Flow
 
@@ -127,22 +128,24 @@ setState(optimistic)          POST /api/sync { action: 'RECORD_EVENT', payload }
                                       ↓
                               Supabase RPCs and tables
                                       ↓
-                              Response → setState(server-confirmed)
+                              { success: true } → refreshState() triggers GET /api/sync
+                                                  (hot path skips refresh; relies on Channels + polling)
 ```
 
 ---
 
 ## 4. DataClient + Adapter Strategy
 
-### Target Architecture
+### Architecture
 
 ```
-UI Component → useApp() → DataClient.applyOccupancyDelta()
-                              ↓
-              ┌───────────────┼───────────────┐
-              │ LocalAdapter  │ SupabaseAdapter│
-              │ (demo mode)   │ (production)   │
-              └───────────────┴───────────────┘
+UI Component → useApp() hook → AppProvider (lib/store.tsx)
+                                     ↓
+              ┌──────────────────────┼──────────────────────┐
+              │ Demo Mode            │ Production Mode       │
+              │ LocalAdapter         │ API Routes → Supabase │
+              │ (localStorage)       │ (/api/sync, /api/rpc) │
+              └──────────────────────┴──────────────────────┘
 ```
 
 ### Files
@@ -151,14 +154,11 @@ UI Component → useApp() → DataClient.applyOccupancyDelta()
 |------|---------|
 | `core/adapters/DataClient.ts` | The interface contract (TypeScript interface) |
 | `core/adapters/LocalAdapter.ts` | In-memory/localStorage implementation (for demo) |
-| `core/adapters/SupabaseAdapter.ts` | Production Supabase implementation (stub, to be completed) |
 
-### Integration Steps
+### Mode Switching
 
-1. ✅ **`LocalAdapter.ts`** — complete. All methods implemented using localStorage.
-2. 📝 **Implement `SupabaseAdapter.ts`** method by method using the RPCs from `/migrations/003_rpcs.sql`
-3. 📝 **Refactor `AppProvider`** to accept a `DataClient` instance instead of calling fetch directly
-4. **Switch via env**: `NEXT_PUBLIC_APP_MODE=demo|production`
+- **Demo**: `NEXT_PUBLIC_APP_MODE=demo` → `LocalAdapter` (no Supabase needed)
+- **Production**: `NEXT_PUBLIC_APP_MODE=production` → API routes call Supabase directly via `lib/store.tsx`
 
 ---
 
@@ -166,16 +166,16 @@ UI Component → useApp() → DataClient.applyOccupancyDelta()
 
 ### Existing Supabase Touchpoints
 
-| File | What it does | Action needed |
-|------|-------------|--------------|
-| `lib/supabase.ts` | Creates browser Supabase client | Keep, use in SupabaseAdapter |
-| `lib/supabase-admin.ts` | Creates server-side admin client | Keep for RPCs that need SECURITY DEFINER |
-| `lib/core/supabase.ts` | Getter for Supabase instance | Keep, centralize usage |
-| `lib/core/mutations.ts` | RPC wrappers (applyDelta, resetCounts, etc.) | Absorb into SupabaseAdapter |
-| `lib/core/metrics.ts` | Report/traffic RPC wrappers | Absorb into SupabaseAdapter |
-| `lib/core/errors.ts` | Error logging to app_errors table | Shared utility (both adapters) |
-| `lib/store.tsx` | Context provider with Supabase Realtime | Refactor to use DataClient |
-| `app/api/sync/route.ts` | Supabase-only data proxy | Uses `lib/sync-data.ts` |
+| File | What it does |
+|------|-------------|
+| `lib/supabase.ts` | Creates browser Supabase client |
+| `lib/supabase-admin.ts` | Creates server-side admin client (SECURITY DEFINER RPCs) |
+| `lib/core/supabase.ts` | Getter for Supabase instance |
+| `lib/core/mutations.ts` | RPC wrappers (applyDelta, resetCounts, etc.) |
+| `lib/core/metrics.ts` | Report/traffic RPC wrappers |
+| `lib/core/errors.ts` | Error logging to app_errors table |
+| `lib/store.tsx` | Context provider with Supabase Realtime + polling |
+| `app/api/sync/route.ts` | Main data proxy (state hydration + write dispatch) |
 
 ### What gets removed in production
 
@@ -189,23 +189,24 @@ UI Component → useApp() → DataClient.applyOccupancyDelta()
 
 | Channel | Table | Event | Use |
 |---------|-------|-------|-----|
-| `snapshots:{businessId}` | `occupancy_snapshots` | UPDATE | Live occupancy across all dashboard views |
+| `occupancy:{businessId}` | `areas` | UPDATE | Live occupancy across all dashboard views |
 | `events:{businessId}` | `occupancy_events` | INSERT | Event log feed, recent activity |
 | `scans:{businessId}` | `id_scans` | INSERT | Guest directory live feed |
 
 ### Implementation Pattern
 
 ```typescript
-// In SupabaseAdapter.subscribeToSnapshots():
+// In lib/store.tsx (AppProvider):
 const channel = supabase
-    .channel(`snapshots:${scope.businessId}`)
+    .channel(`occupancy_${businessId}`)
     .on('postgres_changes', {
-        event: 'UPDATE',
+        event: '*',
         schema: 'public',
-        table: 'occupancy_snapshots',
-        filter: `business_id=eq.${scope.businessId}`
+        table: 'areas',
+        filter: `business_id=eq.${businessId}`
     }, (payload) => {
-        callback(mapPayloadToSnapshotRow(payload.new));
+        // Update area occupancy from realtime snapshot
+        lastRealtimeTsRef.current = Date.now();
     })
     .subscribe();
 
