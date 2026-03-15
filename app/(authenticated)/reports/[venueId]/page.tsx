@@ -14,7 +14,8 @@ import {
     ArrowDownRight,
     FileSpreadsheet,
     ArrowLeft,
-    MapPin
+    MapPin,
+    X
 } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay, eachHourOfInterval, addHours } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -99,8 +100,8 @@ export default function VenueReportingDashboard() {
         label: 'Today'
     });
 
-    // Calendar view state
-    const [view, setView] = useState<'calendar' | 'analytics'>('calendar');
+    // Calendar modal state
+    const [calendarOpen, setCalendarOpen] = useState(false);
     const [calYear, setCalYear] = useState(() => new Date().getFullYear());
     const [calMonth, setCalMonth] = useState(() => new Date().getMonth()); // 0-indexed
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -152,8 +153,6 @@ export default function VenueReportingDashboard() {
             return timeMatch && venueMatch;
         });
 
-        // ... (rest of computation uses filteredEvents/filteredScans which are safe now)
-
         // 2. Compute Aggregates
         // -- Totals
         const totalEntries = filteredEvents.filter(e => e.flow_type === 'IN').reduce((acc, e) => acc + e.delta, 0);
@@ -173,23 +172,47 @@ export default function VenueReportingDashboard() {
             if (runningOccupancy > maxOccupancy) maxOccupancy = runningOccupancy;
         });
 
-        // -- Hourly Breakdown
-        const hours = eachHourOfInterval({ start: dateRange.from, end: dateRange.to });
-        const hourlyData = hours.map(hour => {
-            const nextHour = addHours(hour, 1);
-            const hourEvents = filteredEvents.filter(e => e.timestamp >= hour.getTime() && e.timestamp < nextHour.getTime());
+        // -- Hourly Breakdown (group by day when range > 1 day)
+        const rangeMs = dateRange.to.getTime() - dateRange.from.getTime();
+        const isMultiDay = rangeMs > 23 * 60 * 60 * 1000;
 
-            const entries = hourEvents.filter(e => e.flow_type === 'IN').reduce((acc, e) => acc + e.delta, 0);
-            const exits = hourEvents.filter(e => e.flow_type === 'OUT').reduce((acc, e) => acc + Math.abs(e.delta), 0);
+        let hourlyData: Array<{
+            hourLabel: string;
+            hourStart: Date;
+            entries: number;
+            exits: number;
+            net: number;
+            maleEntries: number;
+            femaleEntries: number;
+        }>;
 
-            return {
-                hourLabel: format(hour, 'ha'), // 10pm
-                hourStart: hour,
-                entries,
-                exits,
-                net: entries - exits,
-            };
-        });
+        if (!isMultiDay) {
+            const hours = eachHourOfInterval({ start: dateRange.from, end: dateRange.to });
+            hourlyData = hours.map(hour => {
+                const nextHour = addHours(hour, 1);
+                const hourEvents = filteredEvents.filter(e => e.timestamp >= hour.getTime() && e.timestamp < nextHour.getTime());
+                const hourScans = filteredScans.filter(s => s.timestamp >= hour.getTime() && s.timestamp < nextHour.getTime());
+                const entries = hourEvents.filter(e => e.flow_type === 'IN').reduce((acc, e) => acc + e.delta, 0);
+                const exits = hourEvents.filter(e => e.flow_type === 'OUT').reduce((acc, e) => acc + Math.abs(e.delta), 0);
+                const maleEntries = hourScans.filter(s => s.sex === 'M').length;
+                const femaleEntries = hourScans.filter(s => s.sex === 'F').length;
+                return { hourLabel: format(hour, 'ha'), hourStart: hour, entries, exits, net: entries - exits, maleEntries, femaleEntries };
+            });
+        } else {
+            const dayMs = 24 * 60 * 60 * 1000;
+            const dayCount = Math.ceil(rangeMs / dayMs);
+            hourlyData = Array.from({ length: dayCount }, (_, i) => {
+                const dayStart = startOfDay(new Date(dateRange.from.getTime() + i * dayMs));
+                const dayEnd = endOfDay(dayStart);
+                const dayEvents = filteredEvents.filter(e => e.timestamp >= dayStart.getTime() && e.timestamp <= dayEnd.getTime());
+                const dayScans = filteredScans.filter(s => s.timestamp >= dayStart.getTime() && s.timestamp <= dayEnd.getTime());
+                const entries = dayEvents.filter(e => e.flow_type === 'IN').reduce((acc, e) => acc + e.delta, 0);
+                const exits = dayEvents.filter(e => e.flow_type === 'OUT').reduce((acc, e) => acc + Math.abs(e.delta), 0);
+                const maleEntries = dayScans.filter(s => s.sex === 'M').length;
+                const femaleEntries = dayScans.filter(s => s.sex === 'F').length;
+                return { hourLabel: format(dayStart, 'MMM d'), hourStart: dayStart, entries, exits, net: entries - exits, maleEntries, femaleEntries };
+            });
+        }
 
         // -- Age & Gender & Zip Logic
         const ageBands: Record<string, number> = { 'Under 21': 0, '21-25': 0, '26-30': 0, '31-40': 0, '41+': 0, 'Unknown': 0 };
@@ -212,8 +235,8 @@ export default function VenueReportingDashboard() {
             else if (s.sex === 'F') genderCounts['Female']++;
             else genderCounts['Other']++;
 
-            // Zip
-            if (s.zip_code) {
+            // Zip (filter out null/zero/invalid values)
+            if (s.zip_code && !/^0+$/.test(s.zip_code)) {
                 zipCounts[s.zip_code] = (zipCounts[s.zip_code] || 0) + 1;
             }
         });
@@ -259,6 +282,13 @@ export default function VenueReportingDashboard() {
     const calMonthLabel = format(new Date(calYear, calMonth, 1), 'MMMM').toUpperCase();
 
     const handleClearComparison = () => {
+        setIsComparing(false);
+        setComparisonDate(null);
+    };
+
+    const closeCalendarModal = () => {
+        setCalendarOpen(false);
+        setSelectedDate(null);
         setIsComparing(false);
         setComparisonDate(null);
     };
@@ -322,7 +352,6 @@ export default function VenueReportingDashboard() {
     const handleExport = () => {
         if (!venue || !reportData) return;
 
-        // Inject MOCK Data Logic here if empty, as per previous requirement
         let exportEvents = reportData.filteredEvents;
         let exportScans = reportData.filteredScans;
 
@@ -356,7 +385,7 @@ export default function VenueReportingDashboard() {
 
     return (
         <div className="space-y-8 animate-[fade-in_0.5s_ease-out] pb-24">
-            {/* Header & Filters */}
+            {/* Header */}
             <div className="flex flex-col xl:flex-row justify-between items-start gap-6 border-b border-border pb-8">
                 <div>
                     <div className="flex items-center gap-2 mb-2">
@@ -368,15 +397,102 @@ export default function VenueReportingDashboard() {
                     <p className="text-muted-foreground">Detailed analytics for {venue.city}, {venue.state}</p>
                 </div>
 
-                <div className="flex flex-wrap gap-4 items-center bg-card p-2 rounded-2xl border border-border">
-                    {/* Date Presets */}
-                    <div className="flex gap-2">
+                <button
+                    onClick={() => setCalendarOpen(true)}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-card border border-border text-sm font-bold text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                >
+                    <CalendarIcon className="w-4 h-4" /> Calendar View
+                </button>
+            </div>
+
+            {/* Calendar Modal */}
+            {calendarOpen && (
+                <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 backdrop-blur-sm p-4 pt-8">
+                    <div className="bg-background border border-border rounded-2xl w-full max-w-5xl shadow-2xl mb-8">
+                        <div className="flex items-center justify-between p-6 border-b border-border">
+                            <h2 className="text-xl font-bold text-foreground">Calendar View — {calMonthLabel}</h2>
+                            <div className="flex items-center gap-3">
+                                {selectedDate && !isComparing && !comparisonDate && (
+                                    <button
+                                        onClick={() => setIsComparing(true)}
+                                        className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold transition-colors shadow-lg shadow-purple-500/20"
+                                    >
+                                        Compare to Another Day
+                                    </button>
+                                )}
+                                <button
+                                    onClick={closeCalendarModal}
+                                    className="text-muted-foreground hover:text-foreground p-2 rounded-lg hover:bg-muted transition-colors"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+                        </div>
+                        <div className="p-6 space-y-6">
+                            <MonthStatsBar
+                                monthTotal={monthStats.monthTotal}
+                                daysOpen={monthStats.daysOpen}
+                                ytdTotal={monthStats.ytdTotal}
+                                monthLabel={calMonthLabel}
+                                monthlyTrend={monthlyTrend}
+                            />
+                            <CalendarGrid
+                                year={calYear}
+                                month={calMonth}
+                                dailyEntries={dailyEntries}
+                                selectedDate={selectedDate}
+                                onSelectDate={(date) => {
+                                    setSelectedDate(date);
+                                    setIsComparing(false);
+                                    setComparisonDate(null);
+                                }}
+                                onPrevMonth={handlePrevMonth}
+                                onNextMonth={handleNextMonth}
+                                isComparing={isComparing}
+                                comparisonDate={comparisonDate}
+                                onComparisonSelect={(date) => setComparisonDate(date)}
+                            />
+                            {isComparing && !comparisonDate && (
+                                <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-purple-900/30 border border-purple-500/30">
+                                    <p className="text-sm text-purple-300 font-medium">
+                                        Select a second day on the calendar to compare with <span className="font-bold text-purple-200">{selectedDate}</span>
+                                    </p>
+                                    <button
+                                        onClick={handleClearComparison}
+                                        className="text-xs text-zinc-400 hover:text-white border border-zinc-700 hover:border-zinc-500 px-3 py-1.5 rounded-lg transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            )}
+                            {selectedDate && comparisonDate && comparisonPanel}
+                            {selectedDate && !comparisonDate && !isComparing && (
+                                <DayDetailPanel
+                                    dateStr={selectedDate}
+                                    events={venueEvents}
+                                    scans={venueScans}
+                                    venueId={venueId as string}
+                                />
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Analytics */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+
+                {/* Left Col: KPI Cards + Filters */}
+                <div className="lg:col-span-1 space-y-4">
+
+                    {/* Date Range Filter */}
+                    <div className="flex flex-wrap gap-2 items-center bg-card p-2 rounded-2xl border border-border">
                         {quickRanges.map(range => (
                             <button
                                 key={range.label}
                                 onClick={() => setDateRange(range)}
                                 className={cn(
-                                    "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                                    "px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex-1",
                                     dateRange.label === range.label
                                         ? "bg-primary text-black shadow-lg shadow-primary/25"
                                         : "hover:bg-muted text-muted-foreground"
@@ -385,310 +501,220 @@ export default function VenueReportingDashboard() {
                                 {range.label}
                             </button>
                         ))}
+                        <div className="w-full flex items-center gap-2 px-3 py-1.5 bg-muted rounded-lg text-xs text-foreground/80 font-mono border border-border">
+                            <CalendarIcon className="w-3 h-3 shrink-0" />
+                            {format(dateRange.from, 'MMM d')} – {format(dateRange.to, 'MMM d, yyyy')}
+                        </div>
                     </div>
 
-                    <div className="h-8 w-px bg-muted mx-2 hidden md:block" />
-
-                    {/* Custom / Display */}
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-lg text-xs text-foreground/80 font-mono border border-border">
-                        <CalendarIcon className="w-3 h-3" />
-                        {format(dateRange.from, 'MMM d')} - {format(dateRange.to, 'MMM d, yyyy')}
-                    </div>
-                </div>
-            </div>
-
-            {/* View Toggle */}
-            <div className="flex gap-2 mb-6">
-                {(['calendar', 'analytics'] as const).map(v => (
-                    <button
-                        key={v}
-                        onClick={() => setView(v)}
-                        className={cn(
-                            'px-4 py-2 rounded-lg text-sm font-bold capitalize transition-all',
-                            view === v
-                                ? 'bg-violet-600 text-white shadow-lg shadow-violet-500/25'
-                                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                        )}
-                    >
-                        {v === 'calendar' ? 'Calendar' : 'Analytics'}
-                    </button>
-                ))}
-            </div>
-
-            {view === 'calendar' && (
-                <div className="space-y-6">
-                    <MonthStatsBar
-                        monthTotal={monthStats.monthTotal}
-                        daysOpen={monthStats.daysOpen}
-                        ytdTotal={monthStats.ytdTotal}
-                        monthLabel={calMonthLabel}
-                        monthlyTrend={monthlyTrend}
+                    <MetricCard
+                        title="Total Entries"
+                        value={reportData.totalEntries.toLocaleString()}
+                        subtext="Guests Processed"
+                        icon={Users}
+                        colorClass="text-emerald-500"
                     />
-                    <CalendarGrid
-                        year={calYear}
-                        month={calMonth}
-                        dailyEntries={dailyEntries}
-                        selectedDate={selectedDate}
-                        onSelectDate={(date) => {
-                            setSelectedDate(date);
-                            setIsComparing(false);
-                            setComparisonDate(null);
-                        }}
-                        onPrevMonth={handlePrevMonth}
-                        onNextMonth={handleNextMonth}
-                        isComparing={isComparing}
-                        comparisonDate={comparisonDate}
-                        onComparisonSelect={(date) => setComparisonDate(date)}
+                    <MetricCard
+                        title="Peak Occupancy"
+                        value={reportData.maxOccupancy.toLocaleString()}
+                        subtext="Simultaneous Guests"
+                        icon={TrendingUp}
+                        colorClass="text-blue-500"
                     />
-                    {selectedDate && !isComparing && !comparisonDate && (
-                        <div className="flex justify-end">
-                            <button
-                                onClick={() => setIsComparing(true)}
-                                className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold transition-colors shadow-lg shadow-purple-500/20"
-                            >
-                                Compare to Another Day
-                            </button>
-                        </div>
-                    )}
-                    {isComparing && !comparisonDate && (
-                        <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-purple-900/30 border border-purple-500/30">
-                            <p className="text-sm text-purple-300 font-medium">
-                                Select a second day on the calendar to compare with <span className="font-bold text-purple-200">{selectedDate}</span>
-                            </p>
-                            <button
-                                onClick={handleClearComparison}
-                                className="text-xs text-zinc-400 hover:text-white border border-zinc-700 hover:border-zinc-500 px-3 py-1.5 rounded-lg transition-colors"
-                            >
-                                Cancel
-                            </button>
-                        </div>
-                    )}
-                    {selectedDate && comparisonDate && comparisonPanel}
-                    {selectedDate && !comparisonDate && !isComparing && (
-                        <DayDetailPanel
-                            dateStr={selectedDate}
-                            events={venueEvents}
-                            scans={venueScans}
-                            venueId={venueId as string}
-                        />
-                    )}
-                </div>
-            )}
+                    <MetricCard
+                        title="ID Scans"
+                        value={reportData.totalScans.toLocaleString()}
+                        subtext={`${((reportData.deniedScans / (reportData.totalScans || 1)) * 100).toFixed(1)}% Denial Rate`}
+                        icon={AlertTriangle}
+                        colorClass="text-amber-500"
+                    />
 
-            {view === 'analytics' && (
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-
-                    {/* Left Col: KPI Cards */}
-                    <div className="lg:col-span-1 space-y-4">
-                        <MetricCard
-                            title="Total Entries"
-                            value={reportData.totalEntries.toLocaleString()}
-                            subtext="Guests Processed"
-                            icon={Users}
-                            colorClass="text-emerald-500"
-                        />
-                        <MetricCard
-                            title="Peak Occupancy"
-                            value={reportData.maxOccupancy.toLocaleString()}
-                            subtext="Simultaneous Guests"
-                            icon={TrendingUp}
-                            colorClass="text-blue-500"
-                        />
-                        <MetricCard
-                            title="ID Scans"
-                            value={reportData.totalScans.toLocaleString()}
-                            subtext={`${((reportData.deniedScans / (reportData.totalScans || 1)) * 100).toFixed(1)}% Denial Rate`}
-                            icon={AlertTriangle}
-                            colorClass="text-amber-500"
-                        />
-
-                        {/* Top Locations Card */}
-                        <div className="glass-panel p-6 rounded-2xl">
-                            <h3 className="text-sm uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
-                                <MapPin className="w-4 h-4" /> Top Locations
-                            </h3>
-                            {reportData.topZips.length > 0 ? (
-                                <div className="space-y-3">
-                                    {reportData.topZips.map((z) => (
-                                        <div key={z.zip} className="flex justify-between items-center text-sm">
-                                            <span className="text-foreground/80 font-mono">{z.zip}</span>
-                                            <div className="flex items-center gap-2">
-                                                <div className="h-1.5 bg-primary rounded-full" style={{ width: `${Math.min(100, (z.count / reportData.totalScans) * 100)}px` }} />
-                                                <span className="text-foreground font-bold">{z.count}</span>
-                                            </div>
+                    {/* Top Locations Card */}
+                    <div className="glass-panel p-6 rounded-2xl">
+                        <h3 className="text-sm uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
+                            <MapPin className="w-4 h-4" /> Top Locations
+                        </h3>
+                        {reportData.topZips.length > 0 ? (
+                            <div className="space-y-3">
+                                {reportData.topZips.map((z) => (
+                                    <div key={z.zip} className="flex justify-between items-center text-sm">
+                                        <span className="text-foreground/80 font-mono">{z.zip}</span>
+                                        <div className="flex items-center gap-2">
+                                            <div className="h-1.5 bg-primary rounded-full" style={{ width: `${Math.min(100, (z.count / reportData.totalScans) * 100)}px` }} />
+                                            <span className="text-foreground font-bold">{z.count}</span>
                                         </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="text-center text-muted-foreground/60 text-xs py-4">No location data available</div>
-                            )}
-                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center text-muted-foreground/60 text-xs py-4">No location data available</div>
+                        )}
+                    </div>
 
-                        <div className="mt-8">
-                            <button
-                                onClick={handleExport}
-                                className="w-full py-4 rounded-xl bg-muted hover:bg-muted border border-border text-foreground font-bold flex items-center justify-center gap-3 transition-colors shadow-lg"
-                            >
-                                <FileSpreadsheet className="w-5 h-5 text-emerald-500" />
-                                Export Excel Report
-                            </button>
-                            <p className="text-xs text-center mt-3 text-muted-foreground">
-                                Includes Sheets: Summary, Traffic, Demographics, Logs
-                            </p>
+                    <div className="mt-8">
+                        <button
+                            onClick={handleExport}
+                            className="w-full py-4 rounded-xl bg-muted hover:bg-muted border border-border text-foreground font-bold flex items-center justify-center gap-3 transition-colors shadow-lg"
+                        >
+                            <FileSpreadsheet className="w-5 h-5 text-emerald-500" />
+                            Export Excel Report
+                        </button>
+                        <p className="text-xs text-center mt-3 text-muted-foreground">
+                            Includes Sheets: Summary, Traffic, Demographics, Logs
+                        </p>
+                    </div>
+                </div>
+
+                {/* Right Col: Charts & Details */}
+                <div className="lg:col-span-3 space-y-8">
+
+                    {/* Traffic Chart */}
+                    <div className="glass-panel p-6 rounded-2xl">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                                <BarChart3 className="w-5 h-5 text-primary" />
+                                Hourly Traffic Breakdown
+                            </h3>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-emerald-500" /> Entries</div>
+                                <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-rose-500" /> Exits</div>
+                            </div>
+                        </div>
+                        <div className="h-[300px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={reportData.hourlyData}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} opacity={0.5} vertical={false} />
+                                    <XAxis dataKey="hourLabel" stroke={chartColors.text} fontSize={12} tickLine={false} axisLine={false} />
+                                    <YAxis stroke={chartColors.text} fontSize={12} tickLine={false} axisLine={false} />
+                                    <Tooltip
+                                        contentStyle={{ backgroundColor: chartColors.tooltip.background, borderColor: chartColors.tooltip.border, color: '#f8fafc' }}
+                                        cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                                    />
+                                    <Bar dataKey="entries" name="Entries" fill="#10b981" radius={[4, 4, 0, 0]} barSize={20} />
+                                    <Bar dataKey="exits" name="Exits" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={20} />
+                                </BarChart>
+                            </ResponsiveContainer>
                         </div>
                     </div>
 
-                    {/* Right Col: Charts & Details */}
-                    <div className="lg:col-span-3 space-y-8">
-
-                        {/* Traffic Chart */}
-                        <div className="glass-panel p-6 rounded-2xl">
-                            <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-                                    <BarChart3 className="w-5 h-5 text-primary" />
-                                    Hourly Traffic Breakdown
-                                </h3>
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-emerald-500" /> Entries</div>
-                                    <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-rose-500" /> Exits</div>
-                                </div>
-                            </div>
-                            <div className="h-[300px]">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={reportData.hourlyData}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} opacity={0.5} vertical={false} />
-                                        <XAxis dataKey="hourLabel" stroke={chartColors.text} fontSize={12} tickLine={false} axisLine={false} />
-                                        <YAxis stroke={chartColors.text} fontSize={12} tickLine={false} axisLine={false} />
-                                        <Tooltip
-                                            contentStyle={{ backgroundColor: chartColors.tooltip.background, borderColor: chartColors.tooltip.border, color: '#f8fafc' }}
-                                            cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                                        />
-                                        <Bar dataKey="entries" fill="#10b981" radius={[4, 4, 0, 0]} barSize={20} />
-                                        <Bar dataKey="exits" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={20} />
-                                    </BarChart>
-                                </ResponsiveContainer>
+                    {/* Demographic Flow Chart */}
+                    <div className="glass-panel p-6 rounded-2xl">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                                <Users className="w-5 h-5 text-blue-400" />
+                                Demographic Traffic Flow
+                            </h3>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-blue-500" /> Male</div>
+                                <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-pink-500" /> Female</div>
                             </div>
                         </div>
+                        <div className="h-[250px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={reportData.hourlyData}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} opacity={0.5} vertical={false} />
+                                    <XAxis dataKey="hourLabel" stroke={chartColors.text} fontSize={12} tickLine={false} axisLine={false} />
+                                    <YAxis stroke={chartColors.text} fontSize={12} tickLine={false} axisLine={false} />
+                                    <Tooltip
+                                        contentStyle={{ backgroundColor: chartColors.tooltip.background, borderColor: chartColors.tooltip.border, color: '#f8fafc' }}
+                                        cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                                    />
+                                    <Bar dataKey="maleEntries" name="Male Entries" fill="#3b82f6" stackId="a" radius={[0, 0, 4, 4]} barSize={20} />
+                                    <Bar dataKey="femaleEntries" name="Female Entries" fill="#ec4899" stackId="a" radius={[4, 4, 0, 0]} barSize={20} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
 
-                        {/* Demographic Flow Chart */}
+                    {/* Demographics Row */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Age Chart */}
                         <div className="glass-panel p-6 rounded-2xl">
-                            <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-                                    <Users className="w-5 h-5 text-blue-400" />
-                                    Demographic Traffic Flow
-                                </h3>
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-blue-500" /> Male</div>
-                                    <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-pink-500" /> Female</div>
-                                </div>
-                            </div>
+                            <h3 className="text-lg font-bold text-foreground mb-6">Age Distribution</h3>
                             <div className="h-[250px]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={reportData.hourlyData}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} opacity={0.5} vertical={false} />
-                                        <XAxis dataKey="hourLabel" stroke={chartColors.text} fontSize={12} tickLine={false} axisLine={false} />
-                                        <YAxis stroke={chartColors.text} fontSize={12} tickLine={false} axisLine={false} />
-                                        <Tooltip
-                                            contentStyle={{ backgroundColor: chartColors.tooltip.background, borderColor: chartColors.tooltip.border, color: '#f8fafc' }}
-                                            cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                                        />
-                                        <Bar dataKey="maleEntries" name="Male Entries" fill="#3b82f6" stackId="a" radius={[0, 0, 4, 4]} barSize={20} />
-                                        <Bar dataKey="femaleEntries" name="Female Entries" fill="#ec4899" stackId="a" radius={[4, 4, 0, 0]} barSize={20} />
+                                    <BarChart data={reportData.ageChartData} layout="vertical">
+                                        <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} opacity={0.5} horizontal={false} />
+                                        <XAxis type="number" stroke={chartColors.text} fontSize={12} axisLine={false} tickLine={false} />
+                                        <YAxis dataKey="name" type="category" stroke={chartColors.text} fontSize={12} axisLine={false} tickLine={false} width={80} />
+                                        <Tooltip contentStyle={{ backgroundColor: chartColors.tooltip.background, borderColor: chartColors.tooltip.border, color: '#f8fafc' }} />
+                                        <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={24} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
                         </div>
 
-                        {/* Demographics Row */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Age Chart */}
-                            <div className="glass-panel p-6 rounded-2xl">
-                                <h3 className="text-lg font-bold text-foreground mb-6">Age Distribution</h3>
-                                <div className="h-[250px]">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={reportData.ageChartData} layout="vertical">
-                                            <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} opacity={0.5} horizontal={false} />
-                                            <XAxis type="number" stroke={chartColors.text} fontSize={12} axisLine={false} tickLine={false} />
-                                            <YAxis dataKey="name" type="category" stroke={chartColors.text} fontSize={12} axisLine={false} tickLine={false} width={80} />
-                                            <Tooltip contentStyle={{ backgroundColor: chartColors.tooltip.background, borderColor: chartColors.tooltip.border, color: '#f8fafc' }} />
-                                            <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={24} />
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </div>
-
-                            {/* Gender Chart */}
-                            <div className="glass-panel p-6 rounded-2xl flex flex-col items-center">
-                                <h3 className="text-lg font-bold text-foreground mb-2 self-start w-full">Gender Split</h3>
-                                <div className="h-[250px] w-full mt-4">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <PieChart>
-                                            <Pie
-                                                data={reportData.genderChartData}
-                                                cx="50%"
-                                                cy="50%"
-                                                innerRadius={60}
-                                                outerRadius={80}
-                                                paddingAngle={5}
-                                                dataKey="value"
-                                            >
-                                                {reportData.genderChartData.map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                                ))}
-                                            </Pie>
-                                            <Tooltip contentStyle={{ backgroundColor: chartColors.tooltip.background, borderColor: chartColors.tooltip.border, color: '#f8fafc' }} />
-                                            <Legend
-                                                formatter={(value) => <span className="text-foreground/80">{value}</span>}
-                                                verticalAlign="bottom"
-                                                height={36}
-                                            />
-                                        </PieChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Hourly Table Summary */}
-                        <div className="glass-panel rounded-2xl overflow-hidden">
-                            <div className="p-6 border-b border-white/5 flex justify-between items-center">
-                                <h3 className="text-lg font-bold text-foreground">Hourly Log</h3>
-                            </div>
-                            <div className="max-h-[400px] overflow-y-auto">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-card/80 text-muted-foreground sticky top-0 backdrop-blur-md">
-                                        <tr>
-                                            <th className="px-6 py-3 font-medium">Hour</th>
-                                            <th className="px-6 py-3 font-medium text-emerald-400">Entries</th>
-                                            <th className="px-6 py-3 font-medium text-rose-400">Exits</th>
-                                            <th className="px-6 py-3 font-medium text-blue-400">Net Delta</th>
-                                            <th className="px-6 py-3 font-medium">Est. Occupancy</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-white/5">
-                                        {reportData.hourlyData.map((row, idx) => {
-                                            const cumOcc = reportData.hourlyData.slice(0, idx + 1).reduce((acc, r) => acc + r.net, 0);
-                                            return (
-                                                <tr key={idx} className="hover:bg-white/5">
-                                                    <td className="px-6 py-4 font-mono text-foreground/80">{row.hourLabel}</td>
-                                                    <td className="px-6 py-4 font-bold text-emerald-500">{row.entries}</td>
-                                                    <td className="px-6 py-4 font-bold text-rose-500">{row.exits}</td>
-                                                    <td className="px-6 py-4 font-mono text-muted-foreground">{row.net > 0 ? `+${row.net}` : row.net}</td>
-                                                    <td className="px-6 py-4 font-bold text-blue-400">{cumOcc}</td>
-                                                </tr>
-                                            );
-                                        })}
-                                        {reportData.hourlyData.length === 0 && (
-                                            <tr>
-                                                <td colSpan={5} className="p-8 text-center text-muted-foreground">No traffic data for selected period.</td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
+                        {/* Gender Chart */}
+                        <div className="glass-panel p-6 rounded-2xl flex flex-col items-center">
+                            <h3 className="text-lg font-bold text-foreground mb-2 self-start w-full">Gender Split</h3>
+                            <div className="h-[250px] w-full mt-4">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie
+                                            data={reportData.genderChartData}
+                                            cx="50%"
+                                            cy="50%"
+                                            innerRadius={60}
+                                            outerRadius={80}
+                                            paddingAngle={5}
+                                            dataKey="value"
+                                        >
+                                            {reportData.genderChartData.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip contentStyle={{ backgroundColor: chartColors.tooltip.background, borderColor: chartColors.tooltip.border, color: '#f8fafc' }} />
+                                        <Legend
+                                            formatter={(value) => <span className="text-foreground/80">{value}</span>}
+                                            verticalAlign="bottom"
+                                            height={36}
+                                        />
+                                    </PieChart>
+                                </ResponsiveContainer>
                             </div>
                         </div>
                     </div>
+
+                    {/* Hourly Table Summary */}
+                    <div className="glass-panel rounded-2xl overflow-hidden">
+                        <div className="p-6 border-b border-white/5 flex justify-between items-center">
+                            <h3 className="text-lg font-bold text-foreground">Hourly Log</h3>
+                        </div>
+                        <div className="max-h-[400px] overflow-y-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-card/80 text-muted-foreground sticky top-0 backdrop-blur-md">
+                                    <tr>
+                                        <th className="px-6 py-3 font-medium">Hour</th>
+                                        <th className="px-6 py-3 font-medium text-emerald-400">Entries</th>
+                                        <th className="px-6 py-3 font-medium text-rose-400">Exits</th>
+                                        <th className="px-6 py-3 font-medium text-blue-400">Net Delta</th>
+                                        <th className="px-6 py-3 font-medium">Est. Occupancy</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/5">
+                                    {reportData.hourlyData.filter(row => row.entries > 0 || row.exits > 0).map((row, idx, arr) => {
+                                        const cumOcc = arr.slice(0, idx + 1).reduce((acc, r) => acc + r.net, 0);
+                                        return (
+                                            <tr key={idx} className="hover:bg-white/5">
+                                                <td className="px-6 py-4 font-mono text-foreground/80">{row.hourLabel}</td>
+                                                <td className="px-6 py-4 font-bold text-emerald-500">{row.entries}</td>
+                                                <td className="px-6 py-4 font-bold text-rose-500">{row.exits}</td>
+                                                <td className="px-6 py-4 font-mono text-muted-foreground">{row.net > 0 ? `+${row.net}` : row.net}</td>
+                                                <td className="px-6 py-4 font-bold text-blue-400">{cumOcc}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                    {reportData.hourlyData.filter(row => row.entries > 0 || row.exits > 0).length === 0 && (
+                                        <tr>
+                                            <td colSpan={5} className="p-8 text-center text-muted-foreground">No traffic data for selected period.</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
-            )}
+            </div>
         </div>
     );
 }

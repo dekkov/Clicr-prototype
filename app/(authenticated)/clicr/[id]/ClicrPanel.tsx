@@ -344,6 +344,14 @@ export default function ClicrPanel({
     // --- COUNT HANDLERS ---
     const activeLabels: CounterLabel[] = (clicr?.counter_labels ?? []).filter((l: CounterLabel) => !l.deleted_at).sort((a: CounterLabel, b: CounterLabel) => a.position - b.position);
 
+    // Derive whether IN is blocked (HARD_STOP at or over capacity)
+    // Venue-level: block all counters in the venue
+    const _venueCapMax = currentVenue?.total_capacity ?? currentVenue?.default_capacity_total ?? 0;
+    const _venueHardBlocked = _venueCapMax > 0 && currentVenueOccupancy >= _venueCapMax && venue?.capacity_enforcement_mode === 'HARD_STOP';
+    // Area-level: block this area counter only
+    const _areaHardBlocked = !isVenueCounter && capacity != null && capacity > 0 && totalAreaCount >= capacity && currentArea?.capacity_enforcement_mode === 'HARD_STOP';
+    const isHardBlocked = _venueHardBlocked || _areaHardBlocked;
+
     const handleIn = (counterLabelId: string) => {
         if (!clicr || !venueId) return;
         const { maxCapacity, mode: capMode } = getVenueCapacityRules(venue);
@@ -861,10 +869,19 @@ export default function ClicrPanel({
                                 <button
                                     key={`in-${label.id}`}
                                     onClick={() => handleIn(label.id)}
-                                    className="relative overflow-hidden bg-gradient-to-br from-green-500 to-green-700 hover:from-green-400 hover:to-green-600 active:scale-[0.97] transition-all rounded-2xl border-2 border-green-400/40 shadow-lg shadow-green-500/20 py-8 flex flex-col items-center justify-center touch-manipulation"
+                                    disabled={isHardBlocked}
+                                    className={cn(
+                                        "relative overflow-hidden transition-all rounded-2xl border-2 py-8 flex flex-col items-center justify-center touch-manipulation",
+                                        isHardBlocked
+                                            ? "bg-zinc-700/50 border-zinc-600/40 opacity-40 cursor-not-allowed"
+                                            : "bg-gradient-to-br from-green-500 to-green-700 hover:from-green-400 hover:to-green-600 active:scale-[0.97] border-green-400/40 shadow-lg shadow-green-500/20"
+                                    )}
                                 >
                                     <span className="text-4xl font-bold text-foreground leading-none drop-shadow">+</span>
                                     <span className="text-foreground font-bold tracking-[0.2em] text-sm mt-1 uppercase">{label.label}</span>
+                                    {isHardBlocked && (
+                                        <span className="absolute inset-x-0 bottom-2 text-center text-[10px] font-black uppercase tracking-widest text-red-400">BLOCKED</span>
+                                    )}
                                 </button>
                             ))}
                             {/* - ROW */}
@@ -894,7 +911,15 @@ export default function ClicrPanel({
 
                 {/* ── SCAN MODE ────────────────────────────────────── */}
                 {mode === 'scan' && (
-                    <>
+                    <div className="relative">
+                        {isHardBlocked && (
+                            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-2xl bg-background/80 backdrop-blur-sm border-2 border-red-500/40">
+                                <span className="text-4xl">🚫</span>
+                                <p className="text-red-400 font-black text-lg uppercase tracking-widest">Capacity Reached</p>
+                                <p className="text-muted-foreground text-sm">Scanning blocked — venue is full</p>
+                            </div>
+                        )}
+                    <div className={cn("space-y-3", isHardBlocked && "pointer-events-none opacity-40")}>
                         {/* Scan Input Mode Selector */}
                         <div className="flex gap-1.5 bg-card border border-border/60 rounded-2xl p-2">
                             {([
@@ -986,7 +1011,8 @@ export default function ClicrPanel({
                         >
                             Simulate scan
                         </button>
-                    </>
+                    </div>
+                    </div>
                 )}
             </div>
 
