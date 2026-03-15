@@ -355,7 +355,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     // Initial load, polling, AND Realtime Subscription
     useEffect(() => {
         refreshState();
-        const interval = setInterval(refreshState, 2000); // Keep polling as backup/sync mechanism
+        const interval = setInterval(refreshState, 30000); // Safety-net polling — Channels handle realtime, refreshState() handles post-mutation sync
         return () => clearInterval(interval);
     }, []);
 
@@ -743,15 +743,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }));
 
         try {
-            const res = await fetch('/api/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'ADD_USER', payload: user })
-            });
-            if (res.ok) {
-                const updatedDB = await res.json();
-                setState(prev => ({ ...prev, ...updatedDB }));
-            }
+            const res = await authFetch({ action: 'ADD_USER', payload: user });
+            if (res.ok) await refreshState();
         } catch (error) {
             console.error("Failed to add user", error);
         }
@@ -764,15 +757,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }));
 
         try {
-            const res = await fetch('/api/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'UPDATE_USER', payload: user })
-            });
-            if (res.ok) {
-                const updatedDB = await res.json();
-                setState(prev => ({ ...prev, ...updatedDB }));
-            }
+            const res = await authFetch({ action: 'UPDATE_USER', payload: user });
+            if (res.ok) await refreshState();
         } catch (error) { console.error("Failed to update user", error); }
     };
 
@@ -783,15 +769,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }));
 
         try {
-            const res = await fetch('/api/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'REMOVE_USER', payload: { id: userId } })
-            });
-            if (res.ok) {
-                const updatedDB = await res.json();
-                setState(prev => ({ ...prev, ...updatedDB }));
-            }
+            const res = await authFetch({ action: 'REMOVE_USER', payload: { id: userId } });
+            if (res.ok) await refreshState();
         } catch (error) { console.error("Failed to remove user", error); }
     };
 
@@ -820,15 +799,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const updateVenue = async (venue: Venue) => {
         setState(prev => ({ ...prev, venues: prev.venues.map(v => v.id === venue.id ? venue : v) }));
         try {
-            const res = await fetch('/api/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'UPDATE_VENUE', payload: venue })
-            });
-            if (res.ok) {
-                const updatedDB = await res.json();
-                setState(prev => ({ ...prev, ...updatedDB }));
-            }
+            const res = await authFetch({ action: 'UPDATE_VENUE', payload: venue });
+            if (res.ok) await refreshState();
         } catch (error) { console.error("Failed to update venue", error); }
     };
 
@@ -845,14 +817,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setState(prev => ({ ...prev, areas: prev.areas.map(a => a.id === area.id ? area : a) }));
 
         try {
-            const res = await fetch('/api/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'UPDATE_AREA', payload: area })
-            });
+            const res = await authFetch({ action: 'UPDATE_AREA', payload: area });
             if (res.ok) {
-                const updatedDB = await res.json();
-                setState(prev => ({ ...prev, ...updatedDB }));
+                await refreshState();
                 return true;
             } else {
                 // Revert
@@ -889,8 +856,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             const res = await authFetch({ action: 'DELETE_CLICR', payload: { id: clicrId } });
             isWritingRef.current = Math.max(0, isWritingRef.current - 1);
             if (res.ok) {
-                const updatedDB = await res.json();
-                setState(prev => ({ ...prev, ...updatedDB }));
+                await refreshState();
                 return { success: true };
             } else {
                 const errData = await res.json().catch(() => ({}));
@@ -951,30 +917,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const addDevice = async (device: Device) => {
         setState(prev => ({ ...prev, devices: [...prev.devices, device] }));
         try {
-            const res = await fetch('/api/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'ADD_DEVICE', payload: device })
-            });
-            if (res.ok) {
-                const updatedDB = await res.json();
-                setState(prev => ({ ...prev, ...updatedDB }));
-            }
+            const res = await authFetch({ action: 'ADD_DEVICE', payload: device });
+            if (res.ok) await refreshState();
         } catch (error) { console.error("Failed to add device", error); }
     };
 
     const updateDevice = async (device: Device) => {
         setState(prev => ({ ...prev, devices: prev.devices.map(d => d.id === device.id ? device : d) }));
         try {
-            const res = await fetch('/api/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'UPDATE_DEVICE', payload: device })
-            });
-            if (res.ok) {
-                const updatedDB = await res.json();
-                setState(prev => ({ ...prev, ...updatedDB }));
-            }
+            const res = await authFetch({ action: 'UPDATE_DEVICE', payload: device });
+            if (res.ok) await refreshState();
         } catch (error) { console.error("Failed to update device", error); }
     };
 
@@ -983,30 +935,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const addCapacityOverride = async (override: CapacityOverride) => {
         setState(prev => ({ ...prev, capacityOverrides: [...prev.capacityOverrides, override] }));
         try {
-            const res = await fetch('/api/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'ADD_CAPACITY_OVERRIDE', payload: override })
-            });
-            if (res.ok) {
-                const updatedDB = await res.json();
-                setState(prev => ({ ...prev, ...updatedDB }));
-            }
+            const res = await authFetch({ action: 'ADD_CAPACITY_OVERRIDE', payload: override });
+            if (res.ok) await refreshState();
         } catch (error) { console.error("Failed to add override", error); }
     };
 
     const addVenueAuditLog = async (log: VenueAuditLog) => {
         setState(prev => ({ ...prev, venueAuditLogs: [...prev.venueAuditLogs, log] }));
         try {
-            const res = await fetch('/api/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'ADD_VENUE_AUDIT_LOG', payload: log })
-            });
-            if (res.ok) {
-                const updatedDB = await res.json();
-                setState(prev => ({ ...prev, ...updatedDB }));
-            }
+            const res = await authFetch({ action: 'ADD_VENUE_AUDIT_LOG', payload: log });
+            if (res.ok) await refreshState();
         } catch (error) { console.error("Failed to add audit log", error); }
     };
 
@@ -1018,15 +956,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             bans: [...(prev.bans || []), ban]
         }));
         try {
-            const res = await fetch('/api/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'CREATE_BAN', payload: ban })
-            });
-            if (res.ok) {
-                const updatedDB = await res.json();
-                setState(prev => ({ ...prev, ...updatedDB }));
-            }
+            const res = await authFetch({ action: 'CREATE_BAN', payload: ban });
+            if (res.ok) await refreshState();
         } catch (error) { console.error("Failed to add ban", error); }
     };
 
@@ -1036,15 +967,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             bans: (prev.bans || []).map(b => b.id === banId ? { ...b, status: 'REVOKED', revoked_by_user_id: revokedByUserId, revoked_at: Date.now(), revoked_reason: reason } : b)
         }));
         try {
-            const res = await fetch('/api/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'REVOKE_BAN', payload: { banId, revokedByUserId, reason } })
-            });
-            if (res.ok) {
-                const updatedDB = await res.json();
-                setState(prev => ({ ...prev, ...updatedDB }));
-            }
+            const res = await authFetch({ action: 'REVOKE_BAN', payload: { banId, revokedByUserId, reason } });
+            if (res.ok) await refreshState();
         } catch (error) { console.error("Failed to revoke ban", error); }
     };
 
@@ -1058,16 +982,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }));
 
         try {
-            const res = await fetch('/api/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'CREATE_PATRON_BAN', payload: { person, ban, log } })
-            });
-
-            if (res.ok) {
-                const updatedDB = await res.json();
-                setState(prev => ({ ...prev, ...updatedDB }));
-            }
+            const res = await authFetch({ action: 'CREATE_PATRON_BAN', payload: { person, ban, log } });
+            if (res.ok) await refreshState();
         } catch (error) {
             console.error("Failed to create patron ban", error);
         }
@@ -1082,16 +998,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }));
 
         try {
-            const res = await fetch('/api/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'UPDATE_PATRON_BAN', payload: { ban, log } })
-            });
-
-            if (res.ok) {
-                const updatedDB = await res.json();
-                setState(prev => ({ ...prev, ...updatedDB }));
-            }
+            const res = await authFetch({ action: 'UPDATE_PATRON_BAN', payload: { ban, log } });
+            if (res.ok) await refreshState();
         } catch (error) {
             console.error("Failed to update patron ban", error);
         }
