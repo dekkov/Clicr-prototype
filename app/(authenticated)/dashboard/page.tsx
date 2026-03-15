@@ -405,16 +405,15 @@ const TrafficFlow = ({
     areaDistrib: { name: string; count: number; pct: number }[];
     turnarounds: number; netAdjusted: number;
 }) => {
-    const max = Math.max(totalEntries, 1);
     const funnelRows = [
-        { label: 'Total Entries', value: totalEntries, color: 'bg-indigo-500', textColor: 'text-foreground' },
-        { label: 'IDs Scanned', value: totalScans, color: 'bg-indigo-400', textColor: 'text-foreground' },
-        { label: 'Accepted', value: accepted, color: 'bg-emerald-500', textColor: 'text-emerald-600 dark:text-emerald-300' },
-        { label: 'Denied', value: denied, color: 'bg-orange-500', textColor: 'text-orange-600 dark:text-orange-300' },
-        { label: 'Banned', value: banned, color: 'bg-red-500', textColor: 'text-red-600 dark:text-red-300' },
-        { label: 'Turnarounds', value: turnarounds, color: 'bg-amber-500', textColor: 'text-amber-600 dark:text-amber-300' },
-        { label: 'Net Entries', value: netAdjusted, color: 'bg-teal-500', textColor: 'text-teal-600 dark:text-teal-300' },
-        { label: 'Net Occupancy', value: netOcc, color: 'bg-cyan-500', textColor: 'text-cyan-600 dark:text-cyan-300' },
+        { label: 'Total Entries', value: totalEntries, textColor: 'text-foreground' },
+        { label: 'IDs Scanned', value: totalScans, textColor: 'text-foreground' },
+        { label: 'Accepted', value: accepted, textColor: 'text-emerald-400' },
+        { label: 'Denied', value: denied, textColor: 'text-orange-400' },
+        { label: 'Banned', value: banned, textColor: 'text-red-400' },
+        { label: 'Turnarounds', value: turnarounds, textColor: 'text-amber-400' },
+        { label: 'Net Entries', value: netAdjusted, textColor: 'text-teal-400' },
+        { label: 'Net Occupancy', value: netOcc, textColor: 'text-cyan-400' },
     ];
     return (
         <div className="bg-card border border-border rounded-xl p-6">
@@ -422,31 +421,22 @@ const TrafficFlow = ({
             <p className="text-xs text-gray-500 mb-4">Where your traffic is concentrated</p>
 
             <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Processing Funnel</p>
-            <div className="space-y-2 mb-6">
+            <div className="space-y-1.5 mb-6">
                 {funnelRows.map(row => (
-                    <div key={row.label} className="flex items-center gap-3">
-                        <div className="w-28 text-xs text-muted-foreground shrink-0">{row.label}</div>
-                        <div className="flex-1 h-6 bg-muted rounded overflow-hidden">
-                            <div
-                                className={cn('h-full rounded transition-all', row.color)}
-                                style={{ width: `${(row.value / max) * 100}%` }}
-                            />
-                        </div>
-                        <div className={cn('w-8 text-right text-sm font-medium', row.textColor)}>{row.value}</div>
+                    <div key={row.label} className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">{row.label}</span>
+                        <span className={cn('text-sm font-semibold tabular-nums', row.textColor)}>{row.value}</span>
                     </div>
                 ))}
             </div>
 
             <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Area Distribution</p>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
                 {areaDistrib.length === 0 && <p className="text-xs text-gray-600 italic">No entries yet.</p>}
                 {areaDistrib.map(a => (
-                    <div key={a.name} className="flex items-center gap-3">
-                        <div className="w-28 text-xs text-muted-foreground truncate shrink-0">{a.name}</div>
-                        <div className="flex-1 h-5 bg-muted rounded overflow-hidden">
-                            <div className="h-full bg-primary rounded" style={{ width: `${a.pct}%` }} />
-                        </div>
-                        <div className="w-10 text-right text-xs text-muted-foreground">{a.pct}%</div>
+                    <div key={a.name} className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground truncate">{a.name}</span>
+                        <span className="text-sm font-semibold tabular-nums text-foreground">{a.pct}%</span>
                     </div>
                 ))}
             </div>

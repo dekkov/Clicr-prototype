@@ -1212,11 +1212,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             const payload = state.activeBusiness?.id
                 ? { ...updates, business_id: state.activeBusiness.id }
                 : updates;
-            const res = await authFetch({ action: 'UPDATE_BUSINESS', payload });
-            if (res.ok) {
-                const updatedDB = await res.json();
-                setState(prev => ({ ...prev, ...updatedDB }));
-            }
+            // Fire-and-forget: optimistic state is already correct, no need to re-apply
+            // the full sync response (which would flash the entire dashboard).
+            await authFetch({ action: 'UPDATE_BUSINESS', payload });
         } catch (error) { console.error("Failed to update business", error); }
     };
 
