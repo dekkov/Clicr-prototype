@@ -44,7 +44,8 @@ next-env.d.ts
 .env*.local
 
 # claude
-.claude/worktrees/
+.claude/
+docs/superpowers/
 
 # cursor
 .cursor/
