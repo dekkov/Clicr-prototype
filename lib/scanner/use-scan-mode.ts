@@ -23,14 +23,9 @@ function detectSupport(): ScanModeSupport {
 
 export function useScanMode(businessDefault: ScanMode = 'BLUETOOTH') {
     const [mode, setModeState] = useState<ScanMode>(businessDefault);
-    const [support, setSupport] = useState<ScanModeSupport>({
-        camera: false,
-        bluetooth: true,
-        nfc: false,
-    });
+    const [support] = useState<ScanModeSupport>(() => detectSupport());
 
     useEffect(() => {
-        setSupport(detectSupport());
         // Restore per-session override from sessionStorage
         const stored = sessionStorage.getItem('clicr_scan_mode') as ScanMode | null;
         if (stored && ['CAMERA', 'BLUETOOTH', 'NFC'].includes(stored)) {

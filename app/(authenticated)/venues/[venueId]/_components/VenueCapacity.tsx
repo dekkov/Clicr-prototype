@@ -32,6 +32,12 @@ export default function VenueCapacity({ venueId }: { venueId: string }) {
         capacity_value: 0
     });
 
+    React.useEffect(() => {
+        if (!venue || isSaving) return;
+        setLocalCapacity(venue.default_capacity_total || 0);
+        setLocalMode(venue.capacity_enforcement_mode);
+    }, [venue?.default_capacity_total, venue?.capacity_enforcement_mode, isSaving]);
+
     if (!venue) return null;
 
     const handleSaveOverride = async (e: React.FormEvent) => {
@@ -54,16 +60,6 @@ export default function VenueCapacity({ venueId }: { venueId: string }) {
         setIsOverrideModalOpen(false);
         setNewOverride({ venue_id: venueId, capacity_value: 0 });
     };
-
-    // Sync local state when venue updates (initial load or external change)
-    // BUT only if not currently editing (to avoid jumping). 
-    // Actually, for "Persistence" checks, simple useEffect is fine.
-    React.useEffect(() => {
-        if (!isSaving) {
-            setLocalCapacity(venue.default_capacity_total || 0);
-            setLocalMode(venue.capacity_enforcement_mode);
-        }
-    }, [venue.default_capacity_total, venue.capacity_enforcement_mode, isSaving]);
 
     const handleSaveSettings = async () => {
         setIsSaving(true);

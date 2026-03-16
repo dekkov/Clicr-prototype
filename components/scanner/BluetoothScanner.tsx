@@ -13,7 +13,9 @@ export function BluetoothScanner({ active, onScan, paused = false }: BluetoothSc
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const onScanRef = useRef(onScan);
-    onScanRef.current = onScan;
+    useEffect(() => {
+        onScanRef.current = onScan;
+    }, [onScan]);
 
     // Focus lock — scanner types into the hidden textarea
     useEffect(() => {

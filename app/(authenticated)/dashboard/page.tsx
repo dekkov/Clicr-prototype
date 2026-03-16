@@ -752,7 +752,7 @@ export default function DashboardPage() {
         return 0; // Historical uses night_logs, not event filtering
     }, [isToday, resetTime, resetTz]);
 
-    const dateTo = isToday ? Date.now() : 0;
+    const dateTo = useMemo(() => isToday ? Date.now() : 0, [isToday, events.length]);
 
     const todayEvents = useMemo(
         () => isToday

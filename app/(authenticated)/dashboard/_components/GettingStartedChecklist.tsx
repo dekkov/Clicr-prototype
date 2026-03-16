@@ -9,12 +9,14 @@ const DISMISSED_KEY = 'clicr_checklist_dismissed';
 
 export function GettingStartedChecklist() {
     const { activeBusiness, venues, areas, clicrs, users, teamMemberCount } = useApp();
-    const [dismissed, setDismissed] = useState(false);
+    const [dismissed, setDismissed] = useState(() => {
+        if (typeof window === 'undefined') return false;
+        return localStorage.getItem(DISMISSED_KEY) === 'true';
+    });
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
         setMounted(true);
-        setDismissed(localStorage.getItem(DISMISSED_KEY) === 'true');
     }, []);
 
     const settings = activeBusiness?.settings;

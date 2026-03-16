@@ -17,7 +17,7 @@ import Link from 'next/link';
 export default function AreaDetailPage() {
     const { id } = useParams();
     const router = useRouter();
-    const { areas, venues, clicrs, events, updateArea, addClicr, updateClicr, isLoading } = useApp();
+    const { areas, venues, clicrs, events, updateArea, addClicr, updateClicr, deleteClicr, isLoading } = useApp();
 
     const area = areas.find(a => a.id === id);
     const venue = venues.find(v => v.id === area?.venue_id);
@@ -111,13 +111,6 @@ export default function AreaDetailPage() {
             alert(`Failed to save Clicr: ${res.error || 'Unknown error'}`);
         }
     };
-
-    // New Delete Handler
-    const useAppHook = useApp as any; // Temporary cast if type update is delayed
-    const { deleteClicr } = useAppHook();
-    // Ideally useApp() returns properly typed object if store.tsx is updated.
-    // If strict type checking fails, we might need to rely on the updated interface.
-    // Let's assume useApp() is typed correctly by now.
 
     const confirmDeleteClicr = async () => {
         if (!clicrToDelete) return;
@@ -367,7 +360,7 @@ export default function AreaDetailPage() {
                     <div>
                         <span className="block text-muted-foreground/60">CLICRS:</span> {areaClicrs.length}
                         <span className="block text-muted-foreground/60 mt-1">SYNC MODE:</span> Realtime (Strict)
-                        <span className="block text-muted-foreground/60 mt-1">LAST ERROR:</span> {useAppHook.lastError || 'None'}
+                        <span className="block text-muted-foreground/60 mt-1">LAST ERROR:</span> {'None'}
                     </div>
                 </div>
             </div>

@@ -27,7 +27,9 @@ export function useAutoReset({
 }: UseAutoResetOptions) {
     const firedRef = useRef(false);
     const lastResetAtRef = useRef(lastResetAt);
-    lastResetAtRef.current = lastResetAt;
+    useEffect(() => {
+        lastResetAtRef.current = lastResetAt;
+    }, [lastResetAt]);
 
     const tryReset = useCallback(async () => {
         if (firedRef.current) return;

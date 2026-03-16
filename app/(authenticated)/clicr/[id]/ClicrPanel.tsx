@@ -38,12 +38,13 @@ const ConfigModalBody = React.memo(function ConfigModalBody({
     } | null>;
 }) {
     const snap = configRef.current;
-    if (!snap) return null;
-    const [name, setName] = useState(() => snap.initialName);
-    const [classifyMode, setClassifyMode] = useState(() => snap.initialClassifyMode);
-    const [labels, setLabels] = useState(() => snap.counterLabels.filter(l => !l.deleted_at));
+    const [name, setName] = useState(() => snap?.initialName ?? '');
+    const [classifyMode, setClassifyMode] = useState(() => snap?.initialClassifyMode ?? false);
+    const [labels, setLabels] = useState(() => snap?.counterLabels.filter(l => !l.deleted_at) ?? []);
     const [newLabelName, setNewLabelName] = useState('');
     const [deletePendingId, setDeletePendingId] = useState<string | null>(null);
+
+    if (!snap) return null;
     const handleClassifyToggle = () => {
         const newVal = !classifyMode;
         setClassifyMode(newVal);

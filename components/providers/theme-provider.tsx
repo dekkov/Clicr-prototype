@@ -21,15 +21,15 @@ function applyTheme(theme: "light" | "dark") {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-    const [theme, setThemeState] = useState<Theme>("dark");
-    const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("dark");
+    const [theme, setThemeState] = useState<Theme>(() => {
+        if (typeof window === 'undefined') return 'dark';
+        const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
+        return stored === 'light' || stored === 'dark' ? stored : 'dark';
+    });
+    const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">(theme);
 
     useEffect(() => {
-        const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
-        const initial: Theme = stored === "light" || stored === "dark" ? stored : "dark";
-        setThemeState(initial);
-        setResolvedTheme(initial);
-        applyTheme(initial);
+        applyTheme(theme);
     }, []);
 
     const setTheme = useCallback((newTheme: Theme) => {

@@ -5,16 +5,14 @@ import { createClient } from '@/utils/supabase/client';
 import { useApp } from '@/lib/store';
 
 export default function DebugContextPage() {
-    if (process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_APP_MODE !== 'demo') {
-        return null;
-    }
-
     const supabase = createClient();
     const { currentUser, business, venues, areas, devices } = useApp();
-
     const [debugData, setDebugData] = useState<any>({ loading: true });
 
+    const isProduction = process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_APP_MODE !== 'demo';
+
     useEffect(() => {
+        if (isProduction) return;
         const fetchTruth = async () => {
             const { data: { user } } = await supabase.auth.getUser();
             const { data: profile } = await supabase.from('profiles').select('*').eq('id', user?.id).single();
@@ -47,7 +45,9 @@ export default function DebugContextPage() {
         };
 
         fetchTruth();
-    }, []);
+    }, [isProduction]);
+
+    if (isProduction) return null;
 
     return (
         <div className="p-8 text-foreground font-mono text-xs space-y-6">
